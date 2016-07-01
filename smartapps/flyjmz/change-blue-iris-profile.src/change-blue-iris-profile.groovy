@@ -34,8 +34,8 @@ definition(
 	author: "flyjmz",
 	description: "Change Blue Iris profile to match Smartthings Mode changes (on the local network)",
 	category: "Convenience",
-	iconUrl: "https://raw.githubusercontent.com/aderusha/SmartThings/master/resources/BlueIris_logo.png",
-	iconX2Url: "https://raw.githubusercontent.com/aderusha/SmartThings/master/resources/BlueIris_logo%402x.png"
+	iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo.png",
+	iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png"
 )
 
 preferences {
@@ -74,7 +74,7 @@ def eventHandlerBinary(evt) {
 	if ((evt.value == "active") || (evt.value == "open")) {
 		log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
 		def biHost = "${settings.biServer}:${settings.biPort}"
-		def biRawCommand = "/admin?camera=${settings.biCamera}&trigger&user=${settings.biUser}&pw=${settings.biPass}"
+		def biRawCommand = "/admin?profile=1"    //TO DO - change the 1 to the profile, then repeat the command (to hold it)
         log.debug "sending GET to URL http://$biHost/$biRawCommand"
 		def httpMethod = "GET"
 		def httpRequest = [
@@ -88,4 +88,4 @@ def eventHandlerBinary(evt) {
 		def hubAction = new physicalgraph.device.HubAction(httpRequest)
 		sendHubCommand(hubAction)
 	}
-}
+}   //TO DO - Check the current profile to make sure it set it...how??
