@@ -1,7 +1,7 @@
 /**
  *	Change Blue Iris Profile
  *	
- *	https://github.com/
+ *	https://github.com/flyjmz/jmzSmartThings/blob/master/smartapps/flyjmz/change-blue-iris-profile.src/change-blue-iris-profile.groovy
  *	Copyright 2016 flyjmz
  *	Version	0.0.1 - 2016-06-30 - Initial test release
  *		
@@ -38,54 +38,96 @@ definition(
 	iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png"
 )
 
+/**preferences {
+*	section("Blue Iris server details"){
+*		input "biServer", "text", title: "Server", description: "Blue Iris web server IP", required: true
+*		input "biPort", "number", title: "Port", description: "Blue Iris web server port", required: true
+*		input "biUser", "text", title: "User name", description: "Blue Iris user name", required: true
+*		input "biPass", "password", title: "Password", description: "Blue Iris password", required: true
+*		}
+*}
+
 preferences {
-	section("Blue Iris server details"){
-		input "biServer", "text", title: "Server", description: "Blue Iris web server IP", required: true
-		input "biPort", "number", title: "Port", description: "Blue Iris web server port", required: true
-		input "biUser", "text", title: "User name", description: "Blue Iris user name", required: true
-		input "biPass", "password", title: "Password", description: "Blue Iris password", required: true
-		}
-	section("Blue Iris Camera Name"){
-		input "biCamera", "text", title: "Camera Name", required: true
-	}
-	section("Select events to be sent to Blue Iris"){
-		input "myMotion", "capability.motionSensor", title: "Motion Sensors", required: false, multiple: true
-		input "myContact", "capability.contactSensor", title: "Contact Sensors", required: false, multiple: true
-	}
+    page(name:"selectModes")
+    page(name:"BISettings")
+}
+
+def selectModes() {  
+  dynamicPage(name: "selectModes", title: "Mode and Profile Matching", nextPage:"BISettings", uninstall:true) {    
+    section("") {
+        paragraph "Numbers 1-7 correspond to Blue Iris profile numbers. To ignore a mode leave it blank. A profile of 0 sets Blue Iris to 'inactive.'"
+        location.modes.each { mode ->
+            def modeId = mode.id.toString()  
+            input "mode-${modeId}", "number", title: "Mode ${mode}", required: false
+        }
+    }
+  }
+}
+
+def BISettings() {
+    dynamicPage(name:"BISettings", "title":"Blue Iris Login Info", uninstall:true, install:true) {
+        section( "" ) {
+            input "biServer", "string", title: "BI Webserver Host(include http://)", required:true
+            input "biPort", "number", title: "BI Webserver Port", required:true
+            input "biUser", "string", title: "BI Username", required: true
+            input "biPass", "string", title: "BI Password", required: true
+        }
+    }
 }
 
 def installed() {
 	log.debug "Installed with settings: ${settings}"
-	subscribeToEvents()
+	unsubscribe()
+    	subscribe(location, modeChange)
 }
 
 def updated() {
 	log.debug "Updated with settings: ${settings}"
-	unsubscribe()
-	subscribeToEvents()
+    	unsubscribe()
+    	subscribe(location, modeChange)   
 }
 
-def subscribeToEvents() {
-	subscribe(myMotion, "motion", eventHandlerBinary)
-	subscribe(myContact, "contact", eventHandlerBinary)
+def modeChange(evt)
+{
+    if (evt.name != "mode") {return;}
+    log.debug "BI_modeChange detected. " + evt.value
+    def checkMode = ""
+    
+    //easiest way to get mode by id. Didnt want to use names.
+    location.modes.each { mode ->
+        if (mode.name == evt.value){
+            checkMode = "mode-" + mode.id
+            log.debug "BI_modeChange matched to " + mode.name
+        }
+    }
+    
+    if (checkMode != "" && settings[checkMode]){
+        log.debug "BI_Found profile " + settings[checkMode]
+        takeAction(settings[checkMode].toInteger());
+    }
 }
 
-def eventHandlerBinary(evt) {
-	if ((evt.value == "active") || (evt.value == "open")) {
-		log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
-		def biHost = "${settings.biServer}:${settings.biPort}"
-		def biRawCommand = "/admin?profile=1"    //TO DO - change the 1 to the profile, then repeat the command (to hold it)
-        log.debug "sending GET to URL http://$biHost/$biRawCommand"
-		def httpMethod = "GET"
-		def httpRequest = [
-			method:		httpMethod,
-			path: 		biRawCommand,
-			headers:	[
-        				HOST:		biHost,
-						Accept: 	"*/*",
-                    ]
-		]
-		def hubAction = new physicalgraph.device.HubAction(httpRequest)
-		sendHubCommand(hubAction)
-	}
-}   //TO DO - Check the current profile to make sure it set it...how??
+def takeAction(profile) {
+	def biHost = "${settings.biServer}:${settings.biPort}"
+	def biRawCommand = "/admin?profile=1"    //TODO - change the 1 to the profile number, then repeat the command (to hold it)
+        log.debug "sending GET to URL $biHost$biRawCommand"
+	def httpMethod = "GET"
+	def httpRequest = [
+		method:		httpMethod,
+		path: 		biRawCommand,
+		headers:	[
+       				HOST:		biHost,
+					Accept: 	"*/*",
+                ]
+	]
+	def hubAction = new physicalgraph.device.HubAction(httpRequest)
+	sendHubCommand(hubAction)
+}  //TODO - Check the current profile to make sure it set it...how??
+
+def profileName(names, num) {
+    if (names[num.toInteger()]) {
+        names[num.toInteger()] + " (#${num})"
+    } else {
+        '#' + num
+    }
+}
