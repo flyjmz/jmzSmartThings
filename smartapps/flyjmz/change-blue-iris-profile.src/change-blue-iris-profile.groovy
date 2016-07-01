@@ -46,6 +46,7 @@ definition(
 *		input "biPass", "password", title: "Password", description: "Blue Iris password", required: true
 *		}
 *}
+*/
 
 preferences {
     page(name:"selectModes")
