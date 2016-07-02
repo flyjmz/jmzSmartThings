@@ -34,15 +34,14 @@ preferences {
 	}
    
    section("Notifications") {
-        input("recipients", "contact", title: "Send notifications to") {
-            input "sendPushMessage", "enum", title: "Send a push notification?", options: ["Yes", "No"], required: true
-            input "phone1", "phone", title: "Send a Text Message?", required: false
+        	input("recipients", "contact", title: "Send notifications to") {
+    		input("sendPushMessage", "enum", title: "Send a push notification?", options: ["Yes", "No"], required: true)
+    		input("phone1", "phone", title: "Phone Number for Text Message: (leave blank for no SMS)", required: false)
+            	paragraph "You will receive notifications when the website goes down and when it comes back up.  Optionally, you can set periodic notifications in between as well." 
+            	input("periodicNotifications", "enum", title: "Recieve periodic notifications?", options: ["Yes", "No"], required: true)
+                input("waitminutes", "number", title: "Minutes between periodic notifications?", required: true)
+                }
         }
-    }
-	
-    section("Minutes inbetween notifications...") {
-		input "waitminutes", "number", title: "Minutes to wait?", required: true
-	}
     
     section("Turn on which A/C or fan...") {
 		input "switch1", "capability.switch", required: false
@@ -77,23 +76,25 @@ def temperatureHandler(evt) {
 	def mySwitch = settings.switch1
     if(tempState.doubleValue >= tooHot) {
     	if (state.msgalreadysent == false) {
-        state.msgsenttime = now()
-        log.debug "Too hot at time ${state.msgsenttime}, sending too hot message, turning switch on."
-    	send("${temperatureSensor1.displayName} is too hot: ${tempState.value}${tempState.unit?:"F"}")
+        	state.msgsenttime = now()
+        	log.debug "Too hot at time ${state.msgsenttime}, sending too hot message, turning switch on."
+    		send("${temperatureSensor1.displayName} is too hot: ${tempState.value}${tempState.unit?:"F"}")
 		switch1?.on()
-        state.msgalreadysent = true
-        log.debug "message sent, msgalreadysent is now ${state.msgalreadysent}"
-         } else {				
-         	if(now()-state.msgsenttime >= waitminutes * 60000) {     //changes waitminutes to milliseconds for how now() uses time
-         	log.debug "It is still too hot, sending still too hot message"
-    		send("${temperatureSensor1.displayName} is still too hot, now: ${tempState.value}${tempState.unit?:"F"}")
-       		state.msgalreadysent = true
-            state.msgsenttime = now()  //resets the sent time to the lastest message
-        	log.debug "still too hot message sent, msgalreadysent is now ${state.msgalreadysent}"
-         	} else {
-            	log.debug "too soon since last message, waiting..."
-            }
-         }
+		state.msgalreadysent = true
+        	log.debug "message sent, msgalreadysent is now ${state.msgalreadysent}"
+        } else {				
+         	if(periodicNotifications == "Yes") {
+         		if(now()-state.msgsenttime >= waitminutes * 60000) {     //changes waitminutes to milliseconds for how now() uses time
+         			log.debug "It is still too hot, sending still too hot message"
+    				send("${temperatureSensor1.displayName} is still too hot, now: ${tempState.value}${tempState.unit?:"F"}")
+       				state.msgalreadysent = true
+            			state.msgsenttime = now()  //resets the sent time to the lastest message
+        			log.debug "still too hot message sent, msgalreadysent is now ${state.msgalreadysent}"
+         		} else {
+            			log.debug "too soon since last message, waiting..."
+         		}
+            	}
+        }
     } else {
     	if(state.msgalreadysent == true) {
         	log.debug "temp is okay after sending message, sending ok message and turning off switch."
