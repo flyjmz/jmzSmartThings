@@ -53,7 +53,6 @@ def installed() {
 	unschedule()
     unsubscribe()
     subscribe(temperatureSensor1, "temperature", temperatureHandler)
-    //runEvery5Minutes(temperatureHandler)   		//remove and put in subscriptions to temp evt
     state.msgalreadysent = false
     state.msgsenttime = now()
 }
@@ -63,7 +62,6 @@ def updated() {
 	unschedule()
     unsubscribe()
     subscribe(temperatureSensor1, "temperature", temperatureHandler)
-    //runEvery5Minutes(temperatureHandler)   		//remove and put in subscriptions to temp evt
     state.msgalreadysent = false
     state.msgsenttime = now()
 }
