@@ -12,6 +12,9 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
+ *  Version 1.0 - 01 July 2016 - Added periodic Notification ability
+ *  Version 2.0 - 30 July 2016 - Removed validateUrl(), which was striping any http:// and port, etc, then adding its own http:// to the URL that was actually used, which prevented https and specific ports from being used.  Now the user has to type it in corrected themselves, but everything will work.
+ *
  */
  
 definition(
@@ -39,7 +42,6 @@ def updated() {
 }
 
 def initialize() {
-	if (validateURL()) {
 		state.downHost = false
 		state.pollVerify = false
         state.timeDown = now()
@@ -47,39 +49,14 @@ def initialize() {
         state.sentPeriodMsg = now()
 		app.updateLabel("${state.website} Monitor")
 		runEvery5Minutes(poll)
-    	log.debug "initialized state.downHost = ${state.downHost}, state.pollVerify = ${state.pollVerify}, state.timeDown = ${state.timeDown}, state.websiteDownMsgSent = ${state.websiteDownMsgSent}, state.sentPeriodMsg = ${state.sentPeriodMsg}"
-        }
-}
-
-def validateURL() {    //TO DO - make sure this will work for https
-	state.website = website.toLowerCase()
-    	if (state.website.contains(".com") || state.website.contains(".net") || state.website.contains(".org") || state.website.contains(".biz") || state.website.contains(".us") || state.website.contains(".info") || state.website.contains(".io") || state.website.contains(".ca") || state.website.contains(".co.uk") || state.website.contains(".tv") || state.website.contains(":")) {
-    		state.website = state.website.trim()
-    		if (state.website.startsWith("http://")) {
-    			state.website = state.website.replace("http://", "")
-        		state.website = state.website.replace("www.", "")
-    		}
-    		if (state.website.startsWith("https://")) {
-    			state.website = state.website.replace("https://", "")
-        		state.website = state.website.replace("www.", "")
-    		}
-    		if (state.website.startsWith("www.")) {
-    			state.website = state.website.replace("www.", "")
-    		}
-    		state.validURL = "true"
-            log.debug "state.validURL set to true"
-    		return true
-	} else {
-    		state.validURL = "false"
-        	return false
-            log.debug "state.validURL set to false"
-    	}
+        state.website = website.toLowerCase()
+    	log.debug "initialized: state.website = ${state.website}, state.downHost = ${state.downHost}, state.pollVerify = ${state.pollVerify}, state.timeDown = ${state.timeDown}, state.websiteDownMsgSent = ${state.websiteDownMsgSent}, state.sentPeriodMsg = ${state.sentPeriodMsg}"
 }
 
 def mainPage() {
 	return dynamicPage(name: "mainPage", title: "") {
     		section {
-        		paragraph "URL you want to monitor. ex: google.com"    //TO DO - set this up to work for https, whether we need to type in https:// or not, and talk about putting in the port
+        		paragraph "URL you want to monitor. Type the full URL and the port (if needed) in all lowercase. (e.g. https://mydomain.ddns.net:81 or http://www.google.com)"
             		input(name: "website", title:"URL", type: "text", required: true)
             		input(name: "threshold", title:"False Alarm Threshold (minutes)", type: "number", required: true, defaultValue:2)
         	}
@@ -108,7 +85,7 @@ def mainPage() {
 def poll() {
 	log.debug "poll started, states are: state.downHost = ${state.downHost}, state.pollVerify = ${state.pollVerify}, state.timeDown = ${state.timeDown}, state.websiteDownMsgSent = ${state.websiteDownMsgSent}, state.sentPeriodMsg = ${state.sentPeriodMsg}"
     def reqParams = [
-            uri: "http://${state.website}"
+            uri: "${state.website}"
     	]
     	if (state.validURL == "true") {
     		try {
@@ -172,7 +149,7 @@ def poll() {
 
 def pollVerify() {
     def reqParams = [
-		uri: "http://${state.website}"
+		uri: "${state.website}"
 	]
     	try {
         	httpGet(reqParams) { resp ->
@@ -200,7 +177,7 @@ def pollVerify() {
 
 def turnOnHandler() {
 	log.debug "running turnOnHandler()"
-    send("${state.website} is down")   //send notificiton that website is down
+    send("${state.website} is down")   //sends notificiton that website is down
     state.websiteDownMsgSent = true
     state.sentPeriodMsg = now()  //this is also the "first" periodic notificaiton sent, so reset it's timer
     log.debug "website down message sent & state.websiteDownMsgSent set to true"
