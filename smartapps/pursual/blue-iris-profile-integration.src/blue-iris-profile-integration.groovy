@@ -21,8 +21,8 @@
  *
  *  From Github: https://github.com/pursual/SmartThingsPublic/blob/master/smartapps/pursual/blue-iris-profile-integration.src/blue-iris-profile-integration.groovy
  *  #1.65   Mar 25, 2016
- *  JMZ Fixed typos Jun 18, 2016 (line 46)
- *
+ *  #1.66   Jul 4, 2016 flyjmz fixed typo in line 46, changed password input type to password (now encrypted within the app and cloud)
+ *  
  */
 
 definition(
@@ -57,7 +57,7 @@ def BISettings() {
             input "host", "string", title: "BI Webserver Host(include http://)", required:true
             input "port", "number", title: "BI Webserver Port (81?)", required:true, default:81
             input "username", "string", title: "BI Username", required: true
-            input "password", "string", title: "BI Password", required: true   //TO DO - make the input type "password" to make it encrypted in smartthings at least (see http://docs.smartthings.com/en/latest/smartapp-developers-guide/preferences-and-settings.html)
+            input "password", "password", title: "BI Password", required: true   //TO DO - make the input type "password" to make it encrypted in smartthings at least (see http://docs.smartthings.com/en/latest/smartapp-developers-guide/preferences-and-settings.html)
             paragraph "Currently, BI only allows Admin Users to toggle profiles."
         }
     }
