@@ -31,8 +31,8 @@ definition(
     author: "Tony Gutierrez",
     description: "Integration with Blue Iris JSON Interface for purposes of toggling recording/alert profiles.",
     category: "Safety & Security",
-    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
-    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+    iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo.png",
+	iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png")
 
 preferences {
     page(name:"selectModes")
