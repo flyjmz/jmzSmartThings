@@ -18,7 +18,7 @@ definition(
 	name: "SmartPing Plus",
 	namespace: "flyjmz",
 	author: "flyjmz",
-	description: "Monitor your website uptime and trigger SmartThings automations and notificaitons if it goes down.",
+	description: "Monitor your website uptime and trigger SmartThings automations and notifications if it goes down.",
 	category: "My Apps",
 	iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/smartping.png",
 	iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/smartping@2x.png",
