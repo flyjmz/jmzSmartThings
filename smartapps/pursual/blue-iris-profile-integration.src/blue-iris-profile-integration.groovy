@@ -22,7 +22,7 @@
  *  From Github: https://github.com/pursual/SmartThingsPublic/blob/master/smartapps/pursual/blue-iris-profile-integration.src/blue-iris-profile-integration.groovy
  *  #1.65   Mar 25, 2016
  *  #1.66   Jul 4, 2016 flyjmz fixed typo in line 46, changed password input type to password (now encrypted within the app and cloud)
- *  
+ *  #1.67   Jul 30, 2016 flyjmz changed icons to Blue Iris icon
  */
 
 definition(
@@ -54,11 +54,11 @@ def selectModes() {
 def BISettings() {
     dynamicPage(name:"BISettings", "title":"Blue Iris Login Info", uninstall:true, install:true) {
         section( "" ) {
-            input "host", "string", title: "BI Webserver Host(include http://)", required:true
+            input "host", "string", title: "BI Webserver Host (include http://)", required:true
             input "port", "number", title: "BI Webserver Port (81?)", required:true, default:81
             input "username", "string", title: "BI Username", required: true
-            input "password", "password", title: "BI Password", required: true   //TO DO - make the input type "password" to make it encrypted in smartthings at least (see http://docs.smartthings.com/en/latest/smartapp-developers-guide/preferences-and-settings.html)
-            paragraph "Currently, BI only allows Admin Users to toggle profiles."
+            input "password", "password", title: "BI Password", required: true
+            paragraph "Currently, BI only allows Admin Users to toggle profiles.  Note: if using https://, the certificate must be from a Certificate Authority (CA), it cannot be self-signed."
         }
     }
 }
@@ -81,7 +81,6 @@ def modeChange(evt)
     log.debug "BI_modeChange detected. " + evt.value
     def checkMode = ""
     
-    //easiest way to get mode by id. Didnt want to use names.
     location.modes.each { mode ->
         if (mode.name == evt.value){
             checkMode = "mode-" + mode.id
