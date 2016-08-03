@@ -21,8 +21,7 @@ definition(
     author: "flyjmz",
     description: "Alert me of power loss using SmartSense Motion v1's change from wired-power to battery-power.  Note: SmartThings hub and internet connection must be working! You can connect the hub and internet connection device (e.g. modem, router, etc.) to a UPS (uniteruptable power supply) so they stay powered even when the house looses power.  Then the motion detector can detect the loss and the hub and router will still have enough power to get the message out before they fail as well.",
     category: "Safety & Security",
-    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
-    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png"
+    iconX2Url: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/home2-icn@2x.png"
 )
 
 
