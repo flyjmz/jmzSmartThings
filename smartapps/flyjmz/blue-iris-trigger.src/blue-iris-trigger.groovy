@@ -2,7 +2,7 @@
  *  Blue Iris Trigger 
  *  (Child app.  Parent app is: "Blue Iris Camera Triggers") 
  *
- *  Copyright 2016 flyjmz, based on "Blue Iris Profile Integration" by Tony Gutierrez and "Send Tigger to Blue Iris" by aderusha
+ *  Copyright 2016 flyjmz, based on "Blue Iris Profile Integration" by Tony Gutierrez and "Send Trigger to Blue Iris" by aderusha
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -13,13 +13,8 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *  Author: flyjmz
- *  Date: 30July2016
- *
- *  Triggers camera in Blue Iris by motion or contact sensors in Smartthings. 
- *
- *  Version 1.0 - 30July2016 First stable release
- *
+ *  Version 1.0 - 30July2016 	Initial release
+ *	Version 1.1 - 3August2016	Cleaned up code
  */
 
 definition(
@@ -27,7 +22,7 @@ definition(
     namespace: "flyjmz",
     author: "flyjmz",
     parent: "flyjmz:Blue Iris Camera Triggers",
-    description: "Uses Smartthings sensors to trigger cameras to record in Blue Iris via JSON Interface.",
+    description: "Child app to 'Blue Iris Camera Triggers.' Install that app, it will call this during setup.",
     category: "Safety & Security",
     iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo.png",
     iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png")
