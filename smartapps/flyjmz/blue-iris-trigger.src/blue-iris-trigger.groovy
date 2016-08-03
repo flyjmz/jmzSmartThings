@@ -2,7 +2,7 @@
  *  Blue Iris Trigger 
  *  (Child app.  Parent app is: "Blue Iris Camera Triggers") 
  *
- *  Copyright 2016 flyjmz, based on "Blue Iris Profile Integration" by Tony Gutierrez and "Send Trigger to Blue Iris" by aderusha
+ *  Copyright 2016 flyjmz, based on work by Tony Gutierrez in "Blue Iris Profile Integration"
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
