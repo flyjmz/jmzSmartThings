@@ -13,8 +13,9 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *  Version 1.0 - 30July2016 	Initial release
+ *  	Version 1.0 - 30July2016 	Initial release
  *	Version 1.1 - 3August2016	Cleaned up code
+ * 	Version 1.2 - 4August2016	Added Alarm trigger capability from rayzurbock
  */
 
 definition(
@@ -40,12 +41,13 @@ def mainPage() {
 		section("Select trigger events"){   
 			input "myMotion", "capability.motionSensor", title: "Motion Sensors Active", required: false, multiple: true
 			input "myContact", "capability.contactSensor", title: "Contact Sensors Opening", required: false, multiple: true
-            input "mySwitch", "capability.switch", title: "Switches Turning On", required: false, multiple: true
-            paragraph "Note: Only the Active/Open/On events will send a trigger.  Motion stopping, Contacts closing, and Switches turning off will not send a trigger."
+            		input "mySwitch", "capability.switch", title: "Switches Turning On", required: false, multiple: true
+            		input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
+            		paragraph "Note: Only the Active/Open/On events will send a trigger.  Motion stopping, Contacts closing, and Switches turning off will not send a trigger."
 		}
         section("") {
         	input "customTitle", "text", title: "Assign a Name", required: true
-            mode(title: "Set for specific mode(s)")
+            	mode(title: "Set for specific mode(s)")
         }
 	}
 }
@@ -61,13 +63,16 @@ def updated() {
 	log.debug "Updated with settings: ${settings}"
 	unsubscribe()
 	subscribeToEvents()
-    app.updateLabel("${customTitle}")
+    	app.updateLabel("${customTitle}")
 }
 
 def subscribeToEvents() {
 	subscribe(myMotion, "motion.active", eventHandlerBinary)
 	subscribe(myContact, "contact.open", eventHandlerBinary)
-    subscribe(mySwitch, "switch.on", eventHandlerBinary)
+	subscribe(mySwitch, "switch.on", eventHandlerBinary)
+	subscribe(myAlarm, "alarm.strobe", eventHandlerBinary)
+	subscribe(myAlarm, "alarm.siren", eventHandlerBinary)
+	subscribe(myAlarm, "alarm.both", eventHandlerBinary)
 }
 
 def eventHandlerBinary(evt) {
