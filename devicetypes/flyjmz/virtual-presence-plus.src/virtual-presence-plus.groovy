@@ -45,8 +45,8 @@ metadata {
 			state("present", labelIcon:"st.presence.tile.mobile-present", backgroundColor:"#53a7c0")
 			state("not present", labelIcon:"st.presence.tile.mobile-not-present", backgroundColor:"#ffffff")
 		}
-		main (["button", "presence"])
-		details(["button", "presence", "refresh"])
+		main (["button"])
+		details(["button"])
 	}
 }
 
