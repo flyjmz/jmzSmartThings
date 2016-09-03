@@ -101,25 +101,26 @@ def eventHandlerBinary(evt) {
                             if (response3.data.result == "success"){
                                     httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
                                         //log.debug response4.data
+                                        log.debug "camera triggerd"
                                         if (response4.data.result == "success") {
                                             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
                                                 //log.debug response5.data
-                                                //log.debug "Logged out?"
+                                                log.debug "Logged out"
                                             }
                                         } else {
-                                            log.debug "BI_FAILURE"
+                                            log.debug "BI_FAILURE, not triggered"
                                             log.debug(response4.data.data.reason)
                                             sendNotificationEvent(errorMsg)
                                         }
                                     }
                             } else {
-                                log.debug "BI_FAILURE"
+                                log.debug "BI_FAILURE, didn't receive status"
                                 log.debug(response3.data.data.reason)
                                 sendNotificationEvent(errorMsg)
                             }
                         }
                     } else {
-                        log.debug "BI_FAILURE"
+                        log.debug "BI_FAILURE, didn't log in"
                         log.debug(response2.data.data.reason)
                         sendNotificationEvent(errorMsg)
                     }

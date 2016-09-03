@@ -10,10 +10,10 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *  It's Too Hot 2
+ *  Version 1.1 - 4 August 2016		Cleaned up code
  *
- *  Author: flyjmz
  */
+ 
 definition(
     name: "It's Too Hot 2",
     namespace: "flyjmz",

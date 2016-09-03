@@ -14,7 +14,7 @@
  *
  *  Version 1.0 - 01 July 2016 - Added periodic Notification ability
  *  Version 2.0 - 30 July 2016 - Removed validateUrl(), which was striping any http:// and port, etc, then adding its own http:// to the URL that was actually used, which prevented https and specific ports from being used.  Now the user has to type it in corrected themselves, but everything will work.
- *
+ *	Version 2.1 - 31 August 2016 - Corrected error (forgot to delete the if(validURL == true) within poll(), so it never actually ran)
  */
  
 definition(
@@ -87,7 +87,6 @@ def poll() {
     def reqParams = [
             uri: "${state.website}"
     	]
-    	if (state.validURL == "true") {
     		try {
         		httpGet(reqParams) { resp ->
             			if (resp.status == 200) {
@@ -144,7 +143,6 @@ def poll() {
                     log.info "catch poll already called pollVerify"
         		}
     		}
-    	}
 }
 
 def pollVerify() {
@@ -154,8 +152,6 @@ def pollVerify() {
     	try {
         	httpGet(reqParams) { resp ->
             		if (resp.status == 200) {
-                		state.downHost = false
-                		state.pollVerify = false
                 		turnOffHandler()
                 		log.info "successful response from ${state.website}, false alarm avoided"
             		} else {
@@ -171,7 +167,7 @@ def pollVerify() {
         	state.pollVerify = false
         	turnOnHandler()
             state.timeDown = now()
-        	log.info "catch pollVerify confirmed request failed to ${state.website}, missed turning on handlers, state.timeDown set to ${state.timeDown}"
+        	log.info "catch pollVerify confirmed request failed to ${state.website}, missed turning on handlers so tried it again, state.timeDown set to ${state.timeDown}"
     	}
 }
 
@@ -217,6 +213,8 @@ def turnOffHandler() {
 	if (state.websiteDownMsgSent == true) {
     	send("${state.website} is back up")    //send notificiton that website is back up
         state.websiteDownMsgSent = false
+        state.downHost = false
+        state.pollVerify = false
     	log.info "website back up message sent &  state.websiteDownMsgSent set back to false"
     }
     if (lights) {

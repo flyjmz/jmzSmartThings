@@ -19,9 +19,9 @@ definition(
     author: "flyjmz",
     description: "Garage door opener app for LFM-20 and SmartSense Multi",
     category: "Safety & Security",
-    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
-    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
-    iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+    iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/garage.png",
+    iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/garage.png",
+    iconX3Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/garage.png")
 
 
 preferences {

@@ -23,6 +23,7 @@
  *  #1.65   Mar 25, 2016
  *  #1.66   Jul 4, 2016 flyjmz fixed typo in line 46, changed password input type to password (now encrypted within the app and cloud)
  *  #1.67   Jul 30, 2016 flyjmz changed icons to Blue Iris icon
+ *  #1.68   Aug 31, 2016 flyjmz added push/sms notification option for errors
  */
 
 definition(
@@ -37,6 +38,7 @@ definition(
 preferences {
     page(name:"selectModes")
     page(name:"BISettings")
+    page(name:"notificationSettings")
 }
 
 def selectModes() {  
@@ -52,13 +54,25 @@ def selectModes() {
 }
 
 def BISettings() {
-    dynamicPage(name:"BISettings", "title":"Blue Iris Login Info", uninstall:true, install:true) {
+    dynamicPage(name:"BISettings", "title":"Blue Iris Login Info", nextPage:"notificationSettings", uninstall:true) {
         section( "" ) {
             input "host", "string", title: "BI Webserver Host (include http://)", required:true
             input "port", "number", title: "BI Webserver Port (81?)", required:true, default:81
             input "username", "string", title: "BI Username", required: true
             input "password", "password", title: "BI Password", required: true
             paragraph "Currently, BI only allows Admin Users to toggle profiles.  Note: if using https://, the certificate must be from a Certificate Authority (CA), it cannot be self-signed."
+        }
+    }
+}
+
+def notificationSettings() {
+	dynamicPage(name:"notificationSettings", "title":"Notification Options", uninstall:true, install:true) {
+    	section(""){
+            paragraph "You can choose to receive Push/SMS when there is an error below.  You will always recieve status notificaitons within the SmartThings Notifications tab." 
+        	input"recipients", "contact", title: "Send notifications via Contact Book to", required: false
+            paragraph "Use below settings if you aren't using contact book:"
+            input"sendPushMessage", "enum", title: "Send a push notification?", options: ["Yes", "No"], required: true
+          	input "phone1", "phone", title: "Phone Number for Text Message: (leave blank for no SMS)", required: false
         }
     }
 }
@@ -96,7 +110,7 @@ def modeChange(evt)
 
 def takeAction(profile)
 {
-    def errorMsg = "Could not adjust Blue Iris :("
+    def errorMsg = "Could not adjust Blue Iris Profile"
     
     try {
         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
@@ -128,6 +142,7 @@ def takeAction(profile)
                                             } else {
                                                 log.debug ("Hmmm...Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? I tried ${profileName(BIprofileNames,profile)}. Check your user permissions.")
                                                 sendNotificationEvent("Hmmm...Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? I tried ${profileName(BIprofileNames,profile)}. Check your user permissions.");
+                                            	send("Blue Iris failed to change Profiles, it is in '${profileName(BIprofileNames,response4.data.data.profile)}' but should have been switched to '${profileName(BIprofileNames,profile)}.'")
                                             }
                                             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
                                                 //log.debug response5.data
@@ -147,23 +162,27 @@ def takeAction(profile)
                                 log.debug "BI_FAILURE"
                                 log.debug(response3.data.data.reason)
                                 sendNotificationEvent(errorMsg)
+                                send("Could not adjust Blue Iris Profile")
                             }
                         }
                     } else {
                         log.debug "BI_FAILURE"
                         log.debug(response2.data.data.reason)
                         sendNotificationEvent(errorMsg)
+                        send("Could not adjust Blue Iris Profile")
                     }
                 }
             } else {
                 log.debug "FAILURE"
                 log.debug(response.data.data.reason)
                 sendNotificationEvent(errorMsg)
+                send("Could not adjust Blue Iris Profile")
             }
         }
     } catch(Exception e) {
         log.debug(e)
         sendNotificationEvent(errorMsg);
+        send("Could not adjust Blue Iris Profile")
     }
 }
 
@@ -173,4 +192,22 @@ def profileName(names, num) {
     } else {
         '#' + num
     }
+}
+
+private send(msg) {
+    if (location.contactBookEnabled) {
+        log.debug("sending notifications to: ${recipients?.size()}")
+        sendNotificationToContacts(msg, recipients)
+    }
+    else {
+        if (sendPushMessage != "No") {
+            log.debug("sending push message")
+            sendPush(msg)
+        }
+        if (phone1) {
+            log.debug("sending text message")
+            sendSms(phone1, msg)
+        }
+    }
+    log.debug msg
 }
