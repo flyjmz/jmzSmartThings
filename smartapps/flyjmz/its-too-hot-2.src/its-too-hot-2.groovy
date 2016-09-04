@@ -1,6 +1,8 @@
 /**
  *  Copyright 2016 flyjmz
  *
+ *	https://github.com/flyjmz/jmzSmartThings
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
@@ -11,7 +13,7 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  *  Version 1.1 - 4 August 2016		Cleaned up code
- *
+ *	Version 1.2 - 3 September 2016	Corrected typo in Preferences>Notifications
  */
  
 definition(
@@ -37,9 +39,9 @@ preferences {
         	input("recipients", "contact", title: "Send notifications to") {
     		input("sendPushMessage", "enum", title: "Send a push notification?", options: ["Yes", "No"], required: true)
     		input("phone1", "phone", title: "Phone Number for Text Message: (leave blank for no SMS)", required: false)
-            	paragraph "You will receive notifications when the website goes down and when it comes back up.  Optionally, you can set periodic notifications in between as well." 
-            	input("periodicNotifications", "enum", title: "Recieve periodic notifications?", options: ["Yes", "No"], required: true)
-                input("waitminutes", "number", title: "Minutes between periodic notifications?", required: true)
+            	paragraph "You will receive notifications when it becomes too hot and also when it has cooled off again.  Optionally, you can set periodic notifications to occur in between as well." 
+            	input("periodicNotifications", "enum", title: "Receive periodic notifications?", options: ["Yes", "No"], required: true, submitOnChange: true)
+            	if (periodicNotifications == "Yes") input("waitminutes", "number", title: "Minutes between periodic notifications? (multiples of 5 only)", required: true)
                 }
         }
     

@@ -1,7 +1,9 @@
 /**
  *  SmartPing Websites  (This is the child app, parent app is "SmartPing Plus")
  *
- *  Copyright 2016 flyjmz, based on previous work: Copyright 2016 Jason Botello
+ *	https://github.com/flyjmz/jmzSmartThings
+ *
+ *  Copyright 2016 flyjmz, based on previous work by Jason Botello in 2016
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -15,6 +17,7 @@
  *  Version 1.0 - 01 July 2016 - Added periodic Notification ability
  *  Version 2.0 - 30 July 2016 - Removed validateUrl(), which was striping any http:// and port, etc, then adding its own http:// to the URL that was actually used, which prevented https and specific ports from being used.  Now the user has to type it in corrected themselves, but everything will work.
  *	Version 2.1 - 31 August 2016 - Corrected error (forgot to delete the if(validURL == true) within poll(), so it never actually ran)
+ *	Version 2.2 - 3 September 2016 - Cleaned up preferences. 
  */
  
 definition(
@@ -55,12 +58,12 @@ def initialize() {
 
 def mainPage() {
 	return dynamicPage(name: "mainPage", title: "") {
-    		section {
-        		paragraph "URL you want to monitor. Type the full URL and the port (if needed) in all lowercase. (e.g. https://mydomain.ddns.net:81 or http://www.google.com)"
+    		section ("URL to Monitor") {
+        		paragraph "Type the full URL and the port (if needed) in all lowercase. (e.g. https://mydomain.ddns.net:81 or http://www.google.com)"
             		input(name: "website", title:"URL", type: "text", required: true)
             		input(name: "threshold", title:"False Alarm Threshold (minutes)", type: "number", required: true, defaultValue:2)
         	}
-        	section {
+        	section ("Actions") {
         		paragraph "If the URL goes offline. Note: These actions only work if the monitored URL is on a different connection than your Smartthings Hub (i.e. if it's your local webserver on the same internet connection as the hub, the hub may go offline with the website.)"
             		lightInputs()
             		lightActionInputs()
@@ -69,14 +72,14 @@ def mainPage() {
             		alarmInputs()
             		alarmActionInputs()
         	}
-            section {
-            	paragraph "Notifications. Note: Notificaitons work regardless whether the website is internal/external.  Monitoring takes place from the cloud, and notifications are sent from the cloud. As long as your phone has internet, notifications will work."
+            section ("Notifications") {
+            	paragraph "Note: Notificaitons work regardless whether the website is internal/external.  Monitoring takes place from the cloud, and notifications are sent from the cloud. As long as your phone has internet, notifications will work."
                     input("recipients", "contact", title: "Send notifications to") {
             		input("sendPushMessage", "enum", title: "Send a push notification?", options: ["Yes", "No"], required: true)
             		input("phone1", "phone", title: "Phone Number for Text Message: (leave blank for no SMS)", required: false)
                     paragraph "You will receive notifications when the website goes down and when it comes back up.  Optionally, you can set periodic notifications in between as well." 
-                    input("periodicNotifications", "enum", title: "Recieve periodic notifications?", options: ["Yes", "No"], required: true)
-                    input("waitminutes", "number", title: "Minutes between periodic notifications? (multiples of 5 only)", required: true)
+                    input("periodicNotifications", "enum", title: "Receive periodic notifications?", options: ["Yes", "No"], required: true, submitOnChange: true)
+            		if (periodicNotifications == "Yes") input("waitminutes", "number", title: "Minutes between periodic notifications? (multiples of 5 only)", required: true)
                     }
             }
     }

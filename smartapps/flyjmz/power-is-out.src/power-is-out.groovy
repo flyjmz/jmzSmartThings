@@ -3,6 +3,8 @@
  *
  *  Copyright 2014 flyjmz
  *
+ *	https://github.com/flyjmz/jmzSmartThings
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
@@ -12,14 +14,16 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *	Version 1.1		2 August 2016 - updated notes within app to clarify.
- *	Version 1.2	 	4 August 2016 - created ability to turn on/off lights/switches (like Cree bulbs, Hue, etc.) when power is restored.  Based on inputs from scottinpollock.
+ *	Version 1.1		2 August 2016 		- updated notes within app to clarify.
+ *	Version 1.2	 	4 August 2016 		- created ability to turn on/off lights/switches (like Cree bulbs, Hue, etc.) when power is restored.  Based on inputs from scottinpollock.
+ * 	Version 1.3		3 September 2016	- Cleaned up code a little
  */
+ 
 definition(
     name: "Power Is Out",
     namespace: "flyjmz",
     author: "flyjmz",
-    description: "Alert me of power loss using SmartSense Motion v1's change from wired-power to battery-power.  Note: SmartThings hub and internet connection must be working! You can connect the hub and internet connection device (e.g. modem, router, etc.) to a UPS (uniteruptable power supply) so they stay powered even when the house looses power.  Then the motion detector can detect the loss and the hub and router will still have enough power to get the message out before they fail as well.",
+    description: "Alerts when power lost (uses SmartSense Motion v1's change from wired-power to battery-power)",
     category: "Safety & Security",
     iconUrl: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/home2-icn@2x.png",
     iconX2Url: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/home2-icn@2x.png",
@@ -32,7 +36,7 @@ preferences {
 			input "motion1", "capability.motionSensor", title: "Where?"
             paragraph "Must be a SmartSense Motion v1.  Also, SmartThings Hub and internet connection (modem/router) must retain power for this to work (e.g. connect them to a UPS)."
 	}
-	section("Enter Phone number if you want a text message (optional) as well as a push notification."){
+	section("Enter Phone number if you want a text message (optional) as well as a push notification."){         //TO DO - Add periodic notifications!
     	input "pushAndPhone", "enum", title: "Send SMS?", required: false, metadata: [values: ["Yes","No"]]
 		input "phone1", "phone", title: "Phone Number (only for SMS)", required: false
 	}
