@@ -60,11 +60,11 @@ def selectModes() {
 def BISettings() {
     dynamicPage(name:"BISettings", "title":"", uninstall:true, install:true) {
         section("Blue Iris Login Info") {
-            input "host", "string", title: "BI Webserver Host (include http://)", required:true
-            input "port", "number", title: "BI Webserver Port (81?)", required:true, default:81
+            input "host", "string", title: "BI External Webserver Host (include http://)", required:true
+            input "port", "number", title: "BI External Webserver Port (81?)", required:true, default:81
             input "username", "string", title: "BI Username", required: true
             input "password", "password", title: "BI Password", required: true
-            paragraph "BI only allows Admin Users to toggle profiles.  Note: if using https://, the certificate must be published via a Certificate Authority (CA), it cannot be self-signed. (i.e. if you login in a browser, it shouldn't give warnings, and the 'https' should be green)"
+            paragraph "Note: BI only allows Admin Users to toggle profiles.  Also, you must use the external address of your server (the app accesses your BI server from the Smartthings cloud).  Use either your external IP or a DDNS service (like www.noip.com).  If using https, the certificate cannot be self-signed.  You can create a free Let's Encrypt certificate at www.zerossl.com"
         }
         section("Notification Type") {
 			paragraph "You can choose to receive push notifications or a SMS when there is an error.  Regardless, you will always receive status notifications within the SmartThings Notifications tab."
