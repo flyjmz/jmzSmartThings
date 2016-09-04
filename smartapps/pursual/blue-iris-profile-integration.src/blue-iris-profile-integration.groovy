@@ -1,6 +1,10 @@
 /**
  *  Blue Iris Integration
  *
+ *	https://community.smartthings.com/t/blue-iris-profile-trigger/17522/76
+ *
+ *	https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/pursual/blue-iris-profile-integration.src
+ *
  *  Copyright 2014 Tony Gutierrez
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
