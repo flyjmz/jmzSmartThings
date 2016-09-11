@@ -18,7 +18,7 @@ definition(
 	name: "SmartPing Plus",
 	namespace: "flyjmz",
 	author: "flyjmz",
-	description: "Monitor your website uptime and trigger SmartThings automations and notifications if it goes down.",
+	description: "Monitor a website's uptime every 5 minutes and triggers SmartThings automations if it goes down. Sends notifications, and can be used to effect lights, switches, or alarms when monitoring an external or internal website.",
 	category: "My Apps",
 	iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/smartping.png",
 	iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/smartping@2x.png",
@@ -29,7 +29,7 @@ definition(
 preferences {
 	page(name: "setup", title: "SmartPing Plus", install: true, uninstall: true, submitOnChange: true) {
     		section("") {
-            		app(name: "SmartPing Websites", appName: "SmartPing Websites", namespace: "flyjmz", title: "Add website", multiple: true)
+            		app(name: "SmartPing Plus - Websites", appName: "SmartPing Plus - Websites", namespace: "flyjmz", title: "Add website", multiple: true)
 		}
 	}
 }

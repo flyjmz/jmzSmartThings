@@ -1,5 +1,5 @@
 /**
- *  Blue Iris Camera Triggers
+ *  Blue Iris Camera Triggers  (parent app, child app is Blue Iris Camera Triggers - Trigger)
  *
  *  Copyright 2016 flyjmz, based on work by Tony Gutierrez in "Blue Iris Profile Integration"
  *
@@ -21,7 +21,7 @@ definition(
 	name: "Blue Iris Camera Triggers",
 	namespace: "flyjmz",
 	author: "flyjmz",
-    description: "Parent App that sses Smartthings motion or contact sensors and/or switches to trigger camera recording in Blue Iris via JSON Interface.",
+    description: "Smartthings motion, contact, or switches trigger camera recording in Blue Iris.",
 	category: "Safety & Security",
     iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo.png",
     iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png",
@@ -35,7 +35,7 @@ preferences {
 def BITriggers() {
 	dynamicPage(name:"BITriggers", title: "Triggers", install: true, uninstall: true, submitOnChange: true) {
     	section("") {
-            app(name: "Blue Iris Trigger", appName: "Blue Iris Trigger", namespace: "flyjmz", title: "Add trigger", multiple: true)
+            app(name: "Blue Iris Camera Triggers - Trigger", appName: "Blue Iris Camera Triggers - Trigger", namespace: "flyjmz", title: "Add trigger", multiple: true)
 		}
         section("Blue Iris Server Login Settings") {
             paragraph "Blue Iris only allows Admin Users to toggle profiles.  Also, if using https://, the SSL certificate must be from a Certificate Authority (CA), it cannot be self-signed."
