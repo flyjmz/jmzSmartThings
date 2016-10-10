@@ -1,10 +1,9 @@
 /*
 Smart Alert - Delayed Alert
    
-Copyright 2016 flyjmz
-   
 https://github.com/flyjmz/jmzSmartThings
- 
+
+
    Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
    in compliance with the License. You may obtain a copy of the License at:
  
@@ -16,13 +15,14 @@ https://github.com/flyjmz/jmzSmartThings
  
 Version History:
 	1.0 - 5Sep2016, Initial Commit
+	1.1 - 10Oct2016, all tweaks rolled into public release
  
 */
  
 definition(
     name: "Smart Alert - Delayed Alert",
     namespace: "flyjmz",
-    author: "flyjmz",
+    author: "flyjmz230@gmail.com",
     parent: "flyjmz:Smart Alert",
     description: "Child app for Smart Alert to notifiy when a contact is left open or closed, or a switch is left on or off.",
     category: "My Apps",
@@ -63,11 +63,11 @@ def settings() {
 
         section("Notification Type"){
             input("recipients", "contact", title: "Send notifications to") {
+                input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]		
                 input "phone", "phone", title: "Phone Number (only for SMS)", required: false
                 paragraph "If outside the US please make sure to enter the proper country code"
-                input "pushAndPhone", "enum", title: "Also send Push if sending SMS? (optional, only needed if using SMS too)", required: false, options: ["Yes", "No"]
             }
-        }
+    	}
         
         section() {
             label title: "Assign a name", required: true
@@ -216,7 +216,6 @@ def okHandler(evt) {
 }
 
 private getAllOk() {
-	//log.trace "mode is ${location.mode}, day is ${date()}, time is ${now()}"  ---some stuff is wrong in here.
 	modeOk && daysOk && timeOk
 }
 
