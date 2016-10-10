@@ -1,11 +1,11 @@
 /*
 Smart Alert
    
-Copyright 2016 flyjmz
-   
 https://github.com/flyjmz/jmzSmartThings
  
-   Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
    in compliance with the License. You may obtain a copy of the License at:
  
        http://www.apache.org/licenses/LICENSE-2.0
@@ -22,13 +22,14 @@ Credits, based on work from:
   
 Version History:
 	1.0 - 5Sep2016, Initial Commit
+    1.1 - 10Oct2016, public release
  
  */
  
 definition(
 	name: "Smart Alert",
 	namespace: "flyjmz",
-	author: "flyjmz",
+	author: "flyjmz230@gmail.com",
 	description: "One stop shop for alerts",
 	category: "My Apps",
 	iconUrl: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png",
@@ -46,14 +47,8 @@ preferences {
 }
 
 def installed() {
-	initialize()
 }
 
 def updated() {
 	unsubscribe()
-	initialize()
-}
-
-def initialize() {
-    // placeholder
 }
