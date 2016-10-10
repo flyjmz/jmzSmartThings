@@ -15,7 +15,9 @@ https://github.com/flyjmz/jmzSmartThings
  
 Version History:
 	1.0 - 5Sep2016, Initial Commit
-	1.1 - 10Oct2016, all tweaks rolled into public release
+	1.1 - 10Oct2016, added mode changes & sunrise/sunset to periodic notifications, public release
+ 
+ To Do: add snooze function to periodic alerts
  
 */
  
@@ -56,10 +58,14 @@ def settings() {
         }
 
         section("Periodic Notificaitons") {
-            paragraph "You'll receive an alert when it is left that way after your defined time period (above) and also onces it returns to normal.  Optionally, you can set periodic notifications for in between as well." 
-            input "periodicNotifications", "enum", title: "Receive periodic notifications?", options: ["Yes", "No"], required: true, submitOnChange: true
-            if (periodicNotifications == "Yes") input "waitMinutes", "number", title: "Minutes between periodic notifications?", required: true
+            paragraph "You'll receive an alert when it is left that way after your defined time period (above) and also onces it returns to normal.  Optionally, you can set periodic notifications for times in between as well." 
+            input "periodicNotifications", "bool", title: "Receive periodic notifications?", required: false, submitOnChange: true
+            if (periodicNotifications) {
+            	input "waitMinutes", "number", title: "Timed periodic notifications? (minutes in-between)", required: false
+                input "modeChange", "bool", title: "Notify on mode change?", required: false
+                input "sunChange", "bool", title: "Notify at sunrise/sunset?", required: false
         	}
+        }
 
         section("Notification Type"){
             input("recipients", "contact", title: "Send notifications to") {
@@ -112,16 +118,11 @@ def installed() {
 def updated() {
 	log.trace "updated with settings: ${settings}"
 	unsubscribe()
+    unschedule()
     initialize()
 }
 
 def initialize () {
-	log.trace "initialize()"
-	subscribeToEvents()
-    atomicState.msgSent = false
-}
-
-def subscribeToEvents() {
     if (openClosed && openClosed == "Open") {
     	subscribe(myContact, "contact.open", eventHandler)
         subscribe(myContact, "contact.closed", okHandler)
@@ -131,30 +132,37 @@ def subscribeToEvents() {
     } else if (onOff && onOff == "On") {
 		subscribe(mySwitch, "switch.on", eventHandler)
         subscribe(mySwitch, "switch.off", okHandler)
-    } else if (onOff && onOff == "Off"){
+    } else if (onOff && onOff == "Off") {
     	subscribe(mySwitch, "switch.off", eventHandler)
 		subscribe(mySwitch, "switch.on", okHandler)
-    } else log.debug "Not subscribing to any events"
+    } else log.debug "Not subscribing to any device events"
+    if (modeChange) subscribe(location, "mode", periodicNotifier)
+    if (sunChange) {
+        subscribe(location, "sunrise", periodicNotifier)
+    	subscribe(location, "sunset", periodicNotifier)
+    }
+    atomicState.msgSent = false
 }
 
 def eventHandler(evt) {
-	log.trace "eventHandler has ${evt.displayName}: ${evt.name}: ${evt.value}, scheduling tooLong() in ${waitThreshold} minutes"
-    runIn((waitThreshold * 60), tooLong)
+	log.trace "eventHandler has ${evt.displayName}: ${evt.name}: ${evt.value}, scheduling stillWrong() in ${waitThreshold} minutes"
+    runIn((waitThreshold * 60), stillWrong)
+    atomicState.problemTime = now()
 }
 
-def tooLong() { 
+def stillWrong() { 
 	def myContactState = myContact?.currentState("contact")
     def mySwitchState = mySwitch?.currentState("switch")
     if (openClosed) {
     	if (openClosed == "Open") {
 			if (myContactState.value == "open") {
             	log.debug "Contact is still open"
-                tooLongMsger()
-            } else log.debug "the contact is closed and you want it that way"  //okHandler will send the it's ok messages
+                stillWrongMsger()
+            } else log.debug "the contact is closed and you want it that way"  //okHandler will send the it's ok messages for all these cases
         } else {
         	if (myContactState.value == "closed") {
             	log.debug "Contact is still closed"
-                tooLongMsger()
+                stillWrongMsger()
             } else log.debug "the contact is open and you want it that way"
     	}
     } 
@@ -162,41 +170,48 @@ def tooLong() {
     	if (onOff == "On") {
 			if (mySwitchState.value == "on") {
             	log.debug "Switch is still on"
-				tooLongMsger()
+				stillWrongMsger()
             } else log.debug "the switch is off and you want it that way"
         } else {
         	if (mySwitchState.value == "off") {
 	            log.debug "Switch is still on"
-				tooLongMsger()
+				stillWrongMsger()
             } else log.debug "the switch is on and you want it that way"
     	}
     }
 }
 
-def tooLongMsger() {
+def stillWrongMsger() {
 	def myContactState2 = myContact?.currentState("contact")
     def mySwitchState2 = mySwitch?.currentState("switch")
     if (allOk) {
         log.debug "event within time/day/mode constraints"
-    	if (atomicState.msgSent == false) {
+    	if (!atomicState.msgSent) {
             if (myContact) sendMessage("${myContact?.displayName} is still ${myContactState2?.value}!")
             if (mySwitch) sendMessage("${mySwitch?.displayName} is still ${mySwitchState2?.value}!")
             atomicState.msgSent = true
             log.debug "sending first message, set atomicState.msgSent to ${atomicState.msgSent}"
-       		if (periodicNotifications == "Yes") {
-            	runIn((waitMinutes * 60), tooLong)
-                log.debug "periodic notifications is on, scheduling tooLong() to run again in ${waitMinutes} minutes"
+       		if (periodicNotifications) {
+            	if (waitMinutes) {
+                	runIn((waitMinutes * 60), stillWrong)
+                	log.debug "periodic notifications is on, scheduling stillWrong() to run again in ${waitMinutes} minutes"
+            	}
             }
-        } else if (periodicNotifications == "Yes") {
+        } else if (periodicNotifications && atomicState.msgSent) {
         	log.debug "sending periodic notification"
-        	if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} is still ${myContactState2?.value}!")
-            if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} is still ${mySwitchState2?.value}!")
-            runIn((waitMinutes * 60), tooLong)
-            log.debug "periodic notifications is scheduling the next tooLong() to run in ${waitMinutes} minutes"
+            int timeSince = ((now() - atomicState.problemTime) / 60000) //time since issue occured in whole minutes
+        	if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeSince} minutes!")
+            if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeSince} minutes!")
+            if (waitMinutes) {
+            	runIn((waitMinutes * 60), stillWrong)
+            	log.debug "periodic notifications is scheduling the next stillWrong() to run in ${waitMinutes} minutes"
+        	}
+        } else if (!periodicNotifications && atomicState.msgSent) {
+        	log.debug "message already sent once, not using periodic notifcations, so not sending another message"
         }
     } else {
-    	log.debug "event outside of time/day/mode conditions, ignoring"
-    	runIn((waitThreshold * 60), tooLong) //keep checking status regardless of allOk() so that the message will happen once allOk() is true
+    	log.debug "event is outside of time/day/mode conditions, no message sent, but monitoring in case it doesn't return to normal before it is within those time/day/mode conditions"
+    	runIn((waitThreshold * 60), stillWrong)
     }
 }
 
@@ -213,6 +228,13 @@ def okHandler(evt) {
         if (evt.value == "on") sendMessage("${mySwitch.displayName} is now on.")
         */
     } else log.debug "it's okay now, and never sent left open/closed/on/off message, so no need to send an 'ok' message"
+}
+
+def periodicNotifier(evt) {
+	if (atomicState.msgSent) {
+    	stillWrong()
+        log.debug "periodic notifier found ${evt.descriptionText} & message has already been sent, calling stillwrong()"
+    }
 }
 
 private getAllOk() {
