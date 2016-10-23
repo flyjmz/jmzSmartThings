@@ -16,8 +16,9 @@ https://github.com/flyjmz/jmzSmartThings
 Version History:
 	1.0 - 5Sep2016, Initial Commit
 	1.1 - 10Oct2016, added mode changes & sunrise/sunset to periodic notifications, public release
+    1.2 - 23Oct2016, found & corrected error when using periodic notifications for mode/sun changes but not timed ones.  Added hours to notifications.
  
- To Do: add snooze function to periodic alerts
+ To Do: add snooze function to periodic notifications.
  
 */
  
@@ -136,8 +137,8 @@ def initialize () {
     	subscribe(mySwitch, "switch.off", eventHandler)
 		subscribe(mySwitch, "switch.on", okHandler)
     } else log.debug "Not subscribing to any device events"
-    if (modeChange) subscribe(location, "mode", periodicNotifier)
-    if (sunChange) {
+    if (modeChange) subscribe(location, "mode", periodicNotifier) //checks status every time mode changes (in case it missed it)
+    if (sunChange) {				//checks status every sun rises/sets (in case it missed it)
         subscribe(location, "sunrise", periodicNotifier)
     	subscribe(location, "sunset", periodicNotifier)
     }
@@ -165,7 +166,7 @@ def stillWrong() {
                 stillWrongMsger()
             } else log.debug "the contact is open and you want it that way"
     	}
-    } 
+    }
     if (onOff) {
     	if (onOff == "On") {
 			if (mySwitchState.value == "on") {
@@ -200,8 +201,14 @@ def stillWrongMsger() {
         } else if (periodicNotifications && atomicState.msgSent) {
         	log.debug "sending periodic notification"
             int timeSince = ((now() - atomicState.problemTime) / 60000) //time since issue occured in whole minutes
-        	if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeSince} minutes!")
-            if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeSince} minutes!")
+            if (timeSince > 180) {
+            	int timeMsg = timeSince / 60
+                if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeMsg} hours!")
+            	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeMsg} hours!")
+            } else {
+        		if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeSince} minutes!")
+            	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeSince} minutes!")
+            }
             if (waitMinutes) {
             	runIn((waitMinutes * 60), stillWrong)
             	log.debug "periodic notifications is scheduling the next stillWrong() to run in ${waitMinutes} minutes"
@@ -217,24 +224,15 @@ def stillWrongMsger() {
 
 def okHandler(evt) {
 	if (atomicState.msgSent) {
-    	//def evtDeviceState = evt.value
     	sendMessage("${evt.device.displayName} is now ${evt.value}.")
         atomicState.msgSent = false
         log.debug "okHandler() evoked, message sent, atomicState.msgSent is now: ${atomicState.msgSent}"
-        /*   This is what it used to be, see if the above works...
-        if (evt.value == "closed") sendMessage("${myContact.displayName} is now closed.")
-        if (evt.value == "open") sendMessage("${myContact.displayName} is now open.")
-        if (evt.value == "off") sendMessage("${mySwitch.displayName} is now off.")
-        if (evt.value == "on") sendMessage("${mySwitch.displayName} is now on.")
-        */
     } else log.debug "it's okay now, and never sent left open/closed/on/off message, so no need to send an 'ok' message"
 }
 
 def periodicNotifier(evt) {
-	if (atomicState.msgSent) {
-    	stillWrong()
-        log.debug "periodic notifier found ${evt.descriptionText} & message has already been sent, calling stillwrong()"
-    }
+	log.debug "periodic notifier got ${evt.descriptionText}, sending to stillWrong()"
+    stillWrong()
 }
 
 private getAllOk() {
@@ -283,12 +281,6 @@ private getTimeOk() {
 
 private getModeOk() {
 	def result = !modes || modes.contains(location.mode)
-	/*    ----some of this is wrong
-    log.debug "!modes is ${!modes}"
-    log.debug "modes.contains(location.mode) is ${modes.contains(location.mode)}"
-    log.debug "result is ${result}"
-    log.trace "modeOk = $result"
-	*/
     return result
 }
 
