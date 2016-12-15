@@ -4,7 +4,7 @@
  *
  *  Created by FLYJMZ (flyjmz230@gmail.com)
  *
- *  Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-camera-triggers-use-smartthings-sensors-to-trigger-camera-recording/54226
+ *  Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226
  *  Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
  *
  *  PARENT APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src

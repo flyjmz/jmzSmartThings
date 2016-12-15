@@ -3,7 +3,7 @@
  *
  *  Created by FLYJMZ (flyjmz230@gmail.com)
  *
- *  Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-camera-triggers-use-smartthings-sensors-to-trigger-camera-recording/54226
+ *  Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226
  *  Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src
  *
  *  CHILD APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
@@ -27,13 +27,17 @@
  *  Version 1.1 - 3August2016   Cleaned up Code
  *  Version 2.0 - 16Oct2016     Added Profile integration.  Also set up option for local connections, but doesn't work.  Standby for updates to make it work.
  *  Version 2.1 - 14Dec2016     Got local connection to work!  If you have issues, try external.  External is very stable.
+ *
+ *	TODO:
+ *		-Create failover (i.e. let user set up both local and external connections so you don't have to retype if you just want to switch, and also to let it try one, if it doesn't work, try the other - but have a switch to turn this option on/off)
+ *		-Add notifications for localAction so the user knows if the profile did change (right now it only checks for success and notifies if user is using external.  So is there any way to check via a local connection if it did change the profile to alert user?
  */
 
 definition(
     name: "Blue Iris Fusion",
     namespace: "flyjmz",
     author: "flyjmz230@gmail.com",
-    description: "Full Smartthings profile integration with Blue Iris, plus Smartthings motion, contact, or switches trigger Blue Iris camera recording.",
+    description: "Full Smartthings mode integration with Blue Iris profiles, plus Smartthings can use motion or contact sensors, or switches to trigger Blue Iris camera recording.",
     category: "Safety & Security",
     iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo.png",
     iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png",
@@ -65,7 +69,7 @@ def BITriggers() {
             input "password", "password", title: "BI Password", required: true
         }
         section("Blue Iris Profile/Smartthings Mode Integration") {
-            paragraph "Enter the number (1-7) of the Blue Iris Profile for each of your Smartthings modes below. To ignore a mode leave it blank.  Entering '0' sets Blue Iris to 'inactive.'"
+            paragraph "Enter the number (1-7) of the Blue Iris Profile for each of your Smartthings modes below. To ignore a mode leave it blank.  Entering '0' sets Blue Iris to 'inactive.' If you don't want to integrate Smartthings Modes with Blue Iris Profiles, leave them all blank."
             location.modes.each { mode ->
                 def modeId = mode.id.toString()  
                 input "mode-${modeId}", "number", title: "Mode ${mode}", required: false
@@ -139,8 +143,6 @@ def localAction(profile) {
     sendHubCommand(hubAction)
 
     if(holdTemp) sendHubCommand(hubAction)
-   
-    //TODO - add notifications for localAction so the user knows if the profile did change, so is there any way to check if it did change the profile to alert user?
 }
     
 def externalAction(profile) {
