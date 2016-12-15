@@ -4,9 +4,9 @@
  *  Created by FLYJMZ (flyjmz230@gmail.com)
  *
  *  Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-camera-triggers-use-smartthings-sensors-to-trigger-camera-recording/54226
- *  Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-camera-triggers.src
+ *  Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz230-gmail-com/blue-iris-camera-triggers.src
  *
- *  CHILD APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-camera-triggers-trigger.src
+ *  CHILD APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz230-gmail-com/blue-iris-camera-triggers-trigger.src
  *
  *  Based on work by:
  *  Tony Gutierrez in "Blue Iris Profile Integration"
