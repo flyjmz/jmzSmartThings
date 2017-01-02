@@ -58,7 +58,7 @@ def BITriggers() {
             paragraph "Local or External Connection to Blue Iris Server (i.e. LAN vs WAN)?"
             input "localOnly", "bool", title: "Local connection?", required: true, submitOnChange: true
             if (localOnly) {
-                paragraph "NOTE: When using a local connection, you need to ensure "Secure Only" is not checked in Blue Iris' Webserver settings."
+                paragraph "NOTE: When using a local connection, you need to ensure 'Secure Only' is not checked in Blue Iris' Webserver settings."
                 paragraph "Since you're using a local connection, use the local IP address for Webserver Host, do not include http:// or anything but the IP address."
             } else {
                 paragraph "Since you're using an external connection, use the external IP address for Webserver Host, and be sure to include the full address (i.e. include http:// or https://, .com, etc)."
