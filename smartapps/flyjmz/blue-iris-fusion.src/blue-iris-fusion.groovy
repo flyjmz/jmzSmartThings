@@ -27,10 +27,11 @@
  *  Version 1.1 - 3August2016   Cleaned up Code
  *  Version 2.0 - 16Oct2016     Added Profile integration.  Also set up option for local connections, but doesn't work.  Standby for updates to make it work.
  *  Version 2.1 - 14Dec2016     Got local connection to work!  If you have issues, try external.  External is very stable.
+ *  Version 2.2 - 2Jan2017		Found out the local connection issue, "Local Only" setting in Blue Iris Webserver Settings cannot be checked.
  *
- *	TODO:
- *		-Create failover (i.e. let user set up both local and external connections so you don't have to retype if you just want to switch, and also to let it try one, if it doesn't work, try the other - but have a switch to turn this option on/off)
- *		-Add notifications for localAction so the user knows if the profile did change (right now it only checks for success and notifies if user is using external.  So is there any way to check via a local connection if it did change the profile to alert user?
+ *  TODO:
+ *      -Create failover (i.e. let user set up both local and external connections so you don't have to retype if you just want to switch, and also to let it try one, if it doesn't work, try the other - but have a switch to turn this option on/off)
+ *      -Add notifications for localAction so the user knows if the profile did change (right now it only checks for success and notifies if user is using external.  So is there any way to check via a local connection if it did change the profile to alert user?
  */
 
 definition(
@@ -57,6 +58,7 @@ def BITriggers() {
             paragraph "Local or External Connection to Blue Iris Server (i.e. LAN vs WAN)?"
             input "localOnly", "bool", title: "Local connection?", required: true, submitOnChange: true
             if (localOnly) {
+                paragraph "NOTE: When using a local connection, you need to ensure "Secure Only" is not checked in Blue Iris' Webserver settings."
                 paragraph "Since you're using a local connection, use the local IP address for Webserver Host, do not include http:// or anything but the IP address."
             } else {
                 paragraph "Since you're using an external connection, use the external IP address for Webserver Host, and be sure to include the full address (i.e. include http:// or https://, .com, etc)."
