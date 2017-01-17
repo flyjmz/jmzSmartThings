@@ -24,10 +24,11 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *  Version 1.0 - 30July2016 	Initial release
- *	Version 1.1 - 3August2016	Cleaned up code
- * 	Version 1.2 - 4August2016	Added Alarm trigger capability from rayzurbock
+ *  Version 1.0 - 30July2016    Initial release
+ *  Version 1.1 - 3August2016   Cleaned up code
+ *  Version 1.2 - 4August2016   Added Alarm trigger capability from rayzurbock
  *  Version 2.0 - 14Dec2016     Added ability to restrict triggering to defined time periods
+ *  Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
  *
  * TODO: 
  *      -Add notifications on trigger? (it'd remove the need to have another app notifying, but may also just be redundant without making it have full capes...)
@@ -45,23 +46,23 @@ definition(
     iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png")
 
 preferences {
-	page(name: "mainPage", title: "", install: true, uninstall: true)
+    page(name: "mainPage", title: "", install: true, uninstall: true)
     page(name: "certainTime")
 }
 
 def mainPage() {
-	return dynamicPage(name: "mainPage", title: "") {
-    	section("Blue Iris Camera Name"){
-			paragraph "Use the Blue Iris short name for the camera, it is case-sensitive."
+    return dynamicPage(name: "mainPage", title: "") {
+        section("Blue Iris Camera Name"){
+            paragraph "Use the Blue Iris short name for the camera, it is case-sensitive."
             input "biCamera", "text", title: "Camera Name", required: true
-		}
-		section("Select trigger events"){   
-			input "myMotion", "capability.motionSensor", title: "Motion Sensors Active", required: false, multiple: true
-			input "myContact", "capability.contactSensor", title: "Contact Sensors Opening", required: false, multiple: true
+        }
+        section("Select trigger events"){   
+            input "myMotion", "capability.motionSensor", title: "Motion Sensors Active", required: false, multiple: true
+            input "myContact", "capability.contactSensor", title: "Contact Sensors Opening", required: false, multiple: true
             input "mySwitch", "capability.switch", title: "Switches Turning On", required: false, multiple: true
             input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
             paragraph "Note: Only the Active/Open/On events will send a trigger.  Motion stopping, Contacts closing, and Switches turning off will not send a trigger."
-		}
+        }
         section(title: "More options", hidden: hideOptionsSection(), hideable: true) {
             def timeLabel = timeIntervalLabel()
             href "certainTime", title: "Only during a certain time", description: timeLabel ?: "Tap to set", state: timeLabel ? "complete" : null
@@ -69,9 +70,9 @@ def mainPage() {
             input "modes", "mode", title: "Only when mode is", multiple: true, required: false
         }
         section("") {
-        	input "customTitle", "text", title: "Assign a Name", required: true
+            input "customTitle", "text", title: "Assign a Name", required: true
         }
-	}
+    }
 }
 
 def certainTime() {
@@ -97,41 +98,41 @@ def certainTime() {
 }
 
 def installed() {
-    log.debug "Installed with settings: ${settings}"
+    if (parent.loggingOn) if (parent.loggingOn) log.debug "Installed with settings: ${settings}"
     subscribeToEvents()
     app.updateLabel("${customTitle}")
 }
 
 def updated() {
-	log.debug "Updated with settings: ${settings}"
-	unsubscribe()
-	subscribeToEvents()
+    if (parent.loggingOn) log.debug "Updated with settings: ${settings}"
+    unsubscribe()
+    subscribeToEvents()
     app.updateLabel("${customTitle}")
 }
 
 def subscribeToEvents() {
-	subscribe(myMotion, "motion.active", eventHandlerBinary)
-	subscribe(myContact, "contact.open", eventHandlerBinary)
-	subscribe(mySwitch, "switch.on", eventHandlerBinary)
-	subscribe(myAlarm, "alarm.strobe", eventHandlerBinary)
-	subscribe(myAlarm, "alarm.siren", eventHandlerBinary)
-	subscribe(myAlarm, "alarm.both", eventHandlerBinary)
+    subscribe(myMotion, "motion.active", eventHandlerBinary)
+    subscribe(myContact, "contact.open", eventHandlerBinary)
+    subscribe(mySwitch, "switch.on", eventHandlerBinary)
+    subscribe(myAlarm, "alarm.strobe", eventHandlerBinary)
+    subscribe(myAlarm, "alarm.siren", eventHandlerBinary)
+    subscribe(myAlarm, "alarm.both", eventHandlerBinary)
 }
 
 def eventHandlerBinary(evt) {
-	log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
+    if (parent.loggingOn) if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
-        log.debug "event occured within the desired timing conditions, triggering"
+        if (parent.loggingOn) log.debug "event occured within the desired timing conditions, triggering"
         if (parent.localOnly) localTrigger()
         else externalTrigger()
-    } else log.debug "event did not occur within the desired timing conditions, not triggering"
+    } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
 }
 
 def localTrigger() {
-	log.debug "Running localTrigger"
-	def biHost = "${parent.host}:${parent.port}"
-	def biRawCommand = "/admin?camera=${biCamera}&trigger&user=${parent.username}&pw=${parent.password}"
-    log.debug "sending GET to URL $biHost/$biRawCommand"
+    if (parent.loggingOn) log.debug "Running localTrigger"
+    def biHost = "${parent.host}:${parent.port}"
+    def biRawCommand = "/admin?camera=${biCamera}&trigger&user=${parent.username}&pw=${parent.password}"
+    if (parent.loggingOn) log.debug "sending GET to URL $biHost/$biRawCommand"
     def httpMethod = "GET"
     def httpRequest = [
         method:     httpMethod,
@@ -146,59 +147,59 @@ def localTrigger() {
 }
 
 def externalTrigger() {
-    log.debug "Running externalTrigger"
+    if (parent.loggingOn) log.debug "Running externalTrigger"
     def errorMsg = "Could not trigger Blue Iris"
     try {
         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login"]) { response ->
-            log.debug response.data
-            log.debug "logging in"
+            if (parent.loggingOn) log.debug response.data
+            if (parent.loggingOn) log.debug "logging in"
             if (response.data.result == "fail") {
-               log.debug "BI_Inside initial call fail, proceeding to login"
+               if (parent.loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
                def session = response.data.session
                def hash = parent.username + ":" + response.data.session + ":" + parent.password
                hash = hash.encodeAsMD5()
                httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
                     if (response2.data.result == "success") {
-                        log.debug ("BI_Logged In")
-                        log.debug response2.data
+                        if (parent.loggingOn) log.debug ("BI_Logged In")
+                        if (parent.loggingOn) log.debug response2.data
                         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
-                            log.debug ("BI_Retrieved Status")
-                            log.debug response3.data
+                            if (parent.loggingOn) log.debug ("BI_Retrieved Status")
+                            if (parent.loggingOn) log.debug response3.data
                             if (response3.data.result == "success"){
                                     httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
-                                        log.debug response4.data
-                                        log.debug "camera triggerd"
+                                        if (parent.loggingOn) log.debug response4.data
+                                        if (parent.loggingOn) log.debug "camera triggerd"
                                         if (response4.data.result == "success") {
                                             httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                log.debug response5.data
-                                                log.debug "Logged out"
+                                                if (parent.loggingOn) log.debug response5.data
+                                                if (parent.loggingOn) log.debug "Logged out"
                                             }
                                         } else {
-                                            log.debug "BI_FAILURE, not triggered"
-                                            log.debug(response4.data.data.reason)
+                                            if (parent.loggingOn) log.debug "BI_FAILURE, not triggered"
+                                            if (parent.loggingOn) log.debug(response4.data.data.reason)
                                             sendNotificationEvent(errorMsg)
                                         }
                                     }
                             } else {
-                                log.debug "BI_FAILURE, didn't receive status"
-                                log.debug(response3.data.data.reason)
+                                if (parent.loggingOn) log.debug "BI_FAILURE, didn't receive status"
+                                if (parent.loggingOn) log.debug(response3.data.data.reason)
                                 sendNotificationEvent(errorMsg)
                             }
                         }
                     } else {
-                        log.debug "BI_FAILURE, didn't log in"
-                        log.debug(response2.data.data.reason)
+                        if (parent.loggingOn) log.debug "BI_FAILURE, didn't log in"
+                        if (parent.loggingOn) log.debug(response2.data.data.reason)
                         sendNotificationEvent(errorMsg)
                     }
                 }
             } else {
-                log.debug "FAILURE"
-                log.debug(response.data.data.reason)
+                if (parent.loggingOn) log.debug "FAILURE"
+                if (parent.loggingOn) log.debug(response.data.data.reason)
                 sendNotificationEvent(errorMsg)
             }
         }
     } catch(Exception e) {
-        log.debug(e)
+        if (parent.loggingOn) log.debug(e)
         sendNotificationEvent(errorMsg)
     }
 }

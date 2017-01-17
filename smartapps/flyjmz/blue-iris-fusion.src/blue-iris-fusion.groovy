@@ -28,6 +28,7 @@
  *  Version 2.0 - 16Oct2016     Added Profile integration.  Also set up option for local connections, but doesn't work.  Standby for updates to make it work.
  *  Version 2.1 - 14Dec2016     Got local connection to work!  If you have issues, try external.  External is very stable.
  *  Version 2.2 - 2Jan2017		Found out the local connection issue, "Local Only" setting in Blue Iris Webserver Settings cannot be checked.
+ *  Version 2.3 - 17Jan2017     Added preference to turn debug logging on or off.
  *
  *  TODO:
  *      -Create failover (i.e. let user set up both local and external connections so you don't have to retype if you just want to switch, and also to let it try one, if it doesn't work, try the other - but have a switch to turn this option on/off)
@@ -93,34 +94,39 @@ def BITriggers() {
                 }
             }
         }
+        section("Debug"){
+            paragraph "You can turn on debug logging, viewed in Live Logging on the API website."
+            def loggingOn = false
+            input "loggingOn", "bool", title: "Debug Logging On?"
+        }
     }
 }
 
 def installed() {
-    log.debug "Installed with settings: ${settings}"
+    if (loggingOn) log.debug "Installed with settings: ${settings}"
     subscribe(location, modeChange)
 }
 
 def updated() {
-    log.debug "Updated with settings: ${settings}"
+    if (loggingOn) log.debug "Updated with settings: ${settings}"
     unsubscribe()
     subscribe(location, modeChange)
 }
 
 def modeChange(evt) {
     if (evt.name != "mode") {return;}
-    log.debug "BI_modeChange detected. " + evt.value
+    if (loggingOn) log.debug "BI_modeChange detected. " + evt.value
     def checkMode = ""
     
     location.modes.each { mode ->
         if (mode.name == evt.value){
             checkMode = "mode-" + mode.id
-            log.debug "BI_modeChange matched to " + mode.name
+            if (loggingOn) log.debug "BI_modeChange matched to " + mode.name
         }
     }
     
     if (checkMode != "" && settings[checkMode]){
-        log.debug "BI_Found profile " + settings[checkMode]
+        if (loggingOn) log.debug "BI_Found profile " + settings[checkMode]
         if(localOnly){
             localAction(settings[checkMode].toInteger())
         } else externalAction(settings[checkMode].toInteger())
@@ -130,7 +136,7 @@ def modeChange(evt) {
 def localAction(profile) {
     def biHost = "${host}:${port}"
     def biRawCommand = "/admin?profile=${profile}&user=${username}&pw=${password}"
-    log.debug "Changing Blue Iris Profile to ${profile} via GET to URL $biHost/$biRawCommand"
+    if (loggingOn) log.debug "Changing Blue Iris Profile to ${profile} via GET to URL $biHost/$biRawCommand"
     sendNotificationEvent("Temporarily changing Blue Iris profile to profile #$profile")
     def httpMethod = "GET"
     def httpRequest = [
@@ -152,10 +158,10 @@ def externalAction(profile) {
     if (!holdTemp) {
         try {
             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
-                //log.debug response.data
+                if (loggingOn) log.debug response.data
 
                 if (response.data.result == "fail") {
-                   //log.debug "BI_Inside initial call fail, proceeding to login"
+                   if (loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
                    def session = response.data.session
                    def hash = username + ":" + response.data.session + ":" + password
                    hash = hash.encodeAsMD5()
@@ -163,71 +169,71 @@ def externalAction(profile) {
                    httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
                         if (response2.data.result == "success") {
                             def BIprofileNames = response2.data.data.profiles
-                            //log.debug ("BI_Logged In")
-                            //log.debug response2.data
+                            if (loggingOn) log.debug ("BI_Logged In")
+                            if (loggingOn) log.debug response2.data
                             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
-                                //log.debug ("BI_Retrieved Status")
-                                //log.debug response3.data
+                                if (loggingOn) log.debug ("BI_Retrieved Status")
+                                if (loggingOn) log.debug response3.data
                                 if (response3.data.result == "success"){
                                     if (response3.data.data.profile != profile){
                                         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"session":session]) { response4 ->
-                                            //log.debug response4.data
+                                            if (loggingOn) log.debug response4.data
                                             if (response4.data.result == "success") {
                                                 if (response4.data.data.profile.toInteger() == profile.toInteger()) {
-                                                    //log.debug ("Blue Iris to profile ${profileName(BIprofileNames,profile)}!")
+                                                    if (loggingOn) log.debug ("Blue Iris to profile ${profileName(BIprofileNames,profile)}!")
                                                     sendNotificationEvent("Blue Iris temp changed to profile ${profileName(BIprofileNames,profile)}!")
                                                 } else {
-                                                    //log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Temp change to ${profileName(BIprofileNames,profile)}. Check your user permissions.")
+                                                    if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Temp change to ${profileName(BIprofileNames,profile)}. Check your user permissions.")
                                                     sendNotificationEvent("Blue Iris Integration failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Temp change to ${profileName(BIprofileNames,profile)} failed. Check your user permissions.")
                                                     send("Blue Iris failed to change profiles, it is in '${profileName(BIprofileNames,response4.data.data.profile)}'. Temp change to '${profileName(BIprofileNames,profile)}' failed.")
                                                 }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                    //log.debug response5.data
-                                                    //log.debug "Logged out"
+                                                    if (loggingOn) log.debug response5.data
+                                                    if (loggingOn) log.debug "Logged out"
                                                 }
                                             } else {
-                                                //log.debug "BI_FAILURE"
-                                                //log.debug(response4.data.data.reason)
+                                                if (loggingOn) log.debug "BI_FAILURE"
+                                                if (loggingOn) log.debug(response4.data.data.reason)
                                                 sendNotificationEvent(errorMsg)
                                             }
                                         }
                                     } else {
-                                        //log.debug ("Blue Iris is already at profile ${profileName(BIprofileNames,profile)}.")
+                                        if (loggingOn) log.debug ("Blue Iris is already at profile ${profileName(BIprofileNames,profile)}.")
                                         sendNotificationEvent("Blue Iris is already in profile ${profileName(BIprofileNames,profile)}.")
                                     }
                                 } else {
-                                    //log.debug "BI_FAILURE"
-                                    //log.debug(response3.data.data.reason)
+                                    if (loggingOn) log.debug "BI_FAILURE"
+                                    if (loggingOn) log.debug(response3.data.data.reason)
                                     sendNotificationEvent(errorMsg)
                                     send(errorMsg)
                                 }
                             }
                         } else {
-                            //log.debug "BI_FAILURE"
-                            //log.debug(response2.data.data.reason)
+                            if (loggingOn) log.debug "BI_FAILURE"
+                            if (loggingOn) log.debug(response2.data.data.reason)
                             sendNotificationEvent(errorMsg)
                             send(errorMsg)
                         }
                     }
                 } else {
-                    //log.debug "FAILURE"
-                    //log.debug(response.data.data.reason)
+                    if (loggingOn) log.debug "FAILURE"
+                    if (loggingOn) log.debug(response.data.data.reason)
                     sendNotificationEvent(errorMsg)
                     send(errorMsg)
                 }
             }
         } catch(Exception e) {
-            //log.debug(e)
+            if (loggingOn) log.debug(e)
             sendNotificationEvent(errorMsg)
             send(errorMsg)
         }
     } else {
         try {
             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
-                //log.debug response.data
+                if (loggingOn) log.debug response.data
 
                 if (response.data.result == "fail") {
-                   //log.debug "BI_Inside initial call fail, proceeding to login"
+                   if (loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
                    def session = response.data.session
                    def hash = username + ":" + response.data.session + ":" + password
                    hash = hash.encodeAsMD5()
@@ -235,71 +241,71 @@ def externalAction(profile) {
                    httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
                         if (response2.data.result == "success") {
                             def BIprofileNames = response2.data.data.profiles
-                            //log.debug ("BI_Logged In")
-                            //log.debug response2.data
+                            if (loggingOn) log.debug ("BI_Logged In")
+                            if (loggingOn) log.debug response2.data
                             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
-                                //log.debug ("BI_Retrieved Status")
-                                //log.debug response3.data
+                                if (loggingOn) log.debug ("BI_Retrieved Status")
+                                if (loggingOn) log.debug response3.data
                                 if (response3.data.result == "success"){
                                     if (response3.data.data.profile != profile){
                                         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"session":session]) { response4 ->
-                                            //log.debug response4.data
+                                            if (loggingOn) log.debug response4.data
                                             if (response4.data.result == "success") {
-                                                //log.debug "Set profile to ${profileName(BIprofileNames,profile)} via temp change, trying to set via hold"
+                                                if (loggingOn) log.debug "Set profile to ${profileName(BIprofileNames,profile)} via temp change, trying to set via hold"
                                                 if (response4.data.data.profile.toInteger() == profile.toInteger()) {
                                                     httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"session":session]) { response5 ->
-                                                        //log.debug response5.data
+                                                        if (loggingOn) log.debug response5.data
                                                         if (response5.data.result == "success") {
-                                                            //log.debug ("Set profile to ${profileName(BIprofileNames,profile)} with a hold change!")
+                                                            if (loggingOn) log.debug ("Set profile to ${profileName(BIprofileNames,profile)} with a hold change!")
                                                             sendNotificationEvent("Blue Iris is holding profile ${profileName(BIprofileNames,profile)}!")
                                                         } else {
-                                                            //log.debug ("Blue Iris failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporary. Check your user permissions.")
+                                                            if (loggingOn) log.debug ("Blue Iris failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporary. Check your user permissions.")
                                                             sendNotificationEvent("Blue Iris ended up on profile ${profileName(BIprofileNames,response5.data.data.profile)}? I tried to hold ${profileName(BIprofileNames,profile)}. Check your user permissions.")
                                                             send("Blue Iris failed to hold profile, it is in '${profileName(BIprofileNames,response5.data.data.profile)}' but is only temporary.")
                                                         }
                                                    }
                                                 } else {
-                                                    //log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Attempt to set ${profileName(BIprofileNames,profile)} failed, also unable to attempt hold. Check your user permissions.")
+                                                    if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Attempt to set ${profileName(BIprofileNames,profile)} failed, also unable to attempt hold. Check your user permissions.")
                                                     sendNotificationEvent("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Attempt to set ${profileName(BIprofileNames,profile)} failed, also unable to attempt hold. Check your user permissions.")
                                                     send("Blue Iris failed to change Profiles, it is in '${profileName(BIprofileNames,response4.data.data.profile)}' but should have been switched to '${profileName(BIprofileNames,profile)}.'")
                                                 }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response6 ->
-                                                    //log.debug response6.data
-                                                    //log.debug "Logged out"
+                                                    if (loggingOn) log.debug response6.data
+                                                    if (loggingOn) log.debug "Logged out"
                                                 }
                                             } else {
-                                                //log.debug "BI_FAILURE"
-                                                //log.debug(response4.data.data.reason)
+                                                if (loggingOn) log.debug "BI_FAILURE"
+                                                if (loggingOn) log.debug(response4.data.data.reason)
                                                 sendNotificationEvent(errorMsg)
                                             }
                                         }
                                     } else {
-                                        //log.debug ("Blue Iris is already at profile ${profileName(BIprofileNames,profile)}.")
+                                        if (loggingOn) log.debug ("Blue Iris is already at profile ${profileName(BIprofileNames,profile)}.")
                                         sendNotificationEvent("Blue Iris is already in profile ${profileName(BIprofileNames,profile)}.")
                                         }
                                 } else {
-                                    //log.debug "BI_FAILURE"
-                                    //log.debug(response3.data.data.reason)
+                                    if (loggingOn) log.debug "BI_FAILURE"
+                                    if (loggingOn) log.debug(response3.data.data.reason)
                                     sendNotificationEvent(errorMsg)
                                     send(errorMsg)
                                 }
                             }
                         } else {
-                            //log.debug "BI_FAILURE"
-                            //log.debug(response2.data.data.reason)
+                            if (loggingOn) log.debug "BI_FAILURE"
+                            if (loggingOn) log.debug(response2.data.data.reason)
                             sendNotificationEvent(errorMsg)
                             send(errorMsg)
                         }
                     }
                 } else {
-                    //log.debug "FAILURE"
-                    //log.debug(response.data.data.reason)
+                    if (loggingOn) log.debug "FAILURE"
+                    if (loggingOn) log.debug(response.data.data.reason)
                     sendNotificationEvent(errorMsg)
                     send(errorMsg)
                 }
             }
         } catch(Exception e) {
-            //log.debug(e)
+            if (loggingOn) log.debug(e)
             sendNotificationEvent(errorMsg)
             send(errorMsg)
         }
@@ -317,14 +323,14 @@ def profileName(names, num) {
 private send(msg) {
     if (receiveAlerts == "Yes") {
         if (location.contactBookEnabled) {
-            log.debug("sending notifications to: ${recipients?.size()}")
+            if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
             sendNotificationToContacts(msg, recipients)
         }
         else {
             Map options = [:]
             if (phone) {
                 options.phone = phone
-                log.debug 'sending SMS'
+                if (loggingOn) log.debug 'sending SMS'
             } else if (pushAndPhone == 'Yes') {
                 options.method = 'both'
                 options.phone = phone
@@ -332,5 +338,5 @@ private send(msg) {
             sendNotification(msg, options)
         }
     }
-    log.debug msg
+    if (loggingOn) log.debug msg
 }
