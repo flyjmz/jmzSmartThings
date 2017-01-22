@@ -29,10 +29,10 @@
  *  Version 1.2 - 4August2016   Added Alarm trigger capability from rayzurbock
  *  Version 2.0 - 14Dec2016     Added ability to restrict triggering to defined time periods
  *  Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
+ *  Version 2.2 - 22Jan2017     Added trigger notifications
  *
  * TODO: 
- *      -Add notifications on trigger? (it'd remove the need to have another app notifying, but may also just be redundant without making it have full capes...)
- *      -Let it trigger for the other states (switch off, contact closed, etc so it'll work for things like the porch mat)
+ *      -Let it trigger for the other states (e.g. switch off, contact closed, etc so it'll work for things like the porch mat)
  */
 
 definition(
@@ -62,6 +62,11 @@ def mainPage() {
             input "mySwitch", "capability.switch", title: "Switches Turning On", required: false, multiple: true
             input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
             paragraph "Note: Only the Active/Open/On events will send a trigger.  Motion stopping, Contacts closing, and Switches turning off will not send a trigger."
+        }
+        section("Notifications") {
+            paragraph "You can choose to receive notifications for this trigger.  Message delivery matches your settings in the main (parent) app.  Regardless, you will always receive status notifications within the SmartThings Notifications tab."
+            def receiveAlerts = false
+            input "receiveAlerts", "bool", title: "Receive Notifications?"
         }
         section(title: "More options", hidden: hideOptionsSection(), hideable: true) {
             def timeLabel = timeIntervalLabel()
@@ -98,7 +103,7 @@ def certainTime() {
 }
 
 def installed() {
-    if (parent.loggingOn) if (parent.loggingOn) log.debug "Installed with settings: ${settings}"
+    if (parent.loggingOn) log.debug "Installed with settings: ${settings}"
     subscribeToEvents()
     app.updateLabel("${customTitle}")
 }
@@ -120,9 +125,11 @@ def subscribeToEvents() {
 }
 
 def eventHandlerBinary(evt) {
-    if (parent.loggingOn) if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
+    if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
         if (parent.loggingOn) log.debug "event occured within the desired timing conditions, triggering"
+        if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+        if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
         if (parent.localOnly) localTrigger()
         else externalTrigger()
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
@@ -148,7 +155,7 @@ def localTrigger() {
 
 def externalTrigger() {
     if (parent.loggingOn) log.debug "Running externalTrigger"
-    def errorMsg = "Could not trigger Blue Iris"
+    def errorMsg = "Blue Iris Fusion could not trigger ${biCamera}"
     try {
         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login"]) { response ->
             if (parent.loggingOn) log.debug response.data
@@ -177,30 +184,35 @@ def externalTrigger() {
                                         } else {
                                             if (parent.loggingOn) log.debug "BI_FAILURE, not triggered"
                                             if (parent.loggingOn) log.debug(response4.data.data.reason)
-                                            sendNotificationEvent(errorMsg)
+                                            if (!receiveAlerts) sendNotificationEvent(errorMsg)
+                                            if (receiveAlerts) parent.send(errorMsg)
                                         }
                                     }
                             } else {
                                 if (parent.loggingOn) log.debug "BI_FAILURE, didn't receive status"
                                 if (parent.loggingOn) log.debug(response3.data.data.reason)
-                                sendNotificationEvent(errorMsg)
+                                if (!receiveAlerts) sendNotificationEvent(errorMsg)
+                                if (receiveAlerts) parent.send(errorMsg)
                             }
                         }
                     } else {
                         if (parent.loggingOn) log.debug "BI_FAILURE, didn't log in"
                         if (parent.loggingOn) log.debug(response2.data.data.reason)
-                        sendNotificationEvent(errorMsg)
+                        if (!receiveAlerts) sendNotificationEvent(errorMsg)
+                        if (receiveAlerts) parent.send(errorMsg)
                     }
                 }
             } else {
                 if (parent.loggingOn) log.debug "FAILURE"
                 if (parent.loggingOn) log.debug(response.data.data.reason)
-                sendNotificationEvent(errorMsg)
+                if (!receiveAlerts) sendNotificationEvent(errorMsg)
+                if (receiveAlerts) parent.send(errorMsg)
             }
         }
     } catch(Exception e) {
         if (parent.loggingOn) log.debug(e)
-        sendNotificationEvent(errorMsg)
+        if (!receiveAlerts) sendNotificationEvent(errorMsg)
+        if (receiveAlerts) parent.send(errorMsg)
     }
 }
 

@@ -29,10 +29,11 @@
  *  Version 2.1 - 14Dec2016     Got local connection to work!  If you have issues, try external.  External is very stable.
  *  Version 2.2 - 2Jan2017		Found out the local connection issue, "Local Only" setting in Blue Iris Webserver Settings cannot be checked.
  *  Version 2.3 - 17Jan2017     Added preference to turn debug logging on or off.
+ *  Version 2.4 - 22Jan2017     Fixed error in profile change notifications (they all said temporary even if it was a hold change)
  *
  *  TODO:
  *      -Create failover (i.e. let user set up both local and external connections so you don't have to retype if you just want to switch, and also to let it try one, if it doesn't work, try the other - but have a switch to turn this option on/off)
- *      -Add notifications for localAction so the user knows if the profile did change (right now it only checks for success and notifies if user is using external.  So is there any way to check via a local connection if it did change the profile to alert user?
+ *      -Add localAction error checking and notifications so the user knows if the profile and/or trigger actually did change (right now it only checks for success and notifies if user is using external.  So is there any way to check via a local connection if it did change the profile to alert user?)
  */
 
 definition(
@@ -84,15 +85,14 @@ def BITriggers() {
             input "holdTemp", "bool", title: "Make Hold changes?", required: true
         }
         section("Notifications") {
-            paragraph "You can choose to receive push notifications or a SMS when there is an error.  Regardless, you will always receive status notifications within the SmartThings Notifications tab."
-            input "receiveAlerts", "enum", title: "Receive Notifications?", options: ["Yes", "No"], required: true, submitOnChange: true
-            if (receiveAlerts == "Yes") {
-                input("recipients", "contact", title: "Send notifications to") {
-                input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]      
-                input "phone", "phone", title: "Phone Number (only for SMS)", required: false
-                paragraph "If outside the US please make sure to enter the proper country code"
-                }
+            paragraph "You can choose to receive push notifications or a SMS.  Regardless, you will always receive status notifications within the SmartThings Notifications tab."
+            input("recipients", "contact", title: "Send notifications to") {
+            input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]      
+            input "phone", "phone", title: "Phone Number (only for SMS)", required: false
+            paragraph "If outside the US please make sure to enter the proper country code"
             }
+            paragraph "Each trigger can send it's own notifications.  Do you also want to receive notificaitons for profile changes?"
+            input "receiveAlerts", "enum", title: "Receive Profile Change Notifications?", options: ["Yes", "No"], required: true
         }
         section("Debug"){
             paragraph "You can turn on debug logging, viewed in Live Logging on the API website."
@@ -136,8 +136,11 @@ def modeChange(evt) {
 def localAction(profile) {
     def biHost = "${host}:${port}"
     def biRawCommand = "/admin?profile=${profile}&user=${username}&pw=${password}"
-    if (loggingOn) log.debug "Changing Blue Iris Profile to ${profile} via GET to URL $biHost/$biRawCommand"
-    sendNotificationEvent("Temporarily changing Blue Iris profile to profile #$profile")
+    if (loggingOn) log.debug "Changed Blue Iris Profile to ${profile} via GET to URL $biHost/$biRawCommand"
+    if(!holdTemp) {
+        if(receiveAlerts == "No") sendNotificationEvent("Temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+        if(receiveAlerts == "Yes") send("Temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+    }
     def httpMethod = "GET"
     def httpRequest = [
         method:     httpMethod,
@@ -149,12 +152,15 @@ def localAction(profile) {
         ]
     def hubAction = new physicalgraph.device.HubAction(httpRequest)
     sendHubCommand(hubAction)
-
-    if(holdTemp) sendHubCommand(hubAction)
+    if(holdTemp) {
+        sendHubCommand(hubAction)
+        if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+        if(receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+    }
 }
     
 def externalAction(profile) {
-    def errorMsg = "Could not adjust Blue Iris Profile"
+    def errorMsg = "Blue Iris Fusion could not adjust Blue Iris Profile"
     if (!holdTemp) {
         try {
             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
@@ -181,11 +187,12 @@ def externalAction(profile) {
                                             if (response4.data.result == "success") {
                                                 if (response4.data.data.profile.toInteger() == profile.toInteger()) {
                                                     if (loggingOn) log.debug ("Blue Iris to profile ${profileName(BIprofileNames,profile)}!")
-                                                    sendNotificationEvent("Blue Iris temp changed to profile ${profileName(BIprofileNames,profile)}!")
+                                                    if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                    if (receiveAlerts == "Yes") send("Blue Iris Fusion temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                 } else {
                                                     if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Temp change to ${profileName(BIprofileNames,profile)}. Check your user permissions.")
-                                                    sendNotificationEvent("Blue Iris Integration failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Temp change to ${profileName(BIprofileNames,profile)} failed. Check your user permissions.")
-                                                    send("Blue Iris failed to change profiles, it is in '${profileName(BIprofileNames,response4.data.data.profile)}'. Temp change to '${profileName(BIprofileNames,profile)}' failed.")
+                                                    if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                    if (receiveAlerts == "Yes") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                                 }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
                                                     if (loggingOn) log.debug response5.data
@@ -204,28 +211,28 @@ def externalAction(profile) {
                                 } else {
                                     if (loggingOn) log.debug "BI_FAILURE"
                                     if (loggingOn) log.debug(response3.data.data.reason)
-                                    sendNotificationEvent(errorMsg)
-                                    send(errorMsg)
+                                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                                    if (receiveAlerts == "Yes") send(errorMsg)
                                 }
                             }
                         } else {
                             if (loggingOn) log.debug "BI_FAILURE"
                             if (loggingOn) log.debug(response2.data.data.reason)
-                            sendNotificationEvent(errorMsg)
-                            send(errorMsg)
+                            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                            if (receiveAlerts == "Yes") send(errorMsg)
                         }
                     }
                 } else {
                     if (loggingOn) log.debug "FAILURE"
                     if (loggingOn) log.debug(response.data.data.reason)
-                    sendNotificationEvent(errorMsg)
-                    send(errorMsg)
+                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                    if (receiveAlerts == "Yes") send(errorMsg)
                 }
             }
         } catch(Exception e) {
             if (loggingOn) log.debug(e)
-            sendNotificationEvent(errorMsg)
-            send(errorMsg)
+            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+            if (receiveAlerts == "Yes") send(errorMsg)
         }
     } else {
         try {
@@ -257,17 +264,18 @@ def externalAction(profile) {
                                                         if (loggingOn) log.debug response5.data
                                                         if (response5.data.result == "success") {
                                                             if (loggingOn) log.debug ("Set profile to ${profileName(BIprofileNames,profile)} with a hold change!")
-                                                            sendNotificationEvent("Blue Iris is holding profile ${profileName(BIprofileNames,profile)}!")
+                                                            if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                            if (receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                         } else {
-                                                            if (loggingOn) log.debug ("Blue Iris failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporary. Check your user permissions.")
-                                                            sendNotificationEvent("Blue Iris ended up on profile ${profileName(BIprofileNames,response5.data.data.profile)}? I tried to hold ${profileName(BIprofileNames,profile)}. Check your user permissions.")
-                                                            send("Blue Iris failed to hold profile, it is in '${profileName(BIprofileNames,response5.data.data.profile)}' but is only temporary.")
+                                                            if (loggingOn) log.debug ("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
+                                                            if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
+                                                            if (receiveAlerts == "Yes") send("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
                                                         }
                                                    }
                                                 } else {
                                                     if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Attempt to set ${profileName(BIprofileNames,profile)} failed, also unable to attempt hold. Check your user permissions.")
-                                                    sendNotificationEvent("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Attempt to set ${profileName(BIprofileNames,profile)} failed, also unable to attempt hold. Check your user permissions.")
-                                                    send("Blue Iris failed to change Profiles, it is in '${profileName(BIprofileNames,response4.data.data.profile)}' but should have been switched to '${profileName(BIprofileNames,profile)}.'")
+                                                    if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                    if (receiveAlerts == "Yes") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                                 }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response6 ->
                                                     if (loggingOn) log.debug response6.data
@@ -286,28 +294,28 @@ def externalAction(profile) {
                                 } else {
                                     if (loggingOn) log.debug "BI_FAILURE"
                                     if (loggingOn) log.debug(response3.data.data.reason)
-                                    sendNotificationEvent(errorMsg)
-                                    send(errorMsg)
+                                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                                    if (receiveAlerts == "Yes") send(errorMsg)
                                 }
                             }
                         } else {
                             if (loggingOn) log.debug "BI_FAILURE"
                             if (loggingOn) log.debug(response2.data.data.reason)
-                            sendNotificationEvent(errorMsg)
-                            send(errorMsg)
+                            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                            if (receiveAlerts == "Yes") send(errorMsg)
                         }
                     }
                 } else {
                     if (loggingOn) log.debug "FAILURE"
                     if (loggingOn) log.debug(response.data.data.reason)
-                    sendNotificationEvent(errorMsg)
-                    send(errorMsg)
+                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                    if (receiveAlerts == "Yes") send(errorMsg)
                 }
             }
         } catch(Exception e) {
             if (loggingOn) log.debug(e)
-            sendNotificationEvent(errorMsg)
-            send(errorMsg)
+            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+            if (receiveAlerts == "Yes") send(errorMsg)
         }
     }
 }
@@ -321,22 +329,20 @@ def profileName(names, num) {
 }
 
 private send(msg) {
-    if (receiveAlerts == "Yes") {
-        if (location.contactBookEnabled) {
-            if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
-            sendNotificationToContacts(msg, recipients)
-        }
-        else {
-            Map options = [:]
-            if (phone) {
-                options.phone = phone
-                if (loggingOn) log.debug 'sending SMS'
-            } else if (pushAndPhone == 'Yes') {
-                options.method = 'both'
-                options.phone = phone
-            } else options.method = 'push'
-            sendNotification(msg, options)
-        }
+    if (location.contactBookEnabled) {
+        if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
+        sendNotificationToContacts(msg, recipients)
+    }
+    else {
+        Map options = [:]
+        if (phone) {
+            options.phone = phone
+            if (loggingOn) log.debug 'sending SMS'
+        } else if (pushAndPhone == 'Yes') {
+            options.method = 'both'
+            options.phone = phone
+        } else options.method = 'push'
+        sendNotification(msg, options)
     }
     if (loggingOn) log.debug msg
 }
