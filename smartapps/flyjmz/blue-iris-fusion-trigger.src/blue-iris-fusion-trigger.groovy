@@ -30,6 +30,7 @@
  *  Version 2.0 - 14Dec2016     Added ability to restrict triggering to defined time periods
  *  Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
  *  Version 2.2 - 22Jan2017     Added trigger notifications
+ *  Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifications in the app is user defined instead of always on.
  *
  * TODO: 
  *      -Let it trigger for the other states (e.g. switch off, contact closed, etc so it'll work for things like the porch mat)
@@ -64,9 +65,11 @@ def mainPage() {
             paragraph "Note: Only the Active/Open/On events will send a trigger.  Motion stopping, Contacts closing, and Switches turning off will not send a trigger."
         }
         section("Notifications") {
-            paragraph "You can choose to receive notifications for this trigger.  Message delivery matches your settings in the main (parent) app.  Regardless, you will always receive status notifications within the SmartThings Notifications tab."
+            paragraph "You can choose to receive notifications for this trigger.  Message delivery matches your settings in the main (parent) app. You can also choose to receive status notifications within the SmartThings Notifications tab (errors will always be displayed here)."
             def receiveAlerts = false
-            input "receiveAlerts", "bool", title: "Receive Notifications?"
+            input "receiveAlerts", "bool", title: "Receive Push/SMS Alerts?"
+            def receiveNotifications = false
+            input "receiveNotifications", "bool", title: "Receive Notifications?"
         }
         section(title: "More options", hidden: hideOptionsSection(), hideable: true) {
             def timeLabel = timeIntervalLabel()
@@ -128,7 +131,7 @@ def eventHandlerBinary(evt) {
     if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
         if (parent.loggingOn) log.debug "event occured within the desired timing conditions, triggering"
-        if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+        if (!receiveAlerts && receiveNotifications) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
         if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
         if (parent.localOnly) localTrigger()
         else externalTrigger()
@@ -151,6 +154,7 @@ def localTrigger() {
         ]
     def hubAction = new physicalgraph.device.HubAction(httpRequest)
     sendHubCommand(hubAction)
+    //todo - add error notification (but need a way to check for error first!)
 }
 
 def externalTrigger() {

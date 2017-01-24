@@ -30,6 +30,7 @@
  *  Version 2.2 - 2Jan2017		Found out the local connection issue, "Local Only" setting in Blue Iris Webserver Settings cannot be checked.
  *  Version 2.3 - 17Jan2017     Added preference to turn debug logging on or off.
  *  Version 2.4 - 22Jan2017     Fixed error in profile change notifications (they all said temporary even if it was a hold change)
+ *  Version 2.5 - 23Jan2017     Slight tweak to notifications.
  *
  *  TODO:
  *      -Create failover (i.e. let user set up both local and external connections so you don't have to retype if you just want to switch, and also to let it try one, if it doesn't work, try the other - but have a switch to turn this option on/off)
@@ -85,7 +86,7 @@ def BITriggers() {
             input "holdTemp", "bool", title: "Make Hold changes?", required: true
         }
         section("Notifications") {
-            paragraph "You can choose to receive push notifications or a SMS.  Regardless, you will always receive status notifications within the SmartThings Notifications tab."
+            paragraph "You can choose to receive push notifications or a SMS."
             input("recipients", "contact", title: "Send notifications to") {
             input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]      
             input "phone", "phone", title: "Phone Number (only for SMS)", required: false
@@ -157,6 +158,7 @@ def localAction(profile) {
         if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
         if(receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
     }
+    //todo - add error notifications (need to figure out how to check for errors first!)
 }
     
 def externalAction(profile) {
@@ -191,7 +193,7 @@ def externalAction(profile) {
                                                     if (receiveAlerts == "Yes") send("Blue Iris Fusion temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                 } else {
                                                     if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Temp change to ${profileName(BIprofileNames,profile)}. Check your user permissions.")
-                                                    if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                    if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                                     if (receiveAlerts == "Yes") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                                 }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
@@ -201,7 +203,8 @@ def externalAction(profile) {
                                             } else {
                                                 if (loggingOn) log.debug "BI_FAILURE"
                                                 if (loggingOn) log.debug(response4.data.data.reason)
-                                                sendNotificationEvent(errorMsg)
+                                                if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                                                if (receiveAlerts == "Yes") send(errorMsg)
                                             }
                                         }
                                     } else {
@@ -211,27 +214,27 @@ def externalAction(profile) {
                                 } else {
                                     if (loggingOn) log.debug "BI_FAILURE"
                                     if (loggingOn) log.debug(response3.data.data.reason)
-                                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
                                     if (receiveAlerts == "Yes") send(errorMsg)
                                 }
                             }
                         } else {
                             if (loggingOn) log.debug "BI_FAILURE"
                             if (loggingOn) log.debug(response2.data.data.reason)
-                            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
                             if (receiveAlerts == "Yes") send(errorMsg)
                         }
                     }
                 } else {
                     if (loggingOn) log.debug "FAILURE"
                     if (loggingOn) log.debug(response.data.data.reason)
-                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
                     if (receiveAlerts == "Yes") send(errorMsg)
                 }
             }
         } catch(Exception e) {
             if (loggingOn) log.debug(e)
-            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
             if (receiveAlerts == "Yes") send(errorMsg)
         }
     } else {
@@ -264,17 +267,17 @@ def externalAction(profile) {
                                                         if (loggingOn) log.debug response5.data
                                                         if (response5.data.result == "success") {
                                                             if (loggingOn) log.debug ("Set profile to ${profileName(BIprofileNames,profile)} with a hold change!")
-                                                            if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                            if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                             if (receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                         } else {
                                                             if (loggingOn) log.debug ("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
-                                                            if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
+                                                            if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
                                                             if (receiveAlerts == "Yes") send("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
                                                         }
                                                    }
                                                 } else {
                                                     if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Attempt to set ${profileName(BIprofileNames,profile)} failed, also unable to attempt hold. Check your user permissions.")
-                                                    if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                    if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                                     if (receiveAlerts == "Yes") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                                 }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response6 ->
@@ -284,7 +287,8 @@ def externalAction(profile) {
                                             } else {
                                                 if (loggingOn) log.debug "BI_FAILURE"
                                                 if (loggingOn) log.debug(response4.data.data.reason)
-                                                sendNotificationEvent(errorMsg)
+                                                if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                                                if (receiveAlerts == "Yes") send(errorMsg)
                                             }
                                         }
                                     } else {
@@ -294,27 +298,27 @@ def externalAction(profile) {
                                 } else {
                                     if (loggingOn) log.debug "BI_FAILURE"
                                     if (loggingOn) log.debug(response3.data.data.reason)
-                                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
                                     if (receiveAlerts == "Yes") send(errorMsg)
                                 }
                             }
                         } else {
                             if (loggingOn) log.debug "BI_FAILURE"
                             if (loggingOn) log.debug(response2.data.data.reason)
-                            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
                             if (receiveAlerts == "Yes") send(errorMsg)
                         }
                     }
                 } else {
                     if (loggingOn) log.debug "FAILURE"
                     if (loggingOn) log.debug(response.data.data.reason)
-                    if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
                     if (receiveAlerts == "Yes") send(errorMsg)
                 }
             }
         } catch(Exception e) {
             if (loggingOn) log.debug(e)
-            if(receiveAlerts == "No") sendNotificationEvent(errorMsg)
+            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
             if (receiveAlerts == "Yes") send(errorMsg)
         }
     }
