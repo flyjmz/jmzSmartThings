@@ -33,8 +33,8 @@ metadata {
     // switch colors for mat
 	tiles {
 		standardTile("contact", "device.contact", width: 2, height: 2, canChangeBackground: true) {
-			state "open", label: 'stepped on', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/matSteppedOn.jpg", backgroundColor: "#79b821"   
-			state "closed", label: 'empty', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/mat.jpg", backgroundColor: "#ffa81e"	
+			state "open", label: 'stepped on', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/matSteppedOn.jpg", backgroundColor: "#ffa81e"   
+			state "closed", label: 'empty', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/mat.jpg", backgroundColor: "#79b821"	
 
 		}
 		valueTile("battery", "device.battery", inactiveLabel: false, decoration: "flat") {
