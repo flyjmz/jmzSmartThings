@@ -3,6 +3,7 @@
  *	https://community.smartthings.com/t/united-security-pressure-mat/12101/24
  *  Author: SmartThings - edited by KW
  *  Date: 2013-11-3
+ *	Updated 2017-04-10 by flyjmz230@gmail.com: added custom icon and flipped open/closed so that Open = stepped on (most smartapps treat open sensors as 'bad' so this will now act the same way)
  */
 
 // for the UI
@@ -21,6 +22,7 @@ metadata {
 	}
 
 	// simulator metadata
+	//probably doesn't work correctly with the open/close change to make it work for a pressure mat.  todo - update or remove
 	simulator {
 		// status messages
 		status "open":  "command: 2001, payload: FF"
@@ -32,10 +34,9 @@ metadata {
     // switch colors for mat
 	tiles {
 		standardTile("contact", "device.contact", width: 2, height: 2, canChangeBackground: true) {
-			state "open", label: 'empty', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/mat.jpg", backgroundColor: "#79b821"   //icon: "st.custom.buttons.a"
-			state "closed", label: 'stepped on', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/matSteppedOn.jpg", backgroundColor: "#ffa81e"	//icon: "st.custom.buttons.b"
-			// state "open", label: '${name}', icon: "st.contact.contact.open", backgroundColor: "#ffa81e"
-			// state "closed", label: '${name}', icon: "st.contact.contact.closed", backgroundColor: "#79b821"
+			state "open", label: 'stepped on', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/matSteppedOn.jpg", backgroundColor: "#ffa81e"   
+			state "closed", label: 'empty', icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/mat.jpg", backgroundColor: "#79b821"	
+
 		}
 		valueTile("battery", "device.battery", inactiveLabel: false, decoration: "flat") {
 			state "battery", label:'${currentValue}% battery', unit:""
@@ -95,9 +96,9 @@ def configure() {
 
 def sensorValueEvent(value) {
 	if (value) {
-		createEvent(name: "contact", value: "open", descriptionText: "$device.displayName is empty")
+		createEvent(name: "contact", value: "closed", descriptionText: "$device.displayName is empty")
 	} else {
-		createEvent(name: "contact", value: "closed", descriptionText: "$device.displayName is stepped on")
+		createEvent(name: "contact", value: "open", descriptionText: "$device.displayName is stepped on")
 	}
 }
 
