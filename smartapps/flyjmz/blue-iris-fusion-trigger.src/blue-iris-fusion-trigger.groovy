@@ -31,6 +31,7 @@
  *  Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
  *  Version 2.2 - 22Jan2017     Added trigger notifications
  *  Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifications in the app is user defined instead of always on.
+ *  Version 2.4 - 30May2017     Added button push to trigger options
  *
  * TODO: 
  *      -Let it trigger for the other states (e.g. switch off, contact closed, etc so it'll work for things like the porch mat)
@@ -62,6 +63,7 @@ def mainPage() {
             input "myContact", "capability.contactSensor", title: "Contact Sensors Opening", required: false, multiple: true
             input "mySwitch", "capability.switch", title: "Switches Turning On", required: false, multiple: true
             input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
+            input "myButton", "capability.button", title: "Button Pushed", required: false, multiple: true
             paragraph "Note: Only the Active/Open/On events will send a trigger.  Motion stopping, Contacts closing, and Switches turning off will not send a trigger."
         }
         section("Notifications") {
@@ -125,6 +127,7 @@ def subscribeToEvents() {
     subscribe(myAlarm, "alarm.strobe", eventHandlerBinary)
     subscribe(myAlarm, "alarm.siren", eventHandlerBinary)
     subscribe(myAlarm, "alarm.both", eventHandlerBinary)
+    subscribe(myButton, "button.pushed", eventHandlerBinary)
 }
 
 def eventHandlerBinary(evt) {
