@@ -31,6 +31,7 @@
  *  Version 2.3 - 17Jan2017     Added preference to turn debug logging on or off.
  *  Version 2.4 - 22Jan2017     Fixed error in profile change notifications (they all said temporary even if it was a hold change)
  *  Version 2.5 - 23Jan2017     Slight tweak to notifications.
+ *	Version 2.6 - 17Jun2017		Fixed Profile names when using in LAN (localAction was throwing NULL). Thanks Zaxxon!
  *
  *  TODO:
  *      -Create failover (i.e. let user set up both local and external connections so you don't have to retype if you just want to switch, and also to let it try one, if it doesn't work, try the other - but have a switch to turn this option on/off)
@@ -139,8 +140,8 @@ def localAction(profile) {
     def biRawCommand = "/admin?profile=${profile}&user=${username}&pw=${password}"
     if (loggingOn) log.debug "Changed Blue Iris Profile to ${profile} via GET to URL $biHost/$biRawCommand"
     if(!holdTemp) {
-        if(receiveAlerts == "No") sendNotificationEvent("Temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-        if(receiveAlerts == "Yes") send("Temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+        if(receiveAlerts == "No") sendNotificationEvent("Temporarily changed Blue Iris to profile ${profile}")
+        if(receiveAlerts == "Yes") send("Temporarily changed Blue Iris to profile ${profile}")
     }
     def httpMethod = "GET"
     def httpRequest = [
@@ -155,8 +156,8 @@ def localAction(profile) {
     sendHubCommand(hubAction)
     if(holdTemp) {
         sendHubCommand(hubAction)
-        if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-        if(receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+        if(receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profile}")
+        if(receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profile}")
     }
     //todo - add error notifications (need to figure out how to check for errors first!)
 }
