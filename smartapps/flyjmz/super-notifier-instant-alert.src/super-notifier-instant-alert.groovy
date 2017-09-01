@@ -1,7 +1,8 @@
 /*
 Super Notifier - Instant Alert
    
-https://github.com/flyjmz/jmzSmartThings
+Code: https://github.com/flyjmz/jmzSmartThings
+Forum: https://community.smartthings.com/t/release-super-notifier-all-your-alerts-in-one-place/59707
 
 
    Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except

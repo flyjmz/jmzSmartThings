@@ -1,7 +1,8 @@
 /*
 Super Notifier - Delayed Alert
    
-https://github.com/flyjmz/jmzSmartThings
+Code: https://github.com/flyjmz/jmzSmartThings
+Forum: https://community.smartthings.com/t/release-super-notifier-all-your-alerts-in-one-place/59707
 
 
    Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -17,9 +18,7 @@ Version History:
 	1.0 - 5Sep2016, Initial Commit
 	1.1 - 10Oct2016, added mode changes & sunrise/sunset to periodic notifications, public release
     1.2 - 23Oct2016, found & corrected error when using periodic notifications for mode/sun changes but not timed ones.  Added hours to notifications.
- 
- To Do: add snooze function to periodic notifications.
- 
+    1.3 - 29Aug2017, added ability to snooze periodic notifications.  Just add a virtual switch device.  (I have a virtual switch device type in my Github repository, linked above).
 */
  
 definition(
@@ -65,7 +64,9 @@ def settings() {
             	input "waitMinutes", "number", title: "Timed periodic notifications? (minutes in-between)", required: false
                 input "modeChange", "bool", title: "Notify on mode change?", required: false
                 input "sunChange", "bool", title: "Notify at sunrise/sunset?", required: false
-        	}
+                paragraph "Periodic Notifications can be snoozed easily with a virtual switch device type.  This is useful when you are unable to resolve an issue and the notifications become irritable.  A 'snooze' switch in your Things is easier to hit than changeing these settings." 
+                input "snoozeSwitch", "capability.switch", title: "Which switch controls snoozing periodic notifications?", required: false
+        	}      
         }
 
         section("Notification Type"){
@@ -186,7 +187,7 @@ def stillWrongMsger() {
 	def myContactState2 = myContact?.currentState("contact")
     def mySwitchState2 = mySwitch?.currentState("switch")
     if (allOk) {
-        log.debug "event within time/day/mode constraints"
+        log.debug "Event within time/day/mode constraints"
     	if (!atomicState.msgSent) {
             if (myContact) sendMessage("${myContact?.displayName} is still ${myContactState2?.value}!")
             if (mySwitch) sendMessage("${mySwitch?.displayName} is still ${mySwitchState2?.value}!")
@@ -199,13 +200,16 @@ def stillWrongMsger() {
             	}
             }
         } else if (periodicNotifications && atomicState.msgSent) {
-        	log.debug "sending periodic notification"
+        	def snooze = false
+        	if (snoozeSwitch?.currentState("switch").value == "on") snooze = true
+            if (!snooze) log.debug "sending periodic notification"
             int timeSince = ((now() - atomicState.problemTime) / 60000) //time since issue occured in whole minutes
-            if (timeSince > 180) {
+            if (!snooze && timeSince > 180) {  //determines whether to report in hours or minutes (longer than 180 minutes is reported in hours), and ensures alerts aren't snoozed.
             	int timeMsg = timeSince / 60
                 if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeMsg} hours!")
             	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeMsg} hours!")
-            } else {
+            } 
+            if (!snooze && timeSince < 180) {
         		if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeSince} minutes!")
             	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeSince} minutes!")
             }
