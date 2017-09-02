@@ -1,41 +1,39 @@
-/**
- *  Blue Iris Fusion - Trigger 
- *  (Child app.  Parent app is: "Blue Iris Fusion") 
- *
- *  Created by FLYJMZ (flyjmz230@gmail.com)
- *
- *  Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226
- *  Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
- *
- *  PARENT APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src
- *
- *
- *  Based on work by:
- *  Tony Gutierrez in "Blue Iris Profile Integration"
- *  jpark40 at https://community.smartthings.com/t/blue-iris-profile-trigger/17522/76
- *  luma at https://community.smartthings.com/t/blue-iris-camera-trigger-from-smart-things/25147/9
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License. You may obtain a copy of the License at:
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
- *  for the specific language governing permissions and limitations under the License.
- *
- *  Version 1.0 - 30July2016    Initial release
- *  Version 1.1 - 3August2016   Cleaned up code
- *  Version 1.2 - 4August2016   Added Alarm trigger capability from rayzurbock
- *  Version 2.0 - 14Dec2016     Added ability to restrict triggering to defined time periods
- *  Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
- *  Version 2.2 - 22Jan2017     Added trigger notifications
- *  Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifications in the app is user defined instead of always on.
- *  Version 2.4 - 30May2017     Added button push to trigger options
- *
- * TODO: 
- *      -Let it trigger for the other states (e.g. switch off, contact closed, etc so it'll work for things like the porch mat)
- */
+/*
+Blue Iris Fusion - Trigger 
+(Child app.  Parent app is: "Blue Iris Fusion") 
+ 
+Created by FLYJMZ (flyjmz230@gmail.com)
+
+Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226
+Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
+ 
+PARENT APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src
+
+
+Based on work by:
+Tony Gutierrez in "Blue Iris Profile Integration"
+jpark40 at https://community.smartthings.com/t/blue-iris-profile-trigger/17522/76
+luma at https://community.smartthings.com/t/blue-iris-camera-trigger-from-smart-things/25147/9
+ 
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+in compliance with the License. You may obtain a copy of the License at:
+ 
+    http://www.apache.org/licenses/LICENSE-2.0
+ 
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+for the specific language governing permissions and limitations under the License.
+ 
+Version 1.0 - 30July2016    Initial release
+Version 1.1 - 3August2016   Cleaned up code
+Version 1.2 - 4August2016   Added Alarm trigger capability from rayzurbock
+Version 2.0 - 14Dec2016     Added ability to restrict triggering to defined time periods
+Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
+Version 2.2 - 22Jan2017     Added trigger notifications
+Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifications in the app is user defined instead of always on.
+Version 2.4 - 30May2017     Added button push to trigger options
+
+*/
 
 definition(
     name: "Blue Iris Fusion - Trigger",

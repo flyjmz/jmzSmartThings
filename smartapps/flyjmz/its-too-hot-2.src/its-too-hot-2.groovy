@@ -1,5 +1,5 @@
 /**
- *  Copyright 2016 flyjmz
+ *  It's Too Hot 2
  *
  *	https://github.com/flyjmz/jmzSmartThings
  *
@@ -19,7 +19,7 @@
 definition(
     name: "It's Too Hot 2",
     namespace: "flyjmz",
-    author: "flyjmz",
+    author: "flyjmz230@gmail.com",
     description: "Monitor the temperature and when it rises above your setting get a notification and/or turn on a switch.",
     category: "My Apps",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Meta/its-too-hot.png",

@@ -1,7 +1,7 @@
 /**
  *  Garage Door Opener
  *
- *  Copyright 2015 flyjmz
+ *  https://github.com/flyjmz/jmzSmartThings/
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -16,7 +16,7 @@
 definition(
     name: "Garage Door Opener",
     namespace: "flyjmz",
-    author: "flyjmz",
+    author: "flyjmz230@gmail.com",
     description: "Garage door opener app for LFM-20 and SmartSense Multi",
     category: "Safety & Security",
     iconUrl: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/garage.png",
