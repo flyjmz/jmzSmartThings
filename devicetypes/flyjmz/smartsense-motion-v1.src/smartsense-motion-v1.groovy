@@ -1,6 +1,7 @@
 /**
- *  Copyright 2015 SmartThings, Modified 2016 flyjmz
+ *  Copyright 2015 SmartThings, Modified 2016 flyjmz230@gmail.com
  *
+ *	https://github.com/flyjmz/jmzSmartThings
  *
  *	NOTE: This is only for the original SmartSense Motion from SmartThings, which is powered by battery and optionally powered by a USB wall plug.
  *		  The power source options will only work on this model, the successor models did not have the USB power option.

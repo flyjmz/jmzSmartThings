@@ -1,7 +1,8 @@
 /**
-* Created by Flyjmz230@gmail.com
-* https://github.com/flyjmz/jmzSmartThings/blob/master/devicetypes/flyjmz/virtual-motion-switch.src/virtual-motion-switch.groovy
+* Virtual Motion Switch
 * 
+* https://github.com/flyjmz/jmzSmartThings
+*
 * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 * in compliance with the License. You may obtain a copy of the License at:
 *
@@ -12,11 +13,10 @@
 * for the specific language governing permissions and limitations under the License.
 *
 * Version 1.0 - 3August2016 Initial Release
-*
 */
 
 metadata {
-	definition (name: "Virtual Motion Switch", namespace: "flyjmz", author: "flyjmz") {
+	definition (name: "Virtual Motion Switch", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
     	capability "Switch"
         capability "Motion Sensor"
 		capability "Sensor"

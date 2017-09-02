@@ -1,5 +1,9 @@
 /**
-* Copyright 2016 Combined effort: flyjmz and Austin Pritchett and SmartThings
+* Virtual Presence Plus
+*
+* https://github.com/flyjmz/jmzSmartThings
+*
+* Based on work by Austin Pritchett and SmartThings
 *
 * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 * in compliance with the License. You may obtain a copy of the License at:
@@ -18,7 +22,7 @@
 
 
 metadata {
-        definition (name: "Virtual Presence Plus", namespace: "flyjmz", author: "flyjmz") {
+        definition (name: "Virtual Presence Plus", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
         capability "Switch"
         capability "Refresh"
         capability "Presence Sensor"

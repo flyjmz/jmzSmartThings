@@ -1,6 +1,9 @@
 /**
  *  SmartSense Open-Closed Sensor with Temp Displayed Primarily
- *  Copyright 2016 flyjmz, modified from SmartThings' SmartSense Open/Closed Sensor, Copyright 2014 SmartThings
+ *  flyjmz230@gmail.com
+ *	Modified from SmartThings' SmartSense Open/Closed Sensor, Copyright 2014 SmartThings
+ *
+ *	https://github.com/flyjmz/jmzSmartThings
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -11,12 +14,11 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
+ *	Modified 10June2016 1515z
  */
- 
- // CAO 10June2016 1515z
- 
+
 metadata {
-	definition (name: "SmartSense Open-Closed Sensor Temp Display", namespace: "flyjmz", author: "flyjmz") {
+	definition (name: "SmartSense Open-Closed Sensor Temp Display", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
 		capability "Battery"
 		capability "Configuration"
 		capability "Contact Sensor"
