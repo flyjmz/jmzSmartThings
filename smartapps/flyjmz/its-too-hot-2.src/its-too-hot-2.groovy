@@ -15,6 +15,7 @@
  *  Version 1.1 - 4 August 2016		Cleaned up code
  *	Version 1.2 - 3 September 2016	Corrected typo in Preferences>Notifications
  *  Version 1.3 - 4 October 2017	Add capability for "temp too cold" and to turn the switch on or off.
+ *	Version 1.4 - 5 October 2017	Fixed Preferences Page bug, added ability to enter negative numbers for the temps.
  *
  *  To do:
  *	(none)
@@ -41,11 +42,11 @@ def tooHot2() {
         }
 
         section("When the temperature rises above...") {
-            input "tempTooHot", "number", title: "Too Hot?", required: false
+            input "tempTooHot", "number", title: "Too Hot?", range: "*..*", required: false
         }
 
         section("When the temperature dips below...") {
-            input "tempTooCold", "number", title: "Too Cold?", required: false
+            input "tempTooCold", "number", title: "Too Cold?", range: "*..*", required: false
         }
 
         section("Notifications") {
@@ -81,7 +82,7 @@ def intialize() {
     subscribe(temperatureSensor1, "temperature", temperatureHandler)
     state.msgalreadysent = false
     state.msgsenttime = now()
-    log.debug "Want temperature between ${tooCold} and ${tooHot}, if not then ${switch1.device} will turn ${onOrOff}"
+    log.debug "Want temperature between ${tooCold} and ${tooHot}."
 }
 
 def gettooCold() {
@@ -97,7 +98,7 @@ def gettooHot() {
 }
 
 def switchSwitcher(control) {
-	log.debug "Turning switch ${control}"
+	log.debug "Turning ${switch1?.device} ${control}"
 	if (control == "On") switch1?.on()
     if (control == "Off") switch1?.off()
 }
@@ -108,7 +109,7 @@ def temperatureHandler(evt) {
     if(tempState.doubleValue > tooHot || tempState.doubleValue < tooCold) {
     	if (state.msgalreadysent == false) {
             state.msgsenttime = now()
-            log.debug "Temp out of limits at ${state.msgsenttime}, sending message, turning ${switch1.device} ${onOrOff}."
+            log.debug "Temp out of limits at ${state.msgsenttime}, sending message."
             send("${temperatureSensor1.displayName} is out of limits at ${tempState.value}${tempState.unit?:"F"}")
 			switchSwitcher(onOrOff)
 			state.msgalreadysent = true
@@ -128,7 +129,7 @@ def temperatureHandler(evt) {
         }
     } else {
     	if(state.msgalreadysent == true) {
-        	log.debug "temp is okay after sending message, sending ok message and switching ${switch1.device}."
+        	log.debug "temp is okay after sending message, sending ok message."
             send("${temperatureSensor1.displayName} is OK: temp now ${tempState.value}${tempState.unit?:"F"}")
 			def oppositeAction = "On"
             if (onOrOff == "On") {
@@ -136,7 +137,7 @@ def temperatureHandler(evt) {
             } else oppositeAction = "On"
             switchSwitcher(oppositeAction)
         	state.msgalreadysent = false
-            log.debug "temp became ok, ${switch1.device} turned ${oppositeAction}, msgalreadysent changed to ${state.msgalreadysent}"
+            log.debug "temp became ok, msgalreadysent changed to ${state.msgalreadysent}"
         } else {
             log.debug "temp is ok: ${tempState.doubleValue}, msgalreadysent is: ${state.msgalreadysent}"
             state.msgalreadysent = false
