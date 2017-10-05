@@ -32,6 +32,7 @@ Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
 Version 2.2 - 22Jan2017     Added trigger notifications
 Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifications in the app is user defined instead of always on.
 Version 2.4 - 30May2017     Added button push to trigger options
+Version 2.5 - 5Oct2017		Added Contact Closing and Switch turning off to trigger options
 
 */
 
@@ -58,11 +59,12 @@ def mainPage() {
         }
         section("Select trigger events"){   
             input "myMotion", "capability.motionSensor", title: "Motion Sensors Active", required: false, multiple: true
-            input "myContact", "capability.contactSensor", title: "Contact Sensors Opening", required: false, multiple: true
-            input "mySwitch", "capability.switch", title: "Switches Turning On", required: false, multiple: true
+            input "myContactOpen", "capability.contactSensor", title: "Contact Sensors Opening", required: false, multiple: true
+            input "myContactClosed", "capability.contactSensor", title: "Contact Sensors Closing", required: false, multiple: true
+            input "mySwitchOn", "capability.switch", title: "Switches Turning On", required: false, multiple: true
+            input "mySwitchOff", "capability.switch", title: "Switches Turning Off", required: false, multiple: true
             input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
             input "myButton", "capability.button", title: "Button Pushed", required: false, multiple: true
-            paragraph "Note: Only the Active/Open/On events will send a trigger.  Motion stopping, Contacts closing, and Switches turning off will not send a trigger."
         }
         section("Notifications") {
             paragraph "You can choose to receive notifications for this trigger.  Message delivery matches your settings in the main (parent) app. You can also choose to receive status notifications within the SmartThings Notifications tab (errors will always be displayed here)."
@@ -120,8 +122,10 @@ def updated() {
 
 def subscribeToEvents() {
     subscribe(myMotion, "motion.active", eventHandlerBinary)
-    subscribe(myContact, "contact.open", eventHandlerBinary)
-    subscribe(mySwitch, "switch.on", eventHandlerBinary)
+    subscribe(myContactOpen, "contact.open", eventHandlerBinary)
+    subscribe(myContactClosed, "contact.closed", eventHandlerBinary)
+    subscribe(mySwitchOn, "switch.on", eventHandlerBinary)
+    subscribe(mySwitchOff, "switch.off", eventHandlerBinary)
     subscribe(myAlarm, "alarm.strobe", eventHandlerBinary)
     subscribe(myAlarm, "alarm.siren", eventHandlerBinary)
     subscribe(myAlarm, "alarm.both", eventHandlerBinary)
