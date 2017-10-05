@@ -17,8 +17,8 @@ Forum: https://community.smartthings.com/t/release-super-notifier-all-your-alert
 Version History:
 	1.0 - 5Sep2016, Initial Commit
     1.1 - 10Oct2016, all tweaks rolled into public release
- 
- */
+ 	1.2 - 5Oct2017, added temperature sensor alert capability
+*/
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -50,6 +50,11 @@ def settings() {
             input "departurePresence", "capability.presenceSensor", title: "Departure Of", required: false, multiple: true
             input "smoke", "capability.smokeDetector", title: "Smoke Detected", required: false, multiple: true
             input "water", "capability.waterSensor", title: "Water Sensor Wet", required: false, multiple: true
+            input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, submitOnChange: true
+            if (temp != null) {
+                input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
+                input "tempTooCold", "number", title: "Too Cold When Temp is Below:", range: "*..*", required: false
+            }
         }
 
         section("Send this custom message (optional, sends standard status message if not specified)") {
@@ -129,6 +134,26 @@ def subscribeToEvents() {
 	subscribe(smoke, "smoke.tested", eventHandler)
 	subscribe(smoke, "carbonMonoxide.detected", eventHandler)
 	subscribe(water, "water.wet", eventHandler)
+    subscribe(temp, "temperature", tempHandler)
+}
+
+def gettooCold() {
+	def temp1 = tempTooCold
+    if (temp1 == null) temp1 = -460.0
+    return temp1
+}
+
+def gettooHot() {
+	def temp2 = tempTooHot 
+    if (temp2 == null) temp2 = 3000.0
+    return temp2
+}
+
+def tempHandler(evt) {
+    def tempState = temp.currentState("temperature")  //trigger is based on the event subcription, but the temp value for notifications is a direct state pull
+    if(tempState.doubleValue > tooHot || tempState.doubleValue < tooCold) {
+    	eventHandler(evt)
+    } else log.debug "Temp within limits, no action taken."
 }
 
 def eventHandler(evt) {
