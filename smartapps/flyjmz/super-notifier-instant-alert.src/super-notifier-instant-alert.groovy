@@ -18,6 +18,7 @@ Version History:
 	1.0 - 5Sep2016, Initial Commit
     1.1 - 10Oct2016, all tweaks rolled into public release
  	1.2 - 5Oct2017, added temperature sensor alert capability
+    1.3 - 10Oct2017, added lock locked/unlocked capability
 */
  
 definition(
@@ -50,6 +51,8 @@ def settings() {
             input "departurePresence", "capability.presenceSensor", title: "Departure Of", required: false, multiple: true
             input "smoke", "capability.smokeDetector", title: "Smoke Detected", required: false, multiple: true
             input "water", "capability.waterSensor", title: "Water Sensor Wet", required: false, multiple: true
+            input "lockLocked", "capability.lock", title: "Lock Locked", required: false, multiple: true
+            input "lockUnlocked", "capability.lock", title: "Lock Unlocked", required: false, multiple: true
             input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, submitOnChange: true
             if (temp != null) {
                 input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
@@ -135,6 +138,8 @@ def subscribeToEvents() {
 	subscribe(smoke, "carbonMonoxide.detected", eventHandler)
 	subscribe(water, "water.wet", eventHandler)
     subscribe(temp, "temperature", tempHandler)
+    subscribe(lockLocked,"lock.locked", eventHandler)
+    subscribe(lockUnlocked,"lock.unlocked", eventHandler)
 }
 
 def gettooCold() {
