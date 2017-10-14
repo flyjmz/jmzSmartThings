@@ -22,6 +22,7 @@ for the specific language governing permissions and limitations under the Licens
 
 Version History:
 1.0		14Oct2017	Initial Commit of Standalone DTH
+1.01	14Oct2017	Re-fixed bug I accidentally reintroduced where the network ID doesn't get updated properly
 
 To Do:
 -Polling isn't posting in the feed every 15 minutes like it should.  Either its because I'm using sendEvent() in parse() without a return(evt1...), or because the sendEvents don't force 'isStateChange: true'
@@ -169,13 +170,17 @@ def updated() {
     initialize()
 }
 
-def initialize() { 
-	state.serverResponseThreshold = (waitThreshold != null) ? waitThreshold : 10
-    log.debug "initialize() called, debug logging is ${loggingOn}, serverResponseThreshold is ${state.serverResponseThreshold}"
+def updateNetworkID() {
+    if(loggingOn) log.debug "updateNetworkID() called"
     //set actual network ID so SmartThings knows what to listen to for Parse()
     def hosthex = convertIPtoHex(host).toUpperCase()  //Note: it needs to be set to uppercase for the new deviceNetworkId to work in SmartThings
     def porthex = convertPortToHex(port).toUpperCase()
     device.deviceNetworkId = "$hosthex:$porthex"
+}
+
+def initialize() { 
+	state.serverResponseThreshold = (waitThreshold != null) ? waitThreshold : 10
+    log.debug "initialize() called, debug logging is ${loggingOn}, serverResponseThreshold is ${state.serverResponseThreshold}"
     
     //initialize variables and set the profile names to the tiles
     if (state.holdChange == null) {
@@ -390,7 +395,8 @@ def setProfile(profile) {
 }
 
 def hubTalksToBI(command) {
-	state.hubCommandSentTime = now()
+	updateNetworkID()  //todo -- this doesn't execute if called from updated or initialize, but does here. Figure out why because we don't need it every time we talk to the hub.
+    state.hubCommandSentTime = now()
     def biHost = "${host}:${port}"
     def sendHTTP = new physicalgraph.device.HubAction(
         method: "GET",
