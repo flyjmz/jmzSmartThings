@@ -24,13 +24,16 @@ Version History:
 1.0		14Oct2017	Initial Commit of Standalone DTH
 
 To Do:
+-Polling isn't posting in the feed every 15 minutes like it should.  Either its because I'm using sendEvent() in parse() without a return(evt1...), or because the sendEvents don't force 'isStateChange: true'
 -Try having camera's motion alert from BI send a get to the hub's ip, parse it out to figure out which camera, and make it's motion active.  Likely need to use subscribe as described at the bottom of this code.  Might have to be inside individual camera devices...
 -Add another layer of server health check or a better method if the user forwards their server out & the cloud could see it: Use the cloud-based gethttp or whatever to send a check for current profile, and if the response is not 200, then we know we're offline
+-If it deems the server is offline, make the blueIrisProfile change to offline and set all the profile tiles to default.
 
-For manager app:
+For Service Manager Smartapp:
 -DTHs can't send notifications.  So manager app needs to subscribe to 'errorMessage' and pass the value as a notification.
 -Want to install the device from the manager app so you don't have to keep entering settings, the tile labels can persist, and the profile names can be site directly from ST modes (like BI Fusion).
 -Can we use null profile numbers to make fewer tiles on the app (i.e. don't display tiles for unused profiles)?
+-Add version checker w/push notification
 
 Wish List:
 -"Commands that take parameters" cannot be called with their parameters from tile action, resulting in a different command for each profile.  Some solutions may exist using child device buttons/switches.
@@ -232,8 +235,8 @@ def parse(description) {
     if(loggingOn) log.debug "status returned ${status.toInteger()}"
 
 	//Update Tiles
-    sendEvent(name: "blueIrisProfile", value: "${newProfileName}")
-    sendEvent(name: "stoplight", value: "$newSignal")
+    sendEvent(name: "blueIrisProfile", value: "${newProfileName}", descriptionText: "Blue Iris Profile is ${newProfileName}", displayed: true)
+    sendEvent(name: "stoplight", value: "$newSignal", descriptionText: "Blue Iris Traffic Signal is ${newSignal}", displayed: true)
     sendEvent(name: "sync", value: "default", displayed: false)
     sendEvent(name: "refresh", value: "default", displayed: false)
     if (newProfileNum ==0) sendEvent(name: "profile0mode", value: "on", displayed: false)
@@ -256,26 +259,25 @@ def parse(description) {
     //Notify if there are errors
     if(state?.desiredNewProfile && state?.desiredNewProfile != newProfileName) {
         log.error "error 1: ${state.desiredNewProfile} != ${newProfileName}"
-        sendEvent(name: "errorMessage", value: "Error! BI profile should be ${state.desiredNewProfile}, but it is ${newProfileName}")
+        sendEvent(name: "errorMessage", value: "Error! BI profile should be ${state.desiredNewProfile}, but it is ${newProfileName}", descriptionText: "Error! BI profile should be ${state.desiredNewProfile}, but it is ${newProfileName}", displayed: true)
     }
     if(state?.desiredNewStoplightColor && state?.desiredNewStoplightColor != newSignal) {
         if(state.desiredNewStoplightColor == 'yellow' && newSignal == 'green'){
             //Do nothing, not a problem, if the user has Blue Iris to skip yellow, or the yellow delay is a very short time, it'll end up on green
         } else {
             log.error "error 2: ${state.desiredNewStoplightColor} != ${newSignal}"
-            sendEvent(name: "errorMessage", value: "Error! BI Traffic Light should be ${state.desiredNewStoplightColor}, but it is ${newSignal}")
+            sendEvent(name: "errorMessage", value: "Error! BI Traffic Light should be ${state.desiredNewStoplightColor}, but it is ${newSignal}", descriptionText: "Error! BI Traffic Light should be ${state.desiredNewStoplightColor}, but it is ${newSignal}", displayed: true)
         }
     }
     if(status.toInteger() != 200){   //200 is ok, 100-300 series should be ok usually, 400 & 500 series are definitely problems
         if (status.toInteger() >= 400){
             log.error "error 3: msg.status returned ${status.toInteger()}"
-            sendEvent(name: "errorMessage", value: "Error! BI server returned http status code ${status.toInteger()}, an error.")
+            sendEvent(name: "errorMessage", value: "Error! BI server returned http status code ${status.toInteger()}, an error.", descriptionText: "Error! BI server returned http status code ${status.toInteger()}, an error.", displayed: true)
         } else {
             log.error "error 4: msg.status returned ${status.toInteger()}"
-            sendEvent(name: "errorMessage", value: "BI server returned http status code ${status.toInteger()}, which may indicate an error.")
+            sendEvent(name: "errorMessage", value: "BI server returned http status code ${status.toInteger()}, which may indicate an error.", descriptionText: "BI server returned http status code ${status.toInteger()}, which may indicate an error.", displayed: true)
         }
     }
-
     /////////////////////Testing Block////////////////////
     //log.debug "11 ${device.currentState("blueIrisProfile").value}"  //returns attribute value, eg Away
     //log.debug "12 ${device.currentState("blueIrisProfile").name}" //returns attribute name, eg blueIrisProfile
@@ -404,12 +406,12 @@ def hubTalksToBI(command) {
     sendHubCommand(sendHTTP)
 }
 
-def serverOfflineChecker() {  //todo: Note - this won't work if I figure out how to subscribe to motion events, probably should fix my SmartPing app.
+def serverOfflineChecker() {  //todo: Note - this likely won't work if I figure out how to subscribe to motion events, probably should fix my SmartPing app.
     double responseTime = (state.hubCommandReceivedTime - state.hubCommandSentTime) / 1000  //response time in seconds
     if (loggingOn) log.debug "serverOfflineChecker() found server response time was ${responseTime}"
     if (responseTime > state.serverResponseThreshold) {
         log.error "error 9: Server Response time was ${responseTime} seconds, the server is offline."
-        sendEvent(name: "errorMessage", value: "Error! Blue Iris Server is offline!")  //It has to be the BI server or the SmartThing hub's connection to the BI Server (because otherwise you're hub would be offline too and the SmartThings app would tell you.)
+        sendEvent(name: "errorMessage", value: "Error! Blue Iris Server is offline!", descriptionText: "Error! Blue Iris Server is offline!", displayed: true)  //It has to be the BI server or the SmartThing hub's connection to the BI Server (because otherwise you're hub would be offline too and the SmartThings app would tell you.)
     }
 }
 
@@ -426,7 +428,7 @@ def getprofileName(number) {
     else if (number == 7) {name = state.profile7mode}
     else {
         log.error "error 10: getprofileName(number) got a profile number outside of the 0-7 range, check the settings of what you passed it."
-        sendEvent(name: "errorMessage", value: "Error! A profile number was passed outside of the 0-7 range. Check settings.")
+        sendEvent(name: "errorMessage", value: "Error! A profile number was passed outside of the 0-7 range. Check settings.", descriptionText: "Error! A Blue Iris profile number was passed outside of the 0-7 range. Check settings.", displayed: true)
     }
     if (loggingOn) log.debug "getprofileName returning ${name}"
     return name
@@ -445,7 +447,7 @@ def getprofileNumber(name) {
     else if (name == state.profile7mode) {number = 7}
     else {
         log.error "error 11: getprofileNumber(name) got a name that isn't one of the user defined profiles, check profile name settings"
-        sendEvent(name: "errorMessage", value: "Error! A profile name was passed that isn't one of the user defined profiles. Check settings.")
+        sendEvent(name: "errorMessage", value: "Error! A profile name was passed that isn't one of the user defined profiles. Check settings.", descriptionText: "Error! A Blue Iris profile name was passed that isn't one of the user defined profiles. Check settings.", displayed: true)
     }
     if (loggingOn) log.debug "getprofileNumber returning ${number}"
     return number
@@ -457,12 +459,14 @@ private String convertIPtoHex(ipAddress) {
         return hex
     } catch (Exception e) {
         log.error "error 12: Invalid IP Address $ipAddress, check settings. Error: $e"
+        sendEvent(name: "errorMessage", value: "Invalid IP Address $ipAddress, check settings", descriptionText: "Invalid Blue Iris Server IP Address $ipAddress, check settings", displayed: true)
     }
 }
 
 private String convertPortToHex(port) {
     if (!port || (port == 0)) {
         log.error "error 13: Invalid port $port, check settings."
+        sendEvent(name: "errorMessage", value: "Invalid port $port, check settings", descriptionText: "Invalid Blue Iris Server port $port, check settings", displayed: true)
     }
 
     try {
@@ -470,8 +474,29 @@ private String convertPortToHex(port) {
         return hexport
     } catch (Exception e) {
         log.error "error 14: Invalid port $port, check settings. Error: $e"
+        sendEvent(name: "errorMessage", value: "Invalid port $port, check settings", descriptionText: "Invalid Blue Iris Server port $port, check settings", displayed: true)
     }
 }
+
+
+
+/*
+Generating Events at the request of the Service Manager
+You won’t generate events directly within the Service Manager, but rather request that they are generated within the Device Handler. For example:
+
+In the service manager:
+
+childName.generateEvent(data)
+COPY
+In the Device Handler:
+
+def generateEvent(Map results) {
+  results.each { name, value ->
+    sendEvent(name: name, value: value)
+  }
+  return null
+}
+*/
 
 
 
