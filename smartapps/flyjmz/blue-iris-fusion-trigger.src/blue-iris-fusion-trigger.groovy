@@ -1,14 +1,8 @@
 /*
 Blue Iris Fusion - Trigger 
-(Child app.  Parent app is: "Blue Iris Fusion") 
+(Child app for camera triggering.  Parent app is: "Blue Iris Fusion") 
  
 Created by FLYJMZ (flyjmz230@gmail.com)
-
-Smartthings Community Thread: https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226
-Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
- 
-PARENT APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src
-
 
 Based on work by:
 Tony Gutierrez in "Blue Iris Profile Integration"
@@ -23,7 +17,21 @@ in compliance with the License. You may obtain a copy of the License at:
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
 on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
 for the specific language governing permissions and limitations under the License.
+*/
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+///										App Info											//
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+Smartthings Community Thread: https://community.smartthings.com/t/release-bi-fusion-v3-0-adds-blue-iris-device-type-handler-blue-iris-camera-dth-motion-sensing/103032
+
+Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
  
+PARENT APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src
+
+Version History:
 Version 1.0 - 30July2016    Initial release
 Version 1.1 - 3August2016   Cleaned up code
 Version 1.2 - 4August2016   Added Alarm trigger capability from rayzurbock
@@ -33,8 +41,13 @@ Version 2.2 - 22Jan2017     Added trigger notifications
 Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifications in the app is user defined instead of always on.
 Version 2.4 - 30May2017     Added button push to trigger options
 Version 2.5 - 5Oct2017		Added Contact Closing and Switch turning off to trigger options
+Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration, and App Update Notifications
 
+To Do:
+-Nothing!
 */
+
+def appVersion() {"3.0"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -47,15 +60,27 @@ definition(
     iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png")
 
 preferences {
-    page(name: "mainPage", title: "", install: true, uninstall: true)
+    page(name: "mainPage", title: "BI Fusion Custom Camera Triggers", install: true, uninstall: true)
     page(name: "certainTime")
 }
 
 def mainPage() {
-    return dynamicPage(name: "mainPage", title: "") {
-        section("Blue Iris Camera Name"){
-            paragraph "Use the Blue Iris short name for the camera, it is case-sensitive."
-            input "biCamera", "text", title: "Camera Name", required: true
+    return dynamicPage(name: "mainPage", title: "BI Fusion Custom Camera Triggers", submitOnChange: true) {
+        section("Using Blue Iris Camera Devices Types?"){
+            paragraph "You can either use the Blue Iris Camera Device Type created in BI Fusion, or skip that and just type in the camera's short name for setup"
+            input "usingCameraDTH", "bool", title: "Use Device Type Handler?", submitOnChange: true
+            paragraph "NOTE: You have to click 'Done' to complete initial BI Fusion setup prior to setting up any triggers (The camera devices aren't created until you click 'Done' the first time)."
+        }
+        if (usingCameraDTH) {
+            section("Select Blue Iris Camera(s) to Trigger") {   
+                input "biCamerasSelected", "capability.imageCapture", title: "Blue Iris Cameras", required: false, multiple: true  
+                paragraph "NOTE: Be sure to only select Blue Iris cameras."
+            }
+        } else {
+            section("Blue Iris Camera Name") {  
+                paragraph "Enter the Blue Iris short name for the camera, it is case-sensitive."
+                input "biCamera", "text", title: "Camera Name", required: false
+            }
         }
         section("Select trigger events"){   
             input "myMotion", "capability.motionSensor", title: "Motion Sensors Active", required: false, multiple: true
@@ -66,18 +91,20 @@ def mainPage() {
             input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
             input "myButton", "capability.button", title: "Button Pushed", required: false, multiple: true
         }
-        section("Notifications") {
-            paragraph "You can choose to receive notifications for this trigger.  Message delivery matches your settings in the main (parent) app. You can also choose to receive status notifications within the SmartThings Notifications tab (errors will always be displayed here)."
-            def receiveAlerts = false
-            input "receiveAlerts", "bool", title: "Receive Push/SMS Alerts?"
-            def receiveNotifications = false
-            input "receiveNotifications", "bool", title: "Receive Notifications?"
-        }
         section(title: "More options", hidden: hideOptionsSection(), hideable: true) {
             def timeLabel = timeIntervalLabel()
             href "certainTime", title: "Only during a certain time", description: timeLabel ?: "Tap to set", state: timeLabel ? "complete" : null
             input "days", "enum", title: "Only on certain days of the week", multiple: true, required: false, options: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
             input "modes", "mode", title: "Only when mode is", multiple: true, required: false
+        }
+        section("Notifications") {
+            def receiveAlerts = false
+            input "receiveAlerts", "bool", title: "Receive Push/SMS Alerts When Triggered?"
+            if (!parent.localOnly && !parent.usingBIServer) {
+                paragraph "You can also receive error SMS/PUSH notifications for this trigger since you are using 'WAN/External' connections.  Message delivery matches your settings in the main BI Fusion app."
+                def receiveNotifications = false
+                input "receiveNotifications", "bool", title: "Receive Error Push/SMS Notifications?"  //todo -- this would also work for usingBIServer, just need to code it out.
+            }
         }
         section("") {
             input "customTitle", "text", title: "Assign a Name", required: true
@@ -135,16 +162,32 @@ def subscribeToEvents() {
 def eventHandlerBinary(evt) {
     if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
-        if (parent.loggingOn) log.debug "event occured within the desired timing conditions, triggering"
-        if (!receiveAlerts && receiveNotifications) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-        if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-        if (parent.localOnly) localTrigger()
-        else externalTrigger()
+        log.info "Triggering event occured within the desired timing conditions, triggering Cameras"
+        if (usingCameraDTH) {
+            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+            cameraDeviceTrigger()
+        } else {
+            if (parent.localOnly) {
+                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+                localTrigger()
+            }
+            else externalTrigger()
+        }
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
+        }
+
+def cameraDeviceTrigger() {
+    for (cameraDevice in biCamerasSelected) {
+        cameraDevice.on()  //since we have devices, we can just turn them on!
+        log.info "Triggering ${cameraDevice.displayName}"
+    }
 }
 
 def localTrigger() {
     if (parent.loggingOn) log.debug "Running localTrigger"
+    log.info "Triggering ${biCamera}"
     def biHost = "${parent.host}:${parent.port}"
     def biRawCommand = "/admin?camera=${biCamera}&trigger&user=${parent.username}&pw=${parent.password}"
     if (parent.loggingOn) log.debug "sending GET to URL $biHost/$biRawCommand"
@@ -159,11 +202,11 @@ def localTrigger() {
         ]
     def hubAction = new physicalgraph.device.HubAction(httpRequest)
     sendHubCommand(hubAction)
-    //todo - add error notification (but need a way to check for error first!)
 }
 
 def externalTrigger() {
     if (parent.loggingOn) log.debug "Running externalTrigger"
+    log.info "Triggering ${biCamera}"
     def errorMsg = "Blue Iris Fusion could not trigger ${biCamera}"
     try {
         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login"]) { response ->
@@ -184,7 +227,9 @@ def externalTrigger() {
                             if (response3.data.result == "success"){
                                     httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
                                         if (parent.loggingOn) log.debug response4.data
-                                        if (parent.loggingOn) log.debug "camera triggerd"
+                                        log.info "${biCamera} triggered"
+                                        if (!receiveAlerts) sendNotificationEvent("Blue Iris Fusion triggered camera '${biCamera}'")
+                                        if (receiveAlerts) parent.send("Blue Iris Fusion triggered camera '${biCamera}'")
                                         if (response4.data.result == "success") {
                                             httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
                                                 if (parent.loggingOn) log.debug response5.data
@@ -193,35 +238,35 @@ def externalTrigger() {
                                         } else {
                                             if (parent.loggingOn) log.debug "BI_FAILURE, not triggered"
                                             if (parent.loggingOn) log.debug(response4.data.data.reason)
-                                            if (!receiveAlerts) sendNotificationEvent(errorMsg)
-                                            if (receiveAlerts) parent.send(errorMsg)
+                                            if (!receiveNotifications) sendNotificationEvent(errorMsg)
+                                            if (receiveNotifications) parent.send(errorMsg)
                                         }
                                     }
                             } else {
                                 if (parent.loggingOn) log.debug "BI_FAILURE, didn't receive status"
                                 if (parent.loggingOn) log.debug(response3.data.data.reason)
-                                if (!receiveAlerts) sendNotificationEvent(errorMsg)
-                                if (receiveAlerts) parent.send(errorMsg)
+                                if (!receiveNotifications) sendNotificationEvent(errorMsg)
+                                if (receiveNotifications) parent.send(errorMsg)
                             }
                         }
                     } else {
                         if (parent.loggingOn) log.debug "BI_FAILURE, didn't log in"
                         if (parent.loggingOn) log.debug(response2.data.data.reason)
-                        if (!receiveAlerts) sendNotificationEvent(errorMsg)
-                        if (receiveAlerts) parent.send(errorMsg)
+                        if (!receiveNotifications) sendNotificationEvent(errorMsg)
+                        if (receiveNotifications) parent.send(errorMsg)
                     }
                 }
             } else {
                 if (parent.loggingOn) log.debug "FAILURE"
                 if (parent.loggingOn) log.debug(response.data.data.reason)
-                if (!receiveAlerts) sendNotificationEvent(errorMsg)
-                if (receiveAlerts) parent.send(errorMsg)
+                if (!receiveNotifications) sendNotificationEvent(errorMsg)
+                if (receiveNotifications) parent.send(errorMsg)
             }
         }
     } catch(Exception e) {
         if (parent.loggingOn) log.debug(e)
-        if (!receiveAlerts) sendNotificationEvent(errorMsg)
-        if (receiveAlerts) parent.send(errorMsg)
+        if (!receiveNotifications) sendNotificationEvent(errorMsg)
+        if (receiveNotifications) parent.send(errorMsg)
     }
 }
 
