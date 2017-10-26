@@ -307,7 +307,7 @@ def initialize() {
     createInfoMaps()
     if (autoModeProfileSync) subscribe(location, modeChange)
     if (loggingOn) log.debug "Initialized with settings: ${settings}"
-    if (installCamaraDevices) subscribe(location, null, lanEventHandler, [filterEvents:false])  //for new motion...todo - test
+    //if (installCamaraDevices) subscribe(location, null, lanEventHandler, [filterEvents:false])  //for new motion...todo - test
     makeDevices()
 	schedule(now(), checkForUpdates)
 	checkForUpdates()
@@ -526,6 +526,7 @@ def createBIFusionToken() {
     }
 }
 
+/*
 def lanEventHandler(evt) {  //todo -- see if i can make this work
 	def msg = parseLanMessage(evt.value)
 	def body = msg.body
@@ -533,6 +534,7 @@ def lanEventHandler(evt) {  //todo -- see if i can make this work
     //def headerString = new String(parsedEvent.headers.decodeBase64())		
 	//def bodyString = new String(parsedEvent.body.decodeBase64())
 }
+*/
 
 def cameraActiveHandler() {
     def cameraShortName = params.camera
