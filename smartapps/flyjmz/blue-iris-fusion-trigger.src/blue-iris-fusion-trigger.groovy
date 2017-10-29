@@ -1,19 +1,19 @@
 /*
 Blue Iris Fusion - Trigger 
 (Child app for camera triggering.  Parent app is: "Blue Iris Fusion") 
- 
+
 Created by FLYJMZ (flyjmz230@gmail.com)
 
 Based on work by:
 Tony Gutierrez in "Blue Iris Profile Integration"
 jpark40 at https://community.smartthings.com/t/blue-iris-profile-trigger/17522/76
 luma at https://community.smartthings.com/t/blue-iris-camera-trigger-from-smart-things/25147/9
- 
+
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 in compliance with the License. You may obtain a copy of the License at:
- 
-    http://www.apache.org/licenses/LICENSE-2.0
- 
+
+http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
 on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
 for the specific language governing permissions and limitations under the License.
@@ -28,7 +28,7 @@ for the specific language governing permissions and limitations under the Licens
 Smartthings Community Thread: https://community.smartthings.com/t/release-bi-fusion-v3-0-adds-blue-iris-device-type-handler-blue-iris-camera-dth-motion-sensing/103032
 
 Github: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
- 
+
 PARENT APP CAN BE FOUND ON GITHUB: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src
 
 Version History:
@@ -42,12 +42,13 @@ Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifica
 Version 2.4 - 30May2017     Added button push to trigger options
 Version 2.5 - 5Oct2017		Added Contact Closing and Switch turning off to trigger options
 Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration, and App Update Notifications
+Version 3.0.1 - 28Oct2017 	Enabled full Camera DTH support regardless of command method to Blue Iris (BI Server DTH/Local/External)
 
 To Do:
 -Nothing!
 */
 
-def appVersion() {"3.0"}
+def appVersion() {"3.0.1"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -120,16 +121,16 @@ def certainTime() {
             else {
                 if(startingX == "Sunrise") input "startSunriseOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
                 else if(startingX == "Sunset") input "startSunsetOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
-            }
+                    }
         }
-        
+
         section() {
             input "endingX", "enum", title: "Ending at", options: ["A specific time", "Sunrise", "Sunset"], defaultValue: "A specific time", submitOnChange: true
             if(endingX in [null, "A specific time"]) input "ending", "time", title: "End time", required: false
             else {
                 if(endingX == "Sunrise") input "endSunriseOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
                 else if(endingX == "Sunset") input "endSunsetOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
-            }
+                    }
         }
     }
 }
@@ -164,73 +165,99 @@ def eventHandlerBinary(evt) {
     if (allOk) {
         log.info "Triggering event occured within the desired timing conditions, triggering Cameras"
         if (usingCameraDTH) {
+            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering cameras: '${biCamerasSelected}'")
+            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering cameras: '${biCamerasSelected}'")
+        } else {
             if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
             if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-            cameraDeviceTrigger()
-        } else {
-            if (parent.localOnly) {
-                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-                localTrigger()
-            }
-            else externalTrigger()
         }
+        if (parent.localOnly || parent.usingBIServer) {  //The trigger runs it's own local/external code, so we need to know which BI Fusion is use (and localOnly is the same as using the server in this case)
+            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+            localTrigger()
+        } else externalTrigger()
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
         }
 
-def cameraDeviceTrigger() {
-    for (cameraDevice in biCamerasSelected) {
-        cameraDevice.on()  //since we have devices, we can just turn them on!
-        log.info "Triggering ${cameraDevice.displayName}"
+def localTrigger() {
+    if (usingCameraDTH) {
+        log.info "Triggering: ${biCamerasSelected}"
+        for (cameraDevice in biCamerasSelected) {
+            talkToHub(cameraDevice.name)
+        }
+    } else {
+        log.info "Triggering ${biCamera}"
+        talkToHub(biCamera)
     }
 }
 
-def localTrigger() {
-    if (parent.loggingOn) log.debug "Running localTrigger"
-    log.info "Triggering ${biCamera}"
+def talkToHub(shortName) {
     def biHost = "${parent.host}:${parent.port}"
-    def biRawCommand = "/admin?camera=${biCamera}&trigger&user=${parent.username}&pw=${parent.password}"
+    def triggerCommand = "/admin?camera=${shortName}&trigger&user=${parent.username}&pw=${parent.password}"
     if (parent.loggingOn) log.debug "sending GET to URL $biHost/$biRawCommand"
     def httpMethod = "GET"
     def httpRequest = [
         method:     httpMethod,
-        path:       biRawCommand,
+        path:       triggerCommand,
         headers:    [
-                    HOST:       biHost,
-                    Accept:     "*/*",
-                    ]
+            HOST:       biHost,
+            Accept:     "*/*",
         ]
+    ]
     def hubAction = new physicalgraph.device.HubAction(httpRequest)
     sendHubCommand(hubAction)
 }
 
 def externalTrigger() {
-    if (parent.loggingOn) log.debug "Running externalTrigger"
-    log.info "Triggering ${biCamera}"
-    def errorMsg = "Blue Iris Fusion could not trigger ${biCamera}"
+    log.info "Running externalTrigger"
+    def errorMsg = "Blue Iris Fusion could not trigger camera(s)"
     try {
         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login"]) { response ->
             if (parent.loggingOn) log.debug response.data
             if (parent.loggingOn) log.debug "logging in"
             if (response.data.result == "fail") {
-               if (parent.loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
-               def session = response.data.session
-               def hash = parent.username + ":" + response.data.session + ":" + parent.password
-               hash = hash.encodeAsMD5()
-               httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
+                if (parent.loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
+                def session = response.data.session
+                def hash = parent.username + ":" + response.data.session + ":" + parent.password
+                hash = hash.encodeAsMD5()
+                httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
                     if (response2.data.result == "success") {
                         if (parent.loggingOn) log.debug ("BI_Logged In")
                         if (parent.loggingOn) log.debug response2.data
                         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
-                            if (parent.loggingOn) log.debug ("BI_Retrieved Status")
-                            if (parent.loggingOn) log.debug response3.data
                             if (response3.data.result == "success"){
+                                if (parent.loggingOn) log.debug ("BI_Retrieved Status")
+                                if (parent.loggingOn) log.debug response3.data
+                                //Code for multiple devices:
+                                if (usingCameraDTH) {
+                                    log.info "Triggering: ${biCamerasSelected}"
+                                    for (cameraDevice in biCamerasSelected) {
+                                        def biCamera = cameraDevice.name
+                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
+                                            if (parent.loggingOn) log.debug response4.data
+                                            if (response4.data.result == "success") {
+                                                if (!receiveAlerts) sendNotificationEvent("Blue Iris Fusion triggered camera '${biCamera}'")
+                                                if (receiveAlerts) parent.send("Blue Iris Fusion triggered camera '${biCamera}'")
+                                            } else {
+                                                if (parent.loggingOn) log.debug "BI_FAILURE, not triggered"
+                                                if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                                if (!receiveNotifications) sendNotificationEvent(errorMsg)
+                                                if (receiveNotifications) parent.send(errorMsg)
+                                            }
+                                        }
+                                    }
+                                    httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
+                                        if (parent.loggingOn) log.debug response5.data
+                                        if (parent.loggingOn) log.debug "Logged out"
+                                    }
+                                    //Code for single device:
+                                } else {
+                                    log.info "Triggering ${biCamera}"
                                     httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
                                         if (parent.loggingOn) log.debug response4.data
-                                        log.info "${biCamera} triggered"
-                                        if (!receiveAlerts) sendNotificationEvent("Blue Iris Fusion triggered camera '${biCamera}'")
-                                        if (receiveAlerts) parent.send("Blue Iris Fusion triggered camera '${biCamera}'")
                                         if (response4.data.result == "success") {
+                                            if (!receiveAlerts) sendNotificationEvent("Blue Iris Fusion triggered camera '${biCamera}'")
+                                            if (receiveAlerts) parent.send("Blue Iris Fusion triggered camera '${biCamera}'")
                                             httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
                                                 if (parent.loggingOn) log.debug response5.data
                                                 if (parent.loggingOn) log.debug "Logged out"
@@ -242,6 +269,8 @@ def externalTrigger() {
                                             if (receiveNotifications) parent.send(errorMsg)
                                         }
                                     }
+                                }
+                                //Continue with code:
                             } else {
                                 if (parent.loggingOn) log.debug "BI_FAILURE, didn't receive status"
                                 if (parent.loggingOn) log.debug(response3.data.data.reason)
@@ -294,22 +323,22 @@ private getDaysOk() {
 private getTimeOk() {
     def result = true
     if ((starting && ending) ||
-    (starting && endingX in ["Sunrise", "Sunset"]) ||
-    (startingX in ["Sunrise", "Sunset"] && ending) ||
-    (startingX in ["Sunrise", "Sunset"] && endingX in ["Sunrise", "Sunset"])) {
+        (starting && endingX in ["Sunrise", "Sunset"]) ||
+        (startingX in ["Sunrise", "Sunset"] && ending) ||
+        (startingX in ["Sunrise", "Sunset"] && endingX in ["Sunrise", "Sunset"])) {
         def currTime = now()
         def start = null
         def stop = null
         def s = getSunriseAndSunset(zipCode: zipCode, sunriseOffset: startSunriseOffset, sunsetOffset: startSunsetOffset)
         if(startingX == "Sunrise") start = s.sunrise.time
         else if(startingX == "Sunset") start = s.sunset.time
-        else if(starting) start = timeToday(starting,location.timeZone).time
-        s = getSunriseAndSunset(zipCode: zipCode, sunriseOffset: endSunriseOffset, sunsetOffset: endSunsetOffset)
-        if(endingX == "Sunrise") stop = s.sunrise.time
-        else if(endingX == "Sunset") stop = s.sunset.time
-        else if(ending) stop = timeToday(ending,location.timeZone).time
-        result = start < stop ? currTime >= start && currTime <= stop : currTime <= stop || currTime >= start
-    }
+            else if(starting) start = timeToday(starting,location.timeZone).time
+                s = getSunriseAndSunset(zipCode: zipCode, sunriseOffset: endSunriseOffset, sunsetOffset: endSunsetOffset)
+            if(endingX == "Sunrise") stop = s.sunrise.time
+            else if(endingX == "Sunset") stop = s.sunset.time
+                else if(ending) stop = timeToday(ending,location.timeZone).time
+                    result = start < stop ? currTime >= start && currTime <= stop : currTime <= stop || currTime >= start
+            }
     log.trace "timeOk = $result"
     return result
 }
@@ -338,11 +367,11 @@ private timeIntervalLabel() {
     def result = ""
     if (startingX == "Sunrise" && endingX == "Sunrise") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
     else if (startingX == "Sunrise" && endingX == "Sunset") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-    else if (startingX == "Sunset" && endingX == "Sunrise") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
-    else if (startingX == "Sunset" && endingX == "Sunset") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-    else if (startingX == "Sunrise" && ending) result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")
-    else if (startingX == "Sunset" && ending) result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")
-    else if (starting && endingX == "Sunrise") result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)
-    else if (starting && endingX == "Sunset") result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)
-    else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
-}
+        else if (startingX == "Sunset" && endingX == "Sunrise") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
+            else if (startingX == "Sunset" && endingX == "Sunset") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)
+                else if (startingX == "Sunrise" && ending) result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")
+                    else if (startingX == "Sunset" && ending) result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")
+                        else if (starting && endingX == "Sunrise") result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)
+                            else if (starting && endingX == "Sunset") result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)
+                                else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
+                                    }
