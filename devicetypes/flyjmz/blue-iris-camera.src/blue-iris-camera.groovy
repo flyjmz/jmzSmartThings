@@ -84,13 +84,13 @@ def parse(String description) {  //Don't need to parse anything because it's all
 
 def on() {   //Trigger to start recording with BI Camera
 	log.info "Executing 'on'"
-    sendEvent(name: "switch", value: "on", descriptionText: "Manual Recording Triggered", displayed: true)
+    sendEvent(name: "switch", value: "on", descriptionText: "Recording Triggered", displayed: true)
     runIn(10,off)
 }
 
 def off() {  //Can't actually turn off recording, the trigger is for a defined period in Blue Iris Settings for each camera and profile, this just puts the tile back to normal.
 	log.info "Executing 'off'"
-    sendEvent(name: "switch", value: "off", descriptionText: "Manual Recording Trigger Ended", displayed: true)
+    sendEvent(name: "switch", value: "off", descriptionText: "Recording Trigger Ended", displayed: true)
 }
 
 def active() {  //BI Camera senses motion
