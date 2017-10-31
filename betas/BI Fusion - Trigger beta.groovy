@@ -255,7 +255,7 @@ def localAction() {
 
 def talkToHub(commandPath) {  //todo can I use a 'callback' function to parse results?  Otherwise the trigger app really isn't confirming it worked...
     def biHost = "${parent.host}:${parent.port}"
-    if (parent.loggingOn) log.debug "sending GET to URL $biHost/$commandPath"
+    if (parent.loggingOn) log.debug "sending GET to URL $biHost$commandPath"
     def httpMethod = "GET"
     def httpRequest = [
         method:     httpMethod,
