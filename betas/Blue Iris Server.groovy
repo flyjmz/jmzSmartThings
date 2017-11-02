@@ -298,7 +298,8 @@ def parse(description) {
 
 def parseBody(body) {
     try {
-        if (body == "OkOk") {  //First determine if it came from a preset movement command
+    	def presetCommandTest = body.split()
+        if (presetCommandTest.size() <= 1) {  //First determine if it came from a preset movement command
             log.info "Camera Moved to Preset Successfully" //todo- Can I determine which camera? Pass this as a notification or device status?
         
         //If not preset, then it's a traffic light/profile/trigger response:
