@@ -188,7 +188,7 @@ def initialize() {
     subscribe(mySmoke, "smoke.detected", eventHandlerBinary)
     subscribe(mySmoke, "carbonMonoxide.detected", eventHandlerBinary)
     subscribe(myWater, "water.detected", eventHandlerBinary)
-    def names = []
+    def names = []  //todo - make externalAction use these lists to reduce code length
     def presets = []   
     if (usingCameraDTH) { 
         biCamerasSelected.each { camera ->
@@ -220,16 +220,16 @@ def eventHandlerBinary(evt) {
         } else if (!usePreset && disableRecording) {
             actionName = " Doing nothing to "
         } else if (!usePreset && !disableRecording) {
-            actionname = " Triggering "
+			actionname = " Triggering "
+        }
+        if (usingCameraDTH) {
+            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
+            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
+        } else {
+            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
+            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
         }
         if (parent.localOnly || parent.usingBIServer) {  //The trigger runs it's own local/external code, so we need to know which BI Fusion is use (and localOnly is the same as using the server in this case)
-            if (usingCameraDTH) {		//todo - once callback works, these can be deleted (because the callback will say the camera IS triggered, etc.
-                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
-                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
-            } else {
-                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
-                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
-            }
             localAction()
         } else externalAction()
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
@@ -269,7 +269,7 @@ def talkToHub(commandPath) {  //todo can I use a 'callback' function to parse re
     sendHubCommand(hubAction)
     log.trace hubAction
 }
-
+//todo - do the log.info, log.error and errormsg changes in bi fusion too
 def externalAction() {
     log.info "Running externalAction"
     try {
@@ -292,18 +292,33 @@ def externalAction() {
 
                                 ////////////////////Trigger to Record////////////////////////////////////////////////////
                                 if (!disableRecording) {
-                                	log.trace "Triggering: ${state.shortNameList}"
-                                    for (int i = 0; i < state.listSize; i++) {
-                                        def shortName = state.shortNameList[i]
-                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
+                                    if (usingCameraDTH) {  //If using multiple cameras:
+                                        log.info "Triggering: ${biCamerasSelected}"
+                                        for (cameraDevice in biCamerasSelected) {
+                                            def shortName = cameraDevice.name
+                                            httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
+                                                if (parent.loggingOn) log.debug response4.data
+                                                if (response4.data.result == "success") {
+                                                    log.info "Blue Iris Fusion triggered camera '${shortName}'"
+                                                } else {
+                                                    log.error "BI Fusion Failure: ${shortName} not triggered"
+                                                    if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                                    if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: ${shortName} not triggered")
+                                                    if (receiveNotifications) parent.send("BI Fusion Failure: ${shortName} not triggered")
+                                                }
+                                            }
+                                        }
+                                    } else {        //If using a single camera:
+                                        log.info "Triggering ${biCamera}"
+                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
                                             if (parent.loggingOn) log.debug response4.data
                                             if (response4.data.result == "success") {
-                                                log.info "BI Fusion triggered: ${shortName}"
+                                                log.info "Blue Iris Fusion triggered camera '${biCamera}'"
                                             } else {
-                                                log.error "BI Fusion Failure: ${shortName} not triggered"
+                                                log.error "BI Fusion Failure, not triggered"
                                                 if (parent.loggingOn) log.debug(response4.data.data.reason)
-                                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: ${shortName} not triggered")
-                                                if (receiveNotifications) parent.send("BI Fusion Failure: ${shortName} not triggered")
+                                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: ${biCamera} not triggered")
+                                                if (receiveNotifications) parent.send("BI Fusion Failure: ${biCamera} not triggered")
                                             }
                                         }
                                     }
@@ -311,21 +326,36 @@ def externalAction() {
 
                                 ////////////////////Move to Preset Position//////////////////////////////////////////////
                                 if (usePreset) {
-                                    log.trace "Moving ${state.shortNameList} to preset ${state.presetList}"
-                                    for (int i = 0; i < state.listSize; i++) {
-                                        def shortName = state.shortNameList[i]
-                                        def presetNumber = state.presetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
-                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":shortName,"button":presetNumber, "session":session]) { response4 -> 
-                                            if (parent.loggingOn) log.debug response4.data
-                                            if (response4.data.result == "success") {
-                                                log.info "BI Fusion moved $shortName to preset '${state.presetList[i]}'"
-                                            } else {
-                                                log.error "BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName"
-                                                if (parent.loggingOn) log.debug(response4.data.data.reason)
-                                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName")
-                                                if (receiveNotifications) parent.send("BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName")
+                                    if (usingCameraDTH) {
+                                        for (cameraDevice in biCamerasSelected) {
+                                            def shortName = cameraDevice.name
+                                            def presetInput = "preset-${cameraDevice.displayName}"
+                                            def presetNumber = settings[presetInput].toInteger() + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
+                                            httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":shortName,"button":presetNumber, "session":session]) { response4 -> 
+                                                if (parent.loggingOn) log.debug response4.data
+                                                if (response4.data.result == "success") {
+                                                    log.info "BI Fusion moved $shortName to preset '$presetString'"
+                                                } else {
+                                                    log.error "BI Fusion Failure: preset '$presetString' not sent to $shortName"
+                                                    if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                                    if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: preset '$presetString' not sent to $shortName")
+                                                    if (receiveNotifications) parent.send("BI Fusion Failure: preset '$presetString' not sent to $shortName")
+                                                }
                                             }
                                         }
+                                    } else {
+                                        def presetNumber = biPreset.toInteger() + 100
+                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":biCamera,"button":presetString, "session":session]) { response4 -> 
+                                            if (parent.loggingOn) log.debug response4.data
+                                            if (response4.data.result == "success") {
+                                                log.info "Moved ${biCamera} to preset ${biPreset}"
+                                            } else {
+                                                log.error "BI Fusion Failure: preset '$presetString' not sent to $biCamera"
+                                                if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: preset '$presetString' not sent to $biCamera")
+                                                if (receiveNotifications) parent.send("BI Fusion Failure: preset '$presetString' not sent to $biCamera")
+                                            }
+                                        } 
                                     }
                                 }
 
@@ -335,6 +365,7 @@ def externalAction() {
                                     if (parent.loggingOn) log.debug "Logged out"
                                 }
                                 
+							//////////////////////////Continue with code//////////////////////////////////////////
                             } else {
                                 log.error "BI Fusion Failure: didn't receive status"
                                 if (parent.loggingOn) log.debug(response3.data.data.reason)

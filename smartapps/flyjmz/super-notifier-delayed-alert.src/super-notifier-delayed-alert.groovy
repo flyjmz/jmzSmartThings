@@ -19,6 +19,8 @@ Version History:
 	1.1 - 10Oct2016, added mode changes & sunrise/sunset to periodic notifications, public release
     1.2 - 23Oct2016, found & corrected error when using periodic notifications for mode/sun changes but not timed ones.  Added hours to notifications.
     1.3 - 29Aug2017, added ability to snooze periodic notifications.  Just add a virtual switch device.  (I have a virtual switch device type in my Github repository, linked above).
+	1.4 - 5Oct2017, added temperature sensor monitoring.
+    1.5 - 10Oct2017, added lock monitoring.
 */
  
 definition(
@@ -39,7 +41,7 @@ preferences {
 def settings() {
     dynamicPage(name: "settings", title: "", install: true, uninstall: true) {
         section("") {
-            input "monitorType", "enum", title: "Monitor a switch or contact sensor?", required: true, options: ["Contact Sensor", "Switch"], submitOnChange: true
+            input "monitorType", "enum", title: "Monitor what?", required: true, options: ["Contact Sensor", "Switch", "Temperature", "Lock"], submitOnChange: true
             if (monitorType == "Contact Sensor") {
             	input "myContact", "capability.contactSensor", title: "Which contact?", required: true
             	input "openClosed", "enum", title: "When left open or closed?", required: true, options: ["Open", "Closed"]
@@ -47,6 +49,15 @@ def settings() {
             if (monitorType == "Switch") {
             	input "mySwitch", "capability.switch", title: "Which switch?", required: true
             	input "onOff", "enum", title: "When left on or off?", required: true, options: ["On", "Off"]
+            }
+            if (monitorType == "Temperature") {
+            	input "temp", "capability.temperatureMeasurement", title: "Which Temp Sensor?", required: true
+                input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
+                input "tempTooCold", "number", title: "Too Cold When Temp is Below:", range: "*..*", required: false
+            }
+            if (monitorType == "Lock") {
+            	input "myLock", "capability.lock", title: "Which Lock?", required: true
+                input "lockedUnlocked", "enum", title: "When left locked or left unlocked?", required: true, options: ["Locked", "Unlocked"]
             }
         }
         section("For more than this many minutes") {
@@ -137,6 +148,14 @@ def initialize () {
     } else if (onOff && onOff == "Off") {
     	subscribe(mySwitch, "switch.off", eventHandler)
 		subscribe(mySwitch, "switch.on", okHandler)
+    } else if (lockedUnlocked && lockedUnlocked == "Locked") {
+    	subscribe(myLock, "lock.locked", eventHandler)
+		subscribe(myLock, "lock.unlocked", okHandler)
+    } else if (lockedUnlocked && lockedUnlocked == "Unlocked") {
+        subscribe(myLock, "lock.unlocked", eventHandler)
+        subscribe(myLock, "lock.locked", okHandler)
+    } else if (temp) {
+    	subscribe(temp, "temperature", tempHandler)
     } else log.debug "Not subscribing to any device events"
     if (modeChange) subscribe(location, "mode", periodicNotifier) //checks status every time mode changes (in case it missed it)
     if (sunChange) {				//checks status every sun rises/sets (in case it missed it)
@@ -144,6 +163,29 @@ def initialize () {
     	subscribe(location, "sunset", periodicNotifier)
     }
     atomicState.msgSent = false
+}
+
+def gettooCold() {
+	def temp1 = tempTooCold
+    if (temp1 == null) temp1 = -460.0
+    return temp1
+}
+
+def gettooHot() {
+	def temp2 = tempTooHot 
+    if (temp2 == null) temp2 = 3000.0
+    return temp2
+}
+
+def tempHandler(evt) {
+	log.debug "tempHandler has ${evt.displayName} and ${temp?.currentState("temperature")}"
+    if (!atomicState.msgSent) {  //need this check because temperatures report at intervals on a scale of values (unlike switches and contact sensors), if we didn't check this, every time it recieved a new temp that was still out of limits, it'd reset the event time and start the periodic notifcations over.
+        def tempState1 = temp.currentState("temperature")  //trigger is based on the event subcription, but the temp value for notifications is a direct state pull
+        if (tempState1.doubleValue > tooHot || tempState1.doubleValue < tooCold) {
+            log.debug "Temp out of limits, sending to eventHandler"
+            eventHandler(evt)
+        } else log.debug "Temp within limits, no action taken."
+    }
 }
 
 def eventHandler(evt) {
@@ -155,6 +197,8 @@ def eventHandler(evt) {
 def stillWrong() { 
 	def myContactState = myContact?.currentState("contact")
     def mySwitchState = mySwitch?.currentState("switch")
+    def tempState2 = temp?.currentState("temperature")
+    def myLockState = myLock?.currentState("lock")
     if (openClosed) {
     	if (openClosed == "Open") {
 			if (myContactState.value == "open") {
@@ -176,21 +220,44 @@ def stillWrong() {
             } else log.debug "the switch is off and you want it that way"
         } else {
         	if (mySwitchState.value == "off") {
-	            log.debug "Switch is still on"
+	            log.debug "Switch is still off"
 				stillWrongMsger()
             } else log.debug "the switch is on and you want it that way"
     	}
+    }
+        if (lockedUnlocked) {
+    	if (lockedUnlocked == "locked") {
+			if (myLockState.value == "locked") {
+            	log.debug "Lock is still locked"
+				stillWrongMsger()
+            } else log.debug "the lock is unlocked and you want it that way"
+        } else {
+        	if (myLockState.value == "unlocked") {
+	            log.debug "Lock is still unlocked"
+				stillWrongMsger()
+            } else log.debug "the lock is lcoked and you want it that way"
+    	}
+    }
+    if (temp) {
+        if (tempState2.doubleValue > tooHot || tempState2.doubleValue < tooCold) {
+            log.debug "Temperature is still out of limits"
+            stillWrongMsger()
+        } else log.debug "Temp within limits, no action taken."
     }
 }
 
 def stillWrongMsger() {
 	def myContactState2 = myContact?.currentState("contact")
     def mySwitchState2 = mySwitch?.currentState("switch")
+    def myLockState2 = myLock?.currentState("lock")
+    def tempState3 = temp?.currentState("temperature")
     if (allOk) {
         log.debug "Event within time/day/mode constraints"
     	if (!atomicState.msgSent) {
             if (myContact) sendMessage("${myContact?.displayName} is still ${myContactState2?.value}!")
             if (mySwitch) sendMessage("${mySwitch?.displayName} is still ${mySwitchState2?.value}!")
+            if (myLock) sendMessage("${myLock?.displayName} is still ${myLockState2?.value}!")
+            if (temp) sendMessage("${temp?.displayName} is still ${tempState3?.value}!")
             atomicState.msgSent = true
             log.debug "sending first message, set atomicState.msgSent to ${atomicState.msgSent}"
        		if (periodicNotifications) {
@@ -201,17 +268,21 @@ def stillWrongMsger() {
             }
         } else if (periodicNotifications && atomicState.msgSent) {
         	def snooze = false
-        	if (snoozeSwitch?.currentState("switch").value == "on") snooze = true
+        	if (snoozeSwitch?.currentState("switch")?.value == "on") snooze = true
             if (!snooze) log.debug "sending periodic notification"
             int timeSince = ((now() - atomicState.problemTime) / 60000) //time since issue occured in whole minutes
             if (!snooze && timeSince > 180) {  //determines whether to report in hours or minutes (longer than 180 minutes is reported in hours), and ensures alerts aren't snoozed.
             	int timeMsg = timeSince / 60
                 if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeMsg} hours!")
             	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeMsg} hours!")
+                if (myLock) sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeMsg} hours!")
+                if (temp) sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeMsg} hours!")
             } 
             if (!snooze && timeSince < 180) {
         		if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeSince} minutes!")
             	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeSince} minutes!")
+                if (myLock) sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeSince} minutes!")
+                if (temp) sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeSince} minutes!")
             }
             if (waitMinutes) {
             	runIn((waitMinutes * 60), stillWrong)
@@ -330,4 +401,5 @@ private sendMessage(msg) {
         } else options.method = 'push'
 		sendNotification(msg, options)
 	}
+    log.debug "sent message: ${msg}"
 }
