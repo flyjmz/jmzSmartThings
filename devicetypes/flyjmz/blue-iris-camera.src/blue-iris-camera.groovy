@@ -29,12 +29,16 @@ Github Code:
 
 Version History:
 v1.0 26Oct17	Initial commit
+v1.1 2Nov17		BI Fusion updated to allow user to change Camera Device Names after installation, removed warnings in this DTH.
+				(Must change in devices' settings page, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).
+                Beta - Added Video Live Stream, but doesn't seem to work
+
 
 To Do:
 -Video stream and image capture
 */
 
-def appVersion() {"1.0"}
+def appVersion() {"1.1"}
 
 metadata {
     definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -42,6 +46,9 @@ metadata {
         capability "Switch"  //To trigger camera recording for other smartapps that may not accept momentary
         capability "Momentary" //To trigger camera recording w/momentary on
         capability "Image Capture"
+        capability "Video Camera"
+		capability "Video Capture"
+		capability "Refresh"
         attribute "cameraShortName", "string"
         attribute "errorMessage", "String"
         attribute "Image", "string"
@@ -50,6 +57,8 @@ metadata {
         command "on"
         command "off"
         command "take"
+        command "start"
+        command "initializeCamera"
     }
 
 
@@ -57,7 +66,35 @@ metadata {
     }
 
     tiles (scale: 2) {
-        standardTile("motion", "device.motion", width: 4, height: 2, canChangeIcon: false, canChangeBackground: true) {
+       		multiAttributeTile(name: "videoPlayer", type: "videoPlayer", width: 6, height: 4) {
+			/*tileAttribute("device.switch", key: "CAMERA_STATUS") {
+				attributeState("on", label: "Active", icon: "st.camera.dlink-indoor", action: "switch.off", backgroundColor: "#79b821", defaultState: true)
+				attributeState("off", label: "Inactive", icon: "st.camera.dlink-indoor", action: "switch.on", backgroundColor: "#ffffff")
+				attributeState("restarting", label: "Connecting", icon: "st.camera.dlink-indoor", backgroundColor: "#53a7c0")
+				attributeState("unavailable", label: "Unavailable", icon: "st.camera.dlink-indoor", action: "refresh.refresh", backgroundColor: "#F22000")
+			}*/
+
+			tileAttribute("device.errorMessage", key: "CAMERA_ERROR_MESSAGE") {
+				attributeState("errorMessage", label: "", value: "", defaultState: true)
+			}
+
+			tileAttribute("device.camera", key: "PRIMARY_CONTROL") {
+				attributeState("on", label: "Active", backgroundColor: "#79b821", defaultState: true)
+				attributeState("off", label: "Inactive", backgroundColor: "#ffffff")
+				attributeState("restarting", label: "Connecting", backgroundColor: "#53a7c0")
+				attributeState("unavailable", label: "Unavailable", backgroundColor: "#F22000")
+			}
+
+			tileAttribute("device.startLive", key: "START_LIVE") {
+				attributeState("live", action: "start", defaultState: true)
+			}
+
+			tileAttribute("device.stream", key: "STREAM_URL") {
+				attributeState("activeURL", defaultState: true)
+			}
+       }
+       
+       standardTile("motion", "device.motion", width: 4, height: 2, canChangeIcon: false, canChangeBackground: true) {
             state "inactive", label: 'No Motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
             state "active", label: 'Motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
         }
@@ -66,16 +103,17 @@ metadata {
             state "on", label: 'Recording', icon: "st.switch.switch.on", backgroundColor: "#53a7c0"  //no action because you can't untrigger a camera
         }
         main (["motion"])
-        details(["motion","button"])
+        details(["videoPlayer","motion","button"])
     }
 
     preferences {
-        section("Device Settings"){	//Can't have paragraphs in a DTH, but I also need to warn not to change the name here.
-            //paragraph "WARNING: DO NOT CHANGE SETTINGS HERE (except to uninstall the device)."
-            //paragraph "To change settings, go to the BI Fusion Smartapp."
-            input "nothing", "text", title: "WARNING: DO NOT CHANGE SETTINGS HERE (except to uninstall the device)", description: "Change settings in BI Fusion.", required: false, displayDuringSetup: false 
-        }
     }
+}
+
+def initializeCamera(cameraSettings) {
+	state.cameraSettings = cameraSettings
+    sendEvent(name: "motion", value: "inactive", descriptionText: "Camera Motion Inactive", displayed: false)  //initializes camera motion state
+    log.trace "${state.cameraSettings}"
 }
 
 def parse(String description) {  //Don't need to parse anything because it's all to/from server device then service manager app.
@@ -111,4 +149,26 @@ def push() {
 def take() {
 	log.info "Executing 'take'"
     //todo - add image capture
+}
+
+def start() {
+	log.trace "start()"
+   	def cameraStreamPath = "http://${state.cameraSettings.username}:${state.cameraSettings.password}@${state.cameraSettings.host}:${state.cameraSettings.port}/mjpg/${state.cameraSettings.shortName}"  //todo - shortname or channel number?
+    def dataLiveVideo = [
+		OutHomeURL  : cameraStreamPath,
+		InHomeURL   : cameraStreamPath,
+		ThumbnailURL: "http://cdn.device-icons.smartthings.com/camera/dlink-indoor@2x.png",
+		cookie      : [key: "key", value: "value"]
+	]
+
+	def event = [
+		name           : "stream",
+		value          : groovy.json.JsonOutput.toJson(dataLiveVideo).toString(),
+		data		   : groovy.json.JsonOutput.toJson(dataLiveVideo),
+		descriptionText: "Starting the livestream",
+		eventType      : "VIDEO",
+		displayed      : false,
+		isStateChange  : true
+	]
+	sendEvent(event)
 }

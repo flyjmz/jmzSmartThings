@@ -37,6 +37,7 @@ Version History:
 2.0		26Oct17		Now can be installed through the BI Fusion smartapp (preferred method).
 					Also added software update notifications, and BI camera integration (via BI Fusion)..
                     Non-destructive install, it can be run standalone or through BI Fusion.
+2.1		1Nov17		Added Parse handling for preset movements from camera DTH		                   
 
 To Do:
 -Nothing!
@@ -49,7 +50,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.0"}
+def appVersion() {"2.1"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -297,59 +298,65 @@ def parse(description) {
 
 def parseBody(body) {
     try {
-        //First separate out if a camera was triggered or not
-        def bodyArrayForTrigger = body.split('=')  //turns "signal=green profile=3 camera=Porch" into "signal,green profile,3 camera,Porch" //Using just split() would split any two-word camera names into two separate things.
-        if (bodyArrayForTrigger.size() > 3) {parseTrigger(bodyArrayForTrigger[3])}	//we know we have a triggered camera
+    	def presetCommandTest = body.split()
+        if (presetCommandTest.size() <= 1) {  //First determine if it came from a preset movement command
+            log.info "Camera Moved to Preset Successfully" //todo- Can I determine which camera? Pass this as a notification or device status?
         
-        //Then parse out traffic signal and profile
-        def bodyArray = body.split()
-        def newSignal = bodyArray[0] - "signal="
-        def newProfile = bodyArray[1] - "profile="
-        def newProfileNum = newProfile.toInteger()
-        def newProfileName = getprofileName(newProfileNum)
-        log.info "parsing results: profile is number '$newProfileNum', named '$newProfileName', signal is '$newSignal'"
-        
-        //Then update Tiles
-        sendEvent(name: "blueIrisProfile", value: "${newProfileName}", descriptionText: "Blue Iris Profile is ${newProfileName}", displayed: true)
-        if (!state.hubOnline) {  	//Sends a notification that it is back online since we had previously said it was offline
-            log.info "BI Server is back online"
-            sendEvent(name: "errorMessage", value: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", descriptionText: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", displayed: false)
-            state.hubOnline = true
-        }
-        sendEvent(name: "stoplight", value: "$newSignal", descriptionText: "Blue Iris Traffic Signal is ${newSignal}", displayed: true)
-        sendEvent(name: "sync", value: "default", displayed: false)
-        sendEvent(name: "refresh", value: "default", displayed: false)
-        if (newProfileNum ==0) sendEvent(name: "profile0mode", value: "on", displayed: false)
-        if (newProfileNum ==1) sendEvent(name: "profile1mode", value: "on", displayed: false)
-        if (newProfileNum ==2) sendEvent(name: "profile2mode", value: "on", displayed: false)
-        if (newProfileNum ==3) sendEvent(name: "profile3mode", value: "on", displayed: false)
-        if (newProfileNum ==4) sendEvent(name: "profile4mode", value: "on", displayed: false)
-        if (newProfileNum ==5) sendEvent(name: "profile5mode", value: "on", displayed: false)
-        if (newProfileNum ==6) sendEvent(name: "profile6mode", value: "on", displayed: false)
-        if (newProfileNum ==7) sendEvent(name: "profile7mode", value: "on", displayed: false)
-        if (newProfileNum !=0) sendEvent(name: "profile0mode", value: "${state.profile0mode}", displayed: false)
-        if (newProfileNum !=1) sendEvent(name: "profile1mode", value: "${state.profile1mode}", displayed: false)
-        if (newProfileNum !=2) sendEvent(name: "profile2mode", value: "${state.profile2mode}", displayed: false)
-        if (newProfileNum !=3) sendEvent(name: "profile3mode", value: "${state.profile3mode}", displayed: false)
-        if (newProfileNum !=4) sendEvent(name: "profile4mode", value: "${state.profile4mode}", displayed: false)
-        if (newProfileNum !=5) sendEvent(name: "profile5mode", value: "${state.profile5mode}", displayed: false)
-        if (newProfileNum !=6) sendEvent(name: "profile6mode", value: "${state.profile6mode}", displayed: false)
-        if (newProfileNum !=7) sendEvent(name: "profile7mode", value: "${state.profile7mode}", displayed: false)
+        //If not preset, then it's a traffic light/profile/trigger response:
+        } else { 
+            //First separate out if a camera was triggered or not
+            def bodyArrayForTrigger = body.split('=')  //turns "signal=green profile=3 camera=Porch" into "signal,green profile,3 camera,Porch" //Using just split() would split any two-word camera names into two separate things.
+            if (bodyArrayForTrigger.size() > 3) {parseTrigger(bodyArrayForTrigger[3])}	//we know we have a triggered camera
 
-        //Finally, notify if there are errors
-        if(state?.desiredNewProfile && state?.desiredNewProfile != newProfileName) {
-            log.error "error 1: ${state.desiredNewProfile} != ${newProfileName}"
-            sendEvent(name: "errorMessage", value: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", descriptionText: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", displayed: true)
-        }
-        if(state?.desiredNewStoplightColor && state?.desiredNewStoplightColor != newSignal) {
-            if(state.desiredNewStoplightColor == 'yellow' && newSignal == 'green'){
-                //Do nothing, not a problem, if the user has Blue Iris to skip yellow, or the yellow delay is a very short time, it'll end up on green
-            } else {
-                log.error "error 2: ${state.desiredNewStoplightColor} != ${newSignal}"
-                sendEvent(name: "errorMessage", value: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", descriptionText: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", displayed: true)
+            //Then parse out traffic signal and profile
+            def bodyArray = body.split()
+            def newSignal = bodyArray[0] - "signal="
+            def newProfile = bodyArray[1] - "profile="
+            def newProfileNum = newProfile.toInteger()
+            def newProfileName = getprofileName(newProfileNum)
+            log.info "parsing results: profile is number '$newProfileNum', named '$newProfileName', signal is '$newSignal'"
+
+            //Then update Tiles
+            sendEvent(name: "blueIrisProfile", value: "${newProfileName}", descriptionText: "Blue Iris Profile is ${newProfileName}", displayed: true)
+            if (!state.hubOnline) {  	//Sends a notification that it is back online since we had previously said it was offline
+                log.info "BI Server is back online"
+                sendEvent(name: "errorMessage", value: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", descriptionText: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", displayed: true)
+                state.hubOnline = true
+            }
+            sendEvent(name: "stoplight", value: "$newSignal", descriptionText: "Blue Iris Traffic Signal is ${newSignal}", displayed: true)
+            sendEvent(name: "sync", value: "default", displayed: false)
+            sendEvent(name: "refresh", value: "default", displayed: false)
+            if (newProfileNum ==0) sendEvent(name: "profile0mode", value: "on", displayed: false)
+            if (newProfileNum ==1) sendEvent(name: "profile1mode", value: "on", displayed: false)
+            if (newProfileNum ==2) sendEvent(name: "profile2mode", value: "on", displayed: false)
+            if (newProfileNum ==3) sendEvent(name: "profile3mode", value: "on", displayed: false)
+            if (newProfileNum ==4) sendEvent(name: "profile4mode", value: "on", displayed: false)
+            if (newProfileNum ==5) sendEvent(name: "profile5mode", value: "on", displayed: false)
+            if (newProfileNum ==6) sendEvent(name: "profile6mode", value: "on", displayed: false)
+            if (newProfileNum ==7) sendEvent(name: "profile7mode", value: "on", displayed: false)
+            if (newProfileNum !=0) sendEvent(name: "profile0mode", value: "${state.profile0mode}", displayed: false)
+            if (newProfileNum !=1) sendEvent(name: "profile1mode", value: "${state.profile1mode}", displayed: false)
+            if (newProfileNum !=2) sendEvent(name: "profile2mode", value: "${state.profile2mode}", displayed: false)
+            if (newProfileNum !=3) sendEvent(name: "profile3mode", value: "${state.profile3mode}", displayed: false)
+            if (newProfileNum !=4) sendEvent(name: "profile4mode", value: "${state.profile4mode}", displayed: false)
+            if (newProfileNum !=5) sendEvent(name: "profile5mode", value: "${state.profile5mode}", displayed: false)
+            if (newProfileNum !=6) sendEvent(name: "profile6mode", value: "${state.profile6mode}", displayed: false)
+            if (newProfileNum !=7) sendEvent(name: "profile7mode", value: "${state.profile7mode}", displayed: false)
+
+            //Finally, notify if there are errors
+            if(state?.desiredNewProfile && state?.desiredNewProfile != newProfileName) {
+                log.error "error 1: ${state.desiredNewProfile} != ${newProfileName}"
+                sendEvent(name: "errorMessage", value: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", descriptionText: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", displayed: true)
+            }
+            if(state?.desiredNewStoplightColor && state?.desiredNewStoplightColor != newSignal) {
+                if(state.desiredNewStoplightColor == 'yellow' && newSignal == 'green'){
+                    //Do nothing, not a problem, if the user has Blue Iris to skip yellow, or the yellow delay is a very short time, it'll end up on green
+                } else {
+                    log.error "error 2: ${state.desiredNewStoplightColor} != ${newSignal}"
+                    sendEvent(name: "errorMessage", value: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", descriptionText: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", displayed: true)
+                }
             }
         }
-
     } catch (Exception e) {
         log.error "error 21: Parsing parseBody() error, body is '$body'.  Error: $e"
         setTileProfileModesToName()
