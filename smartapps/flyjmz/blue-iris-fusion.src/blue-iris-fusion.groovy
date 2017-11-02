@@ -53,10 +53,12 @@ Version 2.5 - 23Jan2017     Slight tweak to notifications.
 Version 2.6 - 17Jun2017		Fixed Profile names when using in LAN (localAction was throwing NULL). Thanks Zaxxon!
 Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration with motion, profile integration, manual triggering and manual profile switching.
 							Also added App Update Notifications, cleaned up notifications, added OAuth for motion alerts
-Version 3.0.1 - 28Oct2017	Fixed bug where server device map was would fail to initialize when user wasn't using it (so now it doesn't generate unless desired)
+Version 3.0.1 - 28Oct2017	Fixed bug where server device map was would fail to initialize when user wasn't using it (so now it doesn't generate unless desired) - it would make install fail even if not using the Server DTH 
                             Fixed bug that would only only allow one camera device to install.
                             Enabled full Camera Device DTH support even without using Server DTH.
                             Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
+Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Names after installation (can change in devices' settings, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).	                           
+
 
 TODO:
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
@@ -67,7 +69,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.1"}
+def appVersion() {"3.0.2"}
 
 mappings {
     path("/active/:camera") {
@@ -378,6 +380,12 @@ def createInfoMaps() {
         }
        if (loggingOn) log.debug "state.cameradeviceDNI: ${state.cameradeviceDNI}, state.camerashortName: ${state.camerashortName}, state.cameradisplayName: ${state.cameradisplayName}"
     }
+    state.cameraSettings = [:]
+    state.cameraSettings.host = host
+    state.cameraSettings.port = port
+    state.cameraSettings.username = username
+    state.cameraSettings.password = password
+    state.cameraSettings.shortName = ""
 
     //Finally, go make the devices:
     makeDevices()
@@ -463,7 +471,7 @@ def serverDeviceErrorMessageHandler(evt) {
 /*		//Code for motion active/inactive from BI Server Device.  OAuth setup overrode this, but I'd like to go back (todo).
 def cameraActiveHandler(evt) {  //receives triggered status from BI through BI Server Device, and sends it to the Camera device
 if (loggingOn) log.debug "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."
-log.trace "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."
+log.trace "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."   //todo - change this so it doesn't use displayname
 def cameraDNI = ""
 def biCameraSize = state.biCamera.size()
 for (int i = 0; i < biCameraSize; i++) {
@@ -475,7 +483,7 @@ cameraDevice.active()
 }
 
 def cameraInactiveHandler(evt) {  //receives triggered status from BI through BI Server Device, and sends it to the Camera device
-if (loggingOn) log.debug "cameraInactiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is inactive."
+if (loggingOn) log.debug "cameraInactiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is inactive."    //todo - change this so it doesn't use displayname
 def cameraDNI = ""
 def biCameraSize = state.biCamera.size()
 for (int i = 0; i < biCameraSize; i++) {
@@ -497,23 +505,25 @@ def createCameraDevice() {
                 cameraDevice = addChildDevice("flyjmz", "Blue Iris Camera", state.cameradeviceDNI[i], location.hubs[0].id, [name: "${state.camerashortName[i]}", label: "${state.cameradisplayName[i]}", completedSetup: true])
                 if (loggingOn) log.debug "'${state.cameradisplayName[i]}' Device Created"
                 subscribe(cameraDevice, "switch.on", cameraTriggerHandler)
+                state.cameraSettings.shortName = state.camerashortName[i]
+                cameraDevice.initializeCamera(state.cameraSettings)  //pass settings
             } catch (e) {
                 log.error "Error creating '${state.cameradisplayName[i]}' Device: ${e}"
             }
         } else {
             if (loggingOn) log.debug "Camera with dni of '${state.cameradeviceDNI[i]}' already exists."
             subscribe(cameraDevice, "switch.on", cameraTriggerHandler) //still have to subscribe (intialize() wiped old subscriptions)
+            state.cameraSettings.shortName = state.camerashortName[i]
+            cameraDevice.initializeCamera(state.cameraSettings)  //pass/update settings
         }
     }
 }
 
-def cameraTriggerHandler(evt) {  //sends command to camera to start recording whenever the camera device is 'turned on'.
-    if (loggingOn) log.debug "cameraTriggerHandler() got event ${evt.displayName} is ${evt.value}"
-    def shortName = ""
+def cameraTriggerHandler(evt) {  //sends command to camera to start recording whenever the camera device is 'turned on' (which is done by the Camera DTH and/or other apps controlling the Camera DTH).
+    //WARNING - you don't want to have a camera triggered event also run this, because you'll end up in a loop.
+    if (loggingOn) log.debug "cameraTriggerHandler() got event ${evt.displayName} is ${evt.value}"//todo - change this so it doesn't use displayname, it's the only place we use it after creation, so fix this and users can change the displayname in settings
+    def shortName = evt.device.name
     def cameraMapSize = state.cameradeviceDNI.size()
-    for (int i = 0; i < cameraMapSize; i++) {
-        if (state.cameradisplayName[i] == evt.displayName) shortName = state.camerashortName[i]
-    }
     if (usingBIServer) {
         def serverDevice = getChildDevice(state.blueIrisServerSettings.DNI)
         serverDevice.triggerCamera(shortName)		//sends command through the BI Server Device
@@ -561,10 +571,15 @@ def cameraActiveHandler() {
         for (int i = 0; i < state.cameradeviceDNI.size(); i++) {
             if (state.camerashortName[i] == cameraShortName) cameraDNI = state.cameradeviceDNI[i]
         }
-        def cameraDevice = getChildDevice(cameraDNI)
-        cameraDevice.active()
+        if (cameraDNI != "") {
+            def cameraDevice = getChildDevice(cameraDNI)
+            cameraDevice.active()
+        } else {
+            log.error "error 30a: Camera Motion Received but received camera shortname not in list.  Check Blue Iris Alert settings for camera."
+            sendEvent(name: "errorMessage", value: "Camera Motion Received but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", descriptionText: "Camera Motion Received but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", displayed: true)
+        }
     } catch (Exception e) {
-        log.error "error 30: Active Camera Motion Received but failed to send motion to ST device. Error: $e"
+        log.error "error 30: Camera Motion Received but failed to send motion to ST device. Error: $e"
         sendEvent(name: "errorMessage", value: "Active Camera Motion Received but failed to send motion to ST device, check settings", descriptionText: "Active Camera Motion Received but failed to send motion to ST device, check settings", displayed: true)
     }
 }
@@ -577,8 +592,13 @@ def cameraInactiveHandler() {
         for (int i = 0; i < state.cameradeviceDNI.size(); i++) {
             if (state.camerashortName[i] == cameraShortName) cameraDNI = state.cameradeviceDNI[i]
         }
-        def cameraDevice = getChildDevice(cameraDNI)
-        cameraDevice.inactive()
+        if (cameraDNI != "") {
+            def cameraDevice = getChildDevice(cameraDNI)
+            cameraDevice.inactive()
+        } else {
+            log.error "error 31a: Camera Motion stopped but received camera shortname not in list.  Check Blue Iris Alert settings for camera."
+            sendEvent(name: "errorMessage", value: "Camera Motion stopped but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", descriptionText: "Camera Motion stopped but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", displayed: true)
+        }
     } catch (Exception e) {
         log.error "error 31: Camera Motion Stopped but failed to update ST device. Error: $e"
         sendEvent(name: "errorMessage", value: "Camera Motion Stopped but failed to update ST device, check settings", descriptionText: "Camera Motion Stopped but failed to update ST device, check settings", displayed: true)
@@ -668,223 +688,112 @@ def externalAction(stringCommand) {  //can accept string of either: number for p
     def isProfileChange = true
     def profile = 1
     def shortName = ""
-    def msg = ""
-    def errorMsg = ""
     if (stringCommand.isNumber()) {
         isProfileChange = true
         profile = stringCommand.toInteger()
-        errorMsg = "Blue Iris Fusion could not Change Blue Iris Profile to $profile"
-        msg = "Blue Iris Profile Change to $profile"
         log.info "Changing Blue Iris Profile to ${profile} via external command"
     } else {
         isProfileChange = false
         shortName = stringCommand
-        errorMsg = "Blue Iris Fusion could not trigger $shortName"
-        msg = "Blue Iris Camera '$shortName' Trigger"
         log.info "Triggering $shortName via external command"
     }
+    def lock = 2
+    if (!holdTemp) lock = 1
 
-    if (!holdTemp) {
-        try {
-            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
-                if (loggingOn) log.debug response.data
-                if (response.data.result == "fail") {
-                    if (loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
-                    def session = response.data.session
-                    def hash = username + ":" + response.data.session + ":" + password
-                    hash = hash.encodeAsMD5()
-                    httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
-                        if (loggingOn) log.debug response2.data
-                        if (response2.data.result == "success") {
-                            def BIprofileNames = response2.data.data.profiles
-                            if (loggingOn) log.debug ("BI_Logged In")
-                            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
-                                if (loggingOn) log.debug response3.data
-                                if (response3.data.result == "success"){
-                                    if (loggingOn) log.debug ("BI_Retrieved Status")
-                                    if (isProfileChange) {   
-                                        //Begin Profile Change Code
-                                        if (response3.data.data.profile != profile){        
-                                            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"session":session]) { response4 ->
-                                                if (loggingOn) log.debug response4.data
-                                                if (response4.data.result == "success") {
-                                                    if (response4.data.data.profile.toInteger() == profile) {
-                                                        if (loggingOn) log.debug ("Blue Iris to profile ${profileName(BIprofileNames,profile)}!")
-                                                        if(receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("Blue Iris Fusion temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-                                                        if (receiveAlerts == "Yes") send("Blue Iris Fusion temporarily changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-                                                    } else {
-                                                        if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Temp change to ${profileName(BIprofileNames,profile)}. Check your user permissions.")
-                                                        if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                        if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                    }
-                                                    httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                        if (loggingOn) log.debug response5.data
-                                                        if (loggingOn) log.debug "Logged out"
-                                                    }
-                                                } else {
-                                                    if (loggingOn) log.debug "BI_FAILURE"
-                                                    if (loggingOn) log.debug(response4.data.data.reason)
-                                                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
-                                                }
-                                            }
-                                        } else {
-                                            if (loggingOn) log.debug ("Blue Iris is already at profile ${profileName(BIprofileNames,profile)}.")
-                                            sendNotificationEvent("Blue Iris is already in profile ${profileName(BIprofileNames,profile)}.")
-                                        }
-                                        //End Profile Change Code
-                                    } else {
-                                        //Begin Trigger code
-                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
+    try {
+        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
+            if (loggingOn) log.debug response.data
+            if (response.data.result == "fail") {
+                if (loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
+                def session = response.data.session
+                def hash = username + ":" + response.data.session + ":" + password
+                hash = hash.encodeAsMD5()
+                httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
+                    if (loggingOn) log.debug response2.data
+                    if (response2.data.result == "success") {
+                        def BIprofileNames = response2.data.data.profiles
+                        if (loggingOn) log.debug ("BI_Logged In")
+                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
+                            if (loggingOn) log.debug response3.data
+                            if (response3.data.result == "success"){
+                                if (loggingOn) log.debug ("BI_Retrieved Status")
+                                if (isProfileChange) {   
+                                    //Begin Profile Change Code
+                                    if (response3.data.data.profile != profile){        
+                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"lock":lock,"session":session]) { response4 ->
                                             if (loggingOn) log.debug response4.data
                                             if (response4.data.result == "success") {
-                                                log.info "${shortName} triggered"
-                                                if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion triggered camera '${shortName}'")
-                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion triggered camera '${shortName}'")
+                                                if (response4.data.data.profile.toInteger() == profile) {
+                                                    log.info ("Blue Iris to profile ${profileName(BIprofileNames,profile)}!")
+                                                    if(receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("Blue Iris Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                    if (receiveAlerts == "Yes") send("Blue Iris Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                } else {
+                                                    log.error ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Change to ${profileName(BIprofileNames,profile)} failed. Check your user permissions.")
+                                                    if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
                                                     if (loggingOn) log.debug response5.data
                                                     if (loggingOn) log.debug "Logged out"
                                                 }
                                             } else {
-                                                if (loggingOn) log.debug "BI_FAILURE, ${shortName} not triggered"
+                                                log.error "Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions."
                                                 if (loggingOn) log.debug(response4.data.data.reason)
-                                                if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
+                                                if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                             }
                                         }
-                                        //End Trigger code
+                                    } else {
+                                        log.info ("Blue Iris is already at profile ${profileName(BIprofileNames,profile)}.")
+                                        sendNotificationEvent("Blue Iris is already in profile ${profileName(BIprofileNames,profile)}.")
                                     }
+                                    //End Profile Change Code
                                 } else {
-                                    if (loggingOn) log.debug "BI_FAILURE"
-                                    if (loggingOn) log.debug(response3.data.data.reason)
-                                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
-                                }
-                            }
-                        } else {
-                            if (loggingOn) log.debug "BI_FAILURE"
-                            if (loggingOn) log.debug(response2.data.data.reason)
-                            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                            if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
-                        }
-                    }
-                } else {
-                    if (loggingOn) log.debug "FAILURE"
-                    if (loggingOn) log.debug(response.data.data.reason)
-                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
-                }
-            }
-        } catch(Exception e) {
-            if (loggingOn) log.debug(e)
-            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-            if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
-        }
-    } else {
-        try {
-            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
-                if (loggingOn) log.debug response.data
-                if (response.data.result == "fail") {
-                    if (loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
-                    def session = response.data.session
-                    def hash = username + ":" + response.data.session + ":" + password
-                    hash = hash.encodeAsMD5()
-                    httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
-                        if (response2.data.result == "success") {
-                            def BIprofileNames = response2.data.data.profiles
-                            if (loggingOn) log.debug ("BI_Logged In")
-                            if (loggingOn) log.debug response2.data
-                            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
-                                if (loggingOn) log.debug response3.data
-                                if (response3.data.result == "success"){
-                                    if (loggingOn) log.debug ("BI_Retrieved Status")
-                                    //Begin Profile Change code
-                                    if (isProfileChange) {   
-                                        if (response3.data.data.profile != profile){
-                                            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"session":session]) { response4 ->
-                                                if (loggingOn) log.debug response4.data
-                                                if (response4.data.result == "success") {
-                                                    if (loggingOn) log.debug "Set profile to ${profileName(BIprofileNames,profile)} via temp change, trying to set via hold"
-                                                    if (response4.data.data.profile.toInteger() == profile) {
-                                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"session":session]) { response5 ->
-                                                            if (loggingOn) log.debug response5.data
-                                                            if (response5.data.result == "success") {
-                                                                if (loggingOn) log.debug ("Set profile to ${profileName(BIprofileNames,profile)} with a hold change!")
-                                                                if (receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-                                                                if (receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-                                                            } else {
-                                                                if (loggingOn) log.debug ("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
-                                                                if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
-                                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion failed to hold profile, it is in ${profileName(BIprofileNames,response5.data.data.profile)}? but is only temporarily changed.")
-                                                            }
-                                                        }
-                                                    } else {
-                                                        if (loggingOn) log.debug ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Attempt to set ${profileName(BIprofileNames,profile)} failed, also unable to attempt hold. Check your user permissions.")
-                                                        if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                        if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                    }
-                                                    httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response6 ->
-                                                        if (loggingOn) log.debug response6.data
-                                                        if (loggingOn) log.debug "Logged out"
-                                                    }
-                                                } else {
-                                                    if (loggingOn) log.debug "BI_FAILURE"
-                                                    if (loggingOn) log.debug(response4.data.data.reason)
-                                                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
-                                                }
+                                    //Begin Trigger code
+                                    httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
+                                        if (loggingOn) log.debug response4.data
+                                        if (response4.data.result == "success") {
+                                            log.info "${shortName} triggered"
+                                            if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion triggered camera '${shortName}'")
+                                            if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion triggered camera '${shortName}'")
+                                            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
+                                                if (loggingOn) log.debug response5.data
+                                                if (loggingOn) log.debug "Logged out"
                                             }
                                         } else {
-                                            if (loggingOn) log.debug ("Blue Iris is already at profile ${profileName(BIprofileNames,profile)}.")
-                                            sendNotificationEvent("Blue Iris is already in profile ${profileName(BIprofileNames,profile)}.")
-                                        }  //End Profile Change Code
-                                    } else {
-                                        //Begin Trigger code
-                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
-                                            if (loggingOn) log.debug response4.data
-                                            if (response4.data.result == "success") {
-                                                log.info "${shortName} triggered"
-                                                if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion triggered camera '${shortName}'")
-                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion triggered camera '${shortName}'")
-                                                httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                    if (loggingOn) log.debug response5.data
-                                                    if (loggingOn) log.debug "Logged out"
-                                                }
-                                            } else {
-                                                if (loggingOn) log.debug "BI_FAILURE, ${shortName} not triggered"
-                                                if (loggingOn) log.debug(response4.data.data.reason)
-                                                if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
-                                            }
+                                            log.error "BI Fusion Error: ${shortName} not triggered"
+                                            if (loggingOn) log.debug(response4.data.data.reason)
+                                            if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: ${shortName} not triggered")
+                                            if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: ${shortName} not triggered")
                                         }
-                                        //End Trigger code
                                     }
-                                } else {
-                                    if (loggingOn) log.debug "BI_FAILURE"
-                                    if (loggingOn) log.debug(response3.data.data.reason)
-                                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
+                                    //End Trigger code
                                 }
+                            } else {
+                                log.error "BI Fusion Error: Could not retrieve current status"
+                                if (loggingOn) log.debug(response3.data.data.reason)
+                                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not retrieve current status")
+                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not retrieve current status")
                             }
-                        } else {
-                            if (loggingOn) log.debug "BI_FAILURE"
-                            if (loggingOn) log.debug(response2.data.data.reason)
-                            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                            if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
                         }
+                    } else {
+                        log.error "BI Fusion Error: Could not login"
+                        if (loggingOn) log.debug(response2.data.data.reason)
+                        if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not login")
+                        if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not login")
                     }
-                } else {
-                    if (loggingOn) log.debug "FAILURE"
-                    if (loggingOn) log.debug(response.data.data.reason)
-                    if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
                 }
+            } else {
+                log.error "BI Fusion Error: Could not login"
+                if (loggingOn) log.debug(response.data.data.reason)
+                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not login")
+                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not login")
             }
-        } catch(Exception e) {
-            if (loggingOn) log.debug(e)
-            if (receiveAlerts == "No") sendNotificationEvent(errorMsg)
-            if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send(errorMsg)
         }
+    } catch(Exception e) {
+        log.error "BI Fusion Error: External Connection to Blue Iris Failed. Error: $e"
+        if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: External Connection to Blue Iris Failed. Error: $e")
+        if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: External Connection to Blue Iris Failed. Error: $e")
     }
 }
 
@@ -1001,7 +910,7 @@ def checkUpdates(name, installedVersion, website) {
     } else if (!publishedVersion) {log.error "Cannot get published app version for ${name} from the web."}
 }
 
-private send(msg) {
+private send(msg) {  //todo - double check what happens here if user doesn't enter contact info but updateAlertsOff defaults to off (so it tries to send messages)
     if (location.contactBookEnabled) {
         if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
         sendNotificationToContacts(msg, recipients)

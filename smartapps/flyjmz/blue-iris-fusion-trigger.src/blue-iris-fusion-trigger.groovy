@@ -43,12 +43,16 @@ Version 2.4 - 30May2017     Added button push to trigger options
 Version 2.5 - 5Oct2017		Added Contact Closing and Switch turning off to trigger options
 Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration, and App Update Notifications
 Version 3.0.1 - 28Oct2017 	Enabled full Camera DTH support regardless of command method to Blue Iris (BI Server DTH/Local/External)
+Version 3.0.2 - ??			Added triggers for: acceleration, presence, shock, smoke, carbonMonoxide, and water sensors.
+							Added ability to send preset commands to cameras when triggering.
+                            Remind Users to click on each Trigger app instance to confirm settings & tap 'done' to ensure initialize() runs.
+BETA 3.0.2.b
 
 To Do:
--Nothing!
+-see todos
 */
 
-def appVersion() {"3.0.1"}
+def appVersion() {"3.0.2"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -67,10 +71,10 @@ preferences {
 
 def mainPage() {
     return dynamicPage(name: "mainPage", title: "BI Fusion Custom Camera Triggers", submitOnChange: true) {
-        section("Using Blue Iris Camera Devices Types?"){
-            paragraph "You can either use the Blue Iris Camera Device Type created in BI Fusion, or skip that and just type in the camera's short name for setup"
-            input "usingCameraDTH", "bool", title: "Use Device Type Handler?", submitOnChange: true
-            paragraph "NOTE: You have to click 'Done' to complete initial BI Fusion setup prior to setting up any triggers (The camera devices aren't created until you click 'Done' the first time)."
+        section(""){
+            paragraph "Select the Camera(s) to control by either selecting from your BI Camera Devices list or type in a camera's short name"
+            input "usingCameraDTH", "bool", title: "Select from list?", submitOnChange: true
+            paragraph "NOTE: To select cameras, first complete the initial BI Fusion setup. (The camera devices aren't created until you click 'Done' the first time)."
         }
         if (usingCameraDTH) {
             section("Select Blue Iris Camera(s) to Trigger") {   
@@ -79,11 +83,11 @@ def mainPage() {
             }
         } else {
             section("Blue Iris Camera Name") {  
-                paragraph "Enter the Blue Iris short name for the camera, it is case-sensitive."
+                paragraph "Enter the Blue Iris short name for the Camera (case-sensitive)."
                 input "biCamera", "text", title: "Camera Name", required: false
             }
         }
-        section("Select trigger events"){   
+        section("Select Trigger Events"){   
             input "myMotion", "capability.motionSensor", title: "Motion Sensors Active", required: false, multiple: true
             input "myContactOpen", "capability.contactSensor", title: "Contact Sensors Opening", required: false, multiple: true
             input "myContactClosed", "capability.contactSensor", title: "Contact Sensors Closing", required: false, multiple: true
@@ -91,6 +95,26 @@ def mainPage() {
             input "mySwitchOff", "capability.switch", title: "Switches Turning Off", required: false, multiple: true
             input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
             input "myButton", "capability.button", title: "Button Pushed", required: false, multiple: true
+            input "myAccel", "capability.accelerationSensor", title: "Acceleration Active", required: false, multiple: true
+            input "myPresence", "capability.presenceSensor", title: "Presence Arrived", required: false, multiple: true
+            input "myShock", "capability.shockSensor", title: "Shock Detected", required: false, multiple: true
+            input "mySmoke", "capability.smokeDetector", title: "Smoke/CO Detected", required: false, multiple: true
+            input "myWater", "capability.waterSensor", title: "Water Detected", required: false, multiple: true
+        }
+        section("Camera Trigger and/or PTZ") {
+            paragraph "This is trigger camera(s) to record by default, you can also choose to move the camera(s) to a preset:"
+            input "usePreset", "bool", title: "Move to Preset?", required: true, submitOnChange: true
+            if (usePreset) {
+                input "disableRecording", "bool", title: "Disable Recording (and only move to preset)?", required: false
+                if (usingCameraDTH) {
+                    biCamerasSelected.each { camera ->
+                        def cameraName = camera.displayName  
+                        input "preset-${cameraName}", "number", title: "Preset # for Camera: ${cameraName}", required: true
+                    }
+                } else {
+                    input "biPreset", "number", title: "Preset # for Camera: ${biCamera}", required: true
+                }
+            }
         }
         section(title: "More options", hidden: hideOptionsSection(), hideable: true) {
             def timeLabel = timeIntervalLabel()
@@ -137,18 +161,18 @@ def certainTime() {
 
 def installed() {
     if (parent.loggingOn) log.debug "Installed with settings: ${settings}"
-    subscribeToEvents()
+    initialize()
     app.updateLabel("${customTitle}")
 }
 
 def updated() {
     if (parent.loggingOn) log.debug "Updated with settings: ${settings}"
     unsubscribe()
-    subscribeToEvents()
+    initialize()
     app.updateLabel("${customTitle}")
 }
 
-def subscribeToEvents() {
+def initialize() {
     subscribe(myMotion, "motion.active", eventHandlerBinary)
     subscribe(myContactOpen, "contact.open", eventHandlerBinary)
     subscribe(myContactClosed, "contact.closed", eventHandlerBinary)
@@ -158,47 +182,84 @@ def subscribeToEvents() {
     subscribe(myAlarm, "alarm.siren", eventHandlerBinary)
     subscribe(myAlarm, "alarm.both", eventHandlerBinary)
     subscribe(myButton, "button.pushed", eventHandlerBinary)
+    subscribe(myAccel, "acceleration.active", eventHandlerBinary)
+    subscribe(myPresence, "presence.active", eventHandlerBinary)
+    subscribe(myShock, "shock.detected", eventHandlerBinary)
+    subscribe(mySmoke, "smoke.detected", eventHandlerBinary)
+    subscribe(mySmoke, "carbonMonoxide.detected", eventHandlerBinary)
+    subscribe(myWater, "water.detected", eventHandlerBinary)
+    def names = []
+    def presets = []   
+    if (usingCameraDTH) { 
+        biCamerasSelected.each { camera ->
+            names += camera.name
+            if (usePreset) {
+                def presetInput = "preset-${camera.displayName}"
+                presets += settings[presetInput].toInteger()
+            }
+        }
+    } else {
+        names += biCamera
+        presets +=biPreset.toInteger()
+    }
+    state.shortNameList = names
+    state.presetList = presets
+    state.listSize =  state.shortNameList.size()
+    log.info "intialized, listSize is $state.listSize, cameras are $state.shortNameList, and presets are $state.presetList"
 }
 
 def eventHandlerBinary(evt) {
     if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
-        log.info "Triggering event occured within the desired timing conditions, triggering Cameras"
-        if (usingCameraDTH) {
-            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering cameras: '${biCamerasSelected}'")
-            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering cameras: '${biCamerasSelected}'")
-        } else {
-            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
+        log.info "Event occured within the desired timing conditions, sending commands"
+        def actionName = ""
+        if (usePreset && !disableRecording) {
+            actionName = " Moving and Triggering "
+        } else if (usePreset && disableRecording) {
+            actionName = " Moving "
+        } else if (!usePreset && disableRecording) {
+            actionName = " Doing nothing to "
+        } else if (!usePreset && !disableRecording) {
+            actionname = " Triggering "
         }
         if (parent.localOnly || parent.usingBIServer) {  //The trigger runs it's own local/external code, so we need to know which BI Fusion is use (and localOnly is the same as using the server in this case)
-            if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-            if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, Blue Iris Fusion is triggering camera '${biCamera}'")
-            localTrigger()
-        } else externalTrigger()
+            if (usingCameraDTH) {		//todo - once callback works, these can be deleted (because the callback will say the camera IS triggered, etc.
+                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
+                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
+            } else {
+                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
+                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
+            }
+            localAction()
+        } else externalAction()
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
         }
 
-def localTrigger() {
-    if (usingCameraDTH) {
-        log.info "Triggering: ${biCamerasSelected}"
-        for (cameraDevice in biCamerasSelected) {
-            talkToHub(cameraDevice.name)
+def localAction() {
+    def triggerCommand = ""
+    def presetCommand = ""
+    for (int i = 0; i < state.listSize; i++) {
+        if (usePreset) {
+        	log.info "Moving ${state.shortNameList[i]} to preset ${state.presetList[i]}"
+            def presetString = 7 + state.presetList[i]  //todo - if preset is 1, do I need to make this "7+1" or "8".  Also, it says unauthorized for ptz if I don't include the user&pass, but when I do the returned body is  null and I don't get a reaction.
+            presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}" //todo - find out what the parse message that comes back looks like
+            talkToHub(presetCommand)
         }
-    } else {
-        log.info "Triggering ${biCamera}"
-        talkToHub(biCamera)
+        if (!disableRecording) {
+            log.info "Triggering: ${state.shortNameList[i]}"
+            triggerCommand = "/admin?camera=${state.shortNameList[i]}&trigger&user=${parent.username}&pw=${parent.password}"
+            talkToHub(triggerCommand)
+        }
     }
 }
 
-def talkToHub(shortName) {
+def talkToHub(commandPath) {  //todo can I use a 'callback' function to parse results?  Otherwise the trigger app really isn't confirming it worked...
     def biHost = "${parent.host}:${parent.port}"
-    def triggerCommand = "/admin?camera=${shortName}&trigger&user=${parent.username}&pw=${parent.password}"
-    if (parent.loggingOn) log.debug "sending GET to URL $biHost/$biRawCommand"
+    if (parent.loggingOn) log.debug "sending GET to URL $biHost$commandPath"
     def httpMethod = "GET"
     def httpRequest = [
         method:     httpMethod,
-        path:       triggerCommand,
+        path:       commandPath,
         headers:    [
             HOST:       biHost,
             Accept:     "*/*",
@@ -206,11 +267,11 @@ def talkToHub(shortName) {
     ]
     def hubAction = new physicalgraph.device.HubAction(httpRequest)
     sendHubCommand(hubAction)
+    log.trace hubAction
 }
 
-def externalTrigger() {
-    log.info "Running externalTrigger"
-    def errorMsg = "Blue Iris Fusion could not trigger camera(s)"
+def externalAction() {
+    log.info "Running externalAction"
     try {
         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login"]) { response ->
             if (parent.loggingOn) log.debug response.data
@@ -228,74 +289,77 @@ def externalTrigger() {
                             if (response3.data.result == "success"){
                                 if (parent.loggingOn) log.debug ("BI_Retrieved Status")
                                 if (parent.loggingOn) log.debug response3.data
-                                //Code for multiple devices:
-                                if (usingCameraDTH) {
-                                    log.info "Triggering: ${biCamerasSelected}"
-                                    for (cameraDevice in biCamerasSelected) {
-                                        def biCamera = cameraDevice.name
-                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
+
+                                ////////////////////Trigger to Record////////////////////////////////////////////////////
+                                if (!disableRecording) {
+                                	log.trace "Triggering: ${state.shortNameList}"
+                                    for (int i = 0; i < state.listSize; i++) {
+                                        def shortName = state.shortNameList[i]
+                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
                                             if (parent.loggingOn) log.debug response4.data
                                             if (response4.data.result == "success") {
-                                                if (!receiveAlerts) sendNotificationEvent("Blue Iris Fusion triggered camera '${biCamera}'")
-                                                if (receiveAlerts) parent.send("Blue Iris Fusion triggered camera '${biCamera}'")
+                                                log.info "BI Fusion triggered: ${shortName}"
                                             } else {
-                                                if (parent.loggingOn) log.debug "BI_FAILURE, not triggered"
+                                                log.error "BI Fusion Failure: ${shortName} not triggered"
                                                 if (parent.loggingOn) log.debug(response4.data.data.reason)
-                                                if (!receiveNotifications) sendNotificationEvent(errorMsg)
-                                                if (receiveNotifications) parent.send(errorMsg)
+                                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: ${shortName} not triggered")
+                                                if (receiveNotifications) parent.send("BI Fusion Failure: ${shortName} not triggered")
                                             }
-                                        }
-                                    }
-                                    httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                        if (parent.loggingOn) log.debug response5.data
-                                        if (parent.loggingOn) log.debug "Logged out"
-                                    }
-                                    //Code for single device:
-                                } else {
-                                    log.info "Triggering ${biCamera}"
-                                    httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":biCamera,"session":session]) { response4 ->
-                                        if (parent.loggingOn) log.debug response4.data
-                                        if (response4.data.result == "success") {
-                                            if (!receiveAlerts) sendNotificationEvent("Blue Iris Fusion triggered camera '${biCamera}'")
-                                            if (receiveAlerts) parent.send("Blue Iris Fusion triggered camera '${biCamera}'")
-                                            httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                if (parent.loggingOn) log.debug response5.data
-                                                if (parent.loggingOn) log.debug "Logged out"
-                                            }
-                                        } else {
-                                            if (parent.loggingOn) log.debug "BI_FAILURE, not triggered"
-                                            if (parent.loggingOn) log.debug(response4.data.data.reason)
-                                            if (!receiveNotifications) sendNotificationEvent(errorMsg)
-                                            if (receiveNotifications) parent.send(errorMsg)
                                         }
                                     }
                                 }
-                                //Continue with code:
+
+                                ////////////////////Move to Preset Position//////////////////////////////////////////////
+                                if (usePreset) {
+                                    log.trace "Moving ${state.shortNameList} to preset ${state.presetList}"
+                                    for (int i = 0; i < state.listSize; i++) {
+                                        def shortName = state.shortNameList[i]
+                                        def presetNumber = state.presetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
+                                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":shortName,"button":presetNumber, "session":session]) { response4 -> 
+                                            if (parent.loggingOn) log.debug response4.data
+                                            if (response4.data.result == "success") {
+                                                log.info "BI Fusion moved $shortName to preset '${state.presetList[i]}'"
+                                            } else {
+                                                log.error "BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName"
+                                                if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName")
+                                                if (receiveNotifications) parent.send("BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName")
+                                            }
+                                        }
+                                    }
+                                }
+
+                                ////////////////////Logout///////////////////////////////////////////////////////////////
+                                httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
+                                    if (parent.loggingOn) log.debug response5.data
+                                    if (parent.loggingOn) log.debug "Logged out"
+                                }
+                                
                             } else {
-                                if (parent.loggingOn) log.debug "BI_FAILURE, didn't receive status"
+                                log.error "BI Fusion Failure: didn't receive status"
                                 if (parent.loggingOn) log.debug(response3.data.data.reason)
-                                if (!receiveNotifications) sendNotificationEvent(errorMsg)
-                                if (receiveNotifications) parent.send(errorMsg)
+                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: Couldn't Login to Blue Iris")
+                                if (receiveNotifications) parent.send("BI Fusion Failure: Couldn't Login to Blue Iris")
                             }
                         }
                     } else {
-                        if (parent.loggingOn) log.debug "BI_FAILURE, didn't log in"
+                        log.error "BI Fusion Failure: Couldn't Login to Blue Iris"
                         if (parent.loggingOn) log.debug(response2.data.data.reason)
-                        if (!receiveNotifications) sendNotificationEvent(errorMsg)
-                        if (receiveNotifications) parent.send(errorMsg)
+                        if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: Couldn't Login to Blue Iris")
+                        if (receiveNotifications) parent.send("BI Fusion Failure: Couldn't Login to Blue Iris")
                     }
                 }
             } else {
-                if (parent.loggingOn) log.debug "FAILURE"
+                log.error "BI Fusion Failure: Couldn't Login to Blue Iris"
                 if (parent.loggingOn) log.debug(response.data.data.reason)
-                if (!receiveNotifications) sendNotificationEvent(errorMsg)
-                if (receiveNotifications) parent.send(errorMsg)
+                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: Couldn't Login to Blue Iris")
+                if (receiveNotifications) parent.send("BI Fusion Failure: Couldn't Login to Blue Iris")
             }
         }
     } catch(Exception e) {
-        if (parent.loggingOn) log.debug(e)
-        if (!receiveNotifications) sendNotificationEvent(errorMsg)
-        if (receiveNotifications) parent.send(errorMsg)
+        log.error "BI Fusion Failure: $e"
+        if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure, turn on debugging and check logs")
+        if (receiveNotifications) parent.send("BI Fusion Failure, turn on debugging and check logs")
     }
 }
 
@@ -316,7 +380,6 @@ private getDaysOk() {
         def day = df.format(new Date())
         result = days.contains(day)
     }
-    log.trace "daysOk = $result"
     return result
 }
 
@@ -339,7 +402,6 @@ private getTimeOk() {
                 else if(ending) stop = timeToday(ending,location.timeZone).time
                     result = start < stop ? currTime >= start && currTime <= stop : currTime <= stop || currTime >= start
             }
-    log.trace "timeOk = $result"
     return result
 }
 
