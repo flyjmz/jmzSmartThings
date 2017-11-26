@@ -43,16 +43,17 @@ Version 2.4 - 30May2017     Added button push to trigger options
 Version 2.5 - 5Oct2017		Added Contact Closing and Switch turning off to trigger options
 Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration, and App Update Notifications
 Version 3.0.1 - 28Oct2017 	Enabled full Camera DTH support regardless of command method to Blue Iris (BI Server DTH/Local/External)
-Version 3.0.2 - ??			Added triggers for: acceleration, presence, shock, smoke, carbonMonoxide, and water sensors.
+Version 3.0.2 - 31Oct2017	Added triggers for: acceleration, presence, shock, smoke, carbonMonoxide, and water sensors.
 							Added ability to send preset commands to cameras when triggering.
                             Remind Users to click on each Trigger app instance to confirm settings & tap 'done' to ensure initialize() runs.
-BETA 3.0.2.b
+Version 3.0.3 - 26Nov2017	Changed variable "actionName" to "processName" to fixed java error everyone had (it's a class name, can't be a variable).
+							Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
 
 To Do:
 -see todos
 */
 
-def appVersion() {"3.0.2"}
+def appVersion() {"3.0.3"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -104,6 +105,7 @@ def mainPage() {
         section("Camera Trigger and/or PTZ") {
             paragraph "This is trigger camera(s) to record by default, you can also choose to move the camera(s) to a preset:"
             input "usePreset", "bool", title: "Move to Preset?", required: true, submitOnChange: true
+            def disableRecording = false
             if (usePreset) {
                 input "disableRecording", "bool", title: "Disable Recording (and only move to preset)?", required: false
                 if (usingCameraDTH) {
@@ -212,23 +214,24 @@ def eventHandlerBinary(evt) {
     if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
         log.info "Event occured within the desired timing conditions, sending commands"
-        def actionName = ""
+        def processName = ""
         if (usePreset && !disableRecording) {
-            actionName = " Moving and Triggering "
+            processName = " Moving and Triggering "
         } else if (usePreset && disableRecording) {
-            actionName = " Moving "
+            processName = " Moving "
         } else if (!usePreset && disableRecording) {
-            actionName = " Doing nothing to "
+            processName = " Doing Nothing to "
         } else if (!usePreset && !disableRecording) {
-            actionname = " Triggering "
+            processName = " Triggering "
         }
+        if (parent.loggingOn) log.debug "processName is $processName"
         if (parent.localOnly || parent.usingBIServer) {  //The trigger runs it's own local/external code, so we need to know which BI Fusion is use (and localOnly is the same as using the server in this case)
             if (usingCameraDTH) {		//todo - once callback works, these can be deleted (because the callback will say the camera IS triggered, etc.
-                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
-                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Cameras: ${biCamerasSelected}")
+                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
+                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
             } else {
-                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
-                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + actionName + "Camera: ${biCamera}")
+                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Camera: ${biCamera}")
+                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Camera: ${biCamera}")
             }
             localAction()
         } else externalAction()
@@ -241,8 +244,8 @@ def localAction() {
     for (int i = 0; i < state.listSize; i++) {
         if (usePreset) {
         	log.info "Moving ${state.shortNameList[i]} to preset ${state.presetList[i]}"
-            def presetString = 7 + state.presetList[i]  //todo - if preset is 1, do I need to make this "7+1" or "8".  Also, it says unauthorized for ptz if I don't include the user&pass, but when I do the returned body is  null and I don't get a reaction.
-            presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}" //todo - find out what the parse message that comes back looks like
+            def presetString = 7 + state.presetList[i]  //1-7 are other actions, presets start at number 8.
+            presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}"
             talkToHub(presetCommand)
         }
         if (!disableRecording) {
@@ -255,7 +258,7 @@ def localAction() {
 
 def talkToHub(commandPath) {  //todo can I use a 'callback' function to parse results?  Otherwise the trigger app really isn't confirming it worked...
     def biHost = "${parent.host}:${parent.port}"
-    if (parent.loggingOn) log.debug "sending GET to URL $biHost$commandPath"
+    log.trace "sending GET to SmartThings hub"
     def httpMethod = "GET"
     def httpRequest = [
         method:     httpMethod,
@@ -267,7 +270,7 @@ def talkToHub(commandPath) {  //todo can I use a 'callback' function to parse re
     ]
     def hubAction = new physicalgraph.device.HubAction(httpRequest)
     sendHubCommand(hubAction)
-    log.trace hubAction
+    if (parent.loggingOn) log.debug hubAction
 }
 
 def externalAction() {

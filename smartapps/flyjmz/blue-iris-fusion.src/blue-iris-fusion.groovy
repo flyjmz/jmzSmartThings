@@ -58,7 +58,7 @@ Version 3.0.1 - 28Oct2017	Fixed bug where server device map was would fail to in
                             Enabled full Camera Device DTH support even without using Server DTH.
                             Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
 Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Names after installation (can change in devices' settings, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).	                           
-
+Versino 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
 
 TODO:
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
@@ -151,7 +151,7 @@ def BIServerSetup() {
 
                 input "host", "text", title: "Blue Iris Server IP (only include the IP)", description: "e.g. 192.168.0.14", required:true
                 input "port", "number", title: "Blue Iris Server Port", description: "e.g. 81", required:true
-                paragraph "NOTE: Ensure 'Secure Only' is not checked in Blue Iris Webserver settings."
+                paragraph "NOTE: Ensure 'Use secure session keys and login page' is not checked in Blue Iris Webserver - Advanced settings."
                 double waitThreshold = 5
                 input "waitThreshold", "number", title: "Blue Iris Server Health Monitor: Enter the max server response time:", description: "Default: 5 seconds", required:false, displayDuringSetup: true 
             } else {
@@ -160,7 +160,7 @@ def BIServerSetup() {
                 paragraph "(Local does not support notifications confirming the changes were actually made.)"
                 input "localOnly", "bool", title: "Local connection?", required: true, submitOnChange: true
                 if (localOnly) {
-                    paragraph "NOTE: When using a local connection, you need to ensure 'Secure Only' is not checked in Blue Iris' Webserver settings."
+                    paragraph "NOTE: When using a local connection, you need to ensure 'Use secure session keys and login page' is not checked in Blue Iris Webserver - Advanced settings."
                     paragraph "Use the local IP address for Host, do not include http:// or anything but the IP address."
                     input "host", "text", title: "BI Webserver IP Address", description: "e.g. 192.168.0.14", required:true
                 } else {
@@ -236,6 +236,8 @@ def cameraDeviceSetup() {
             def createNewAddresses = false
             input "createNewAddresses", "bool", title: "Do you want to (re)create the URLs?", required: false, submitOnChange: true
             paragraph "(Leave Off in Order to VIEW ONLY...Not Change)"
+            input "debugDisplaysURLs", "bool", title: "Display URLs in API Logs?", required: false
+            paragraph "If turned on, the URLs will populate in SmartThings API's Live Logging when you initialize this smartapp.  If you open the API on the computer running Blue Iris, you can then copy and paste the URLs."
         }
         if (createNewAddresses) {
             section("CHANGE & View Motion Alert URLs") {
@@ -310,6 +312,15 @@ def initialize() {
     createInfoMaps()
     if (autoModeProfileSync) subscribe(location, modeChange)
     if (loggingOn) log.debug "Initialized with settings: ${settings}"
+    if (debugDisplaysURLs) {
+        for (int i = 0; i < howManyCameras; i++) {
+			def cameraShortNameInput = "camera${i}shortName"
+            def cameraShortName = settings[cameraShortNameInput].toString()
+            def activeURL = apiServerUrl("/api/smartapps/installations/${app.id}/active/${cameraShortName}?access_token=${state.accessToken}")
+            def inactiveURL = apiServerUrl("/api/smartapps/installations/${app.id}/inactive/${cameraShortName}?access_token=${state.accessToken}")
+            log.info "${cameraShortName} Active URL:" + "\n" + "${activeURL}" + "\n" +"${cameraShortName} Inactive URL:" + "\n" + "${inactiveURL}"
+        }
+    }
     //if (installCamaraDevices) subscribe(location, null, lanEventHandler, [filterEvents:false])  //for new motion...todo - test
     schedule(now(), checkForUpdates)
     checkForUpdates()
@@ -471,11 +482,12 @@ def serverDeviceErrorMessageHandler(evt) {
 /*		//Code for motion active/inactive from BI Server Device.  OAuth setup overrode this, but I'd like to go back (todo).
 def cameraActiveHandler(evt) {  //receives triggered status from BI through BI Server Device, and sends it to the Camera device
 if (loggingOn) log.debug "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."
-log.trace "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."   //todo - change this so it doesn't use displayname
+log.trace "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."
+def shortName = evt.device.name
 def cameraDNI = ""
 def biCameraSize = state.biCamera.size()
 for (int i = 0; i < biCameraSize; i++) {
-if (state.biCamera[i].shortName == evt.value) cameraDNI = state.biCamera[i].deviceDNI
+if (state.biCamera[i].shortName == shortName) cameraDNI = state.biCamera[i].deviceDNI
 }
 log.trace "cameraDNI is $cameraDNI"
 def cameraDevice = getChildDevice(cameraDNI)
@@ -483,11 +495,12 @@ cameraDevice.active()
 }
 
 def cameraInactiveHandler(evt) {  //receives triggered status from BI through BI Server Device, and sends it to the Camera device
-if (loggingOn) log.debug "cameraInactiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is inactive."    //todo - change this so it doesn't use displayname
+if (loggingOn) log.debug "cameraInactiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is inactive."
+def shortName = evt.device.name
 def cameraDNI = ""
 def biCameraSize = state.biCamera.size()
 for (int i = 0; i < biCameraSize; i++) {
-if (state.biCamera[i].shortName == evt.value) cameraDNI = state.biCamera[i].deviceDNI
+if (state.biCamera[i].shortName == shortName) cameraDNI = state.biCamera[i].deviceDNI
 }
 log.trace "cameraDNI is $cameraDNI"
 def cameraDevice = getChildDevice(cameraDNI)
@@ -521,7 +534,7 @@ def createCameraDevice() {
 
 def cameraTriggerHandler(evt) {  //sends command to camera to start recording whenever the camera device is 'turned on' (which is done by the Camera DTH and/or other apps controlling the Camera DTH).
     //WARNING - you don't want to have a camera triggered event also run this, because you'll end up in a loop.
-    if (loggingOn) log.debug "cameraTriggerHandler() got event ${evt.displayName} is ${evt.value}"//todo - change this so it doesn't use displayname, it's the only place we use it after creation, so fix this and users can change the displayname in settings
+    if (loggingOn) log.debug "cameraTriggerHandler() got event ${evt.displayName} is ${evt.value}"
     def shortName = evt.device.name
     def cameraMapSize = state.cameradeviceDNI.size()
     if (usingBIServer) {
@@ -910,7 +923,7 @@ def checkUpdates(name, installedVersion, website) {
     } else if (!publishedVersion) {log.error "Cannot get published app version for ${name} from the web."}
 }
 
-private send(msg) {  //todo - double check what happens here if user doesn't enter contact info but updateAlertsOff defaults to off (so it tries to send messages)
+private send(msg) {  
     if (location.contactBookEnabled) {
         if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
         sendNotificationToContacts(msg, recipients)
