@@ -69,7 +69,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.2"}
+def appVersion() {"3.0.3"}
 
 mappings {
     path("/active/:camera") {
@@ -313,12 +313,13 @@ def initialize() {
     if (autoModeProfileSync) subscribe(location, modeChange)
     if (loggingOn) log.debug "Initialized with settings: ${settings}"
     if (debugDisplaysURLs) {
+    	log.info "PLEASE REMEMBER TO SELECT HTTPS:// FROM THE DROPDOWN AND DON'T TYPE IT IN"
         for (int i = 0; i < howManyCameras; i++) {
 			def cameraShortNameInput = "camera${i}shortName"
             def cameraShortName = settings[cameraShortNameInput].toString()
             def activeURL = apiServerUrl("/api/smartapps/installations/${app.id}/active/${cameraShortName}?access_token=${state.accessToken}")
             def inactiveURL = apiServerUrl("/api/smartapps/installations/${app.id}/inactive/${cameraShortName}?access_token=${state.accessToken}")
-            log.info "${cameraShortName} Active URL:" + "\n" + "${activeURL}" + "\n" +"${cameraShortName} Inactive URL:" + "\n" + "${inactiveURL}"
+            log.info "${cameraShortName} Active URL:" + "\n" + "${activeURL}" - "https://" + "\n" +"${cameraShortName} Inactive URL:" + "\n" + "${inactiveURL}" - "https://"
         }
     }
     //if (installCamaraDevices) subscribe(location, null, lanEventHandler, [filterEvents:false])  //for new motion...todo - test
