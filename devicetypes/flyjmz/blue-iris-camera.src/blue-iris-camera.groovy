@@ -32,13 +32,14 @@ v1.0 26Oct17	Initial commit
 v1.1 2Nov17		BI Fusion updated to allow user to change Camera Device Names after installation, removed warnings in this DTH.
 				(Must change in devices' settings page, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).
                 Beta - Added Video Live Stream, but doesn't seem to work
+v1.2 26Nov17	Video did work! Only change for v1.2 is updated log.info/trace/debug to not post passwords all the time.
 
 
-To Do:
--Video stream and image capture
+ToDo:
+-Image capture
 */
 
-def appVersion() {"1.1"}
+def appVersion() {"1.2"}
 
 metadata {
     definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -113,7 +114,7 @@ metadata {
 def initializeCamera(cameraSettings) {
 	state.cameraSettings = cameraSettings
     sendEvent(name: "motion", value: "inactive", descriptionText: "Camera Motion Inactive", displayed: false)  //initializes camera motion state
-    log.trace "${state.cameraSettings}"
+    log.trace "${state.cameraSettings.shortName} camera DTH initialized"
 }
 
 def parse(String description) {  //Don't need to parse anything because it's all to/from server device then service manager app.
@@ -121,39 +122,39 @@ def parse(String description) {  //Don't need to parse anything because it's all
 }
 
 def on() {   //Trigger to start recording with BI Camera
-	log.info "Executing 'on'"
+	log.info "${state.cameraSettings.shortName} Executing 'on'"
     sendEvent(name: "switch", value: "on", descriptionText: "Recording Triggered", displayed: true)
     runIn(10,off)
 }
 
 def off() {  //Can't actually turn off recording, the trigger is for a defined period in Blue Iris Settings for each camera and profile, this just puts the tile back to normal.
-	log.info "Executing 'off'"
+	log.info "${state.cameraSettings.shortName} Executing 'off'"
     sendEvent(name: "switch", value: "off", descriptionText: "Recording Trigger Ended", displayed: true)
 }
 
 def active() {  //BI Camera senses motion
-	log.info "Motion 'active'"
+	log.info "${state.cameraSettings.shortName} Motion 'active'"
 	sendEvent(name: "motion", value: "active", descriptionText: "Camera Motion Active", displayed: true)
 }
 
 def inactive() {  //BI Camera no longer senses motion
-	log.info "Motion 'inactive'"
+	log.info "${state.cameraSettings.shortName} Motion 'inactive'"
     sendEvent(name: "motion", value: "inactive", descriptionText: "Camera Motion Inactive", displayed: true)
 }
 
 def push() {
-	log.info "Executing 'push'"
+	log.info "${state.cameraSettings.shortName} Executing 'push'"
 	on()
 }
 
 def take() {
-	log.info "Executing 'take'"
+	log.info "${state.cameraSettings.shortName} Executing 'take'"
     //todo - add image capture
 }
 
 def start() {
-	log.trace "start()"
-   	def cameraStreamPath = "http://${state.cameraSettings.username}:${state.cameraSettings.password}@${state.cameraSettings.host}:${state.cameraSettings.port}/mjpg/${state.cameraSettings.shortName}"  //todo - shortname or channel number?
+	log.trace "${state.cameraSettings.shortName} start()"
+   	def cameraStreamPath = "http://${state.cameraSettings.username}:${state.cameraSettings.password}@${state.cameraSettings.host}:${state.cameraSettings.port}/mjpg/${state.cameraSettings.shortName}"
     def dataLiveVideo = [
 		OutHomeURL  : cameraStreamPath,
 		InHomeURL   : cameraStreamPath,

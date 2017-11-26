@@ -37,7 +37,8 @@ Version History:
 2.0		26Oct17		Now can be installed through the BI Fusion smartapp (preferred method).
 					Also added software update notifications, and BI camera integration (via BI Fusion)..
                     Non-destructive install, it can be run standalone or through BI Fusion.
-2.1		1Nov17		Added Parse handling for preset movements from camera DTH		                   
+2.1		1Nov17		Added Parse handling for preset movements from camera DTH
+2.2		26Nov17		Code Cleanup; fixed responseTime math in serverOfflineChecker(); fixed 'secure only' terminology after Blue Iris changed it
 
 To Do:
 -Nothing!
@@ -50,7 +51,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.1"}
+def appVersion() {"2.2"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -151,11 +152,11 @@ metadata {
     preferences {
         section("Blue Iris Server Login Settings:"){  //NOTE: Device Type Handler Preferences can't be a dynamic page, can't do notifications, and can't have paragraph's
             //paragraph "This only functions on a Local Connection to the Blue Iris Server (i.e. LAN, the SmartThings hub is on the same network as the BI Server)?"
-            //paragraph "Ensure 'Secure Only' is not checked in Blue Iris' Webserver settings."
+            //paragraph "Ensure 'Use secure session keys and login page' is not checked in Blue Iris Webserver - Advanced settings."
             input "host", "text", title: "BI Webserver IP", description: "Must be a local connection", required:true, displayDuringSetup: true
             input "port", "number", title: "BI Webserver Port (e.g. 81)", required:true, displayDuringSetup: true
             input "username", "text", title: "BI Username", description: "Must be an Admin User", required: true, displayDuringSetup: true
-            input "password", "password", title: "BI Password", description: "Don't check 'Secure Only' in BI", required: true, displayDuringSetup: true
+            input "password", "password", title: "BI Password", description: "Don't check 'Use secure session...' in BI", required: true, displayDuringSetup: true
         }
         section("Blue Iris Profile <=> SmartThings Mode Matching:"){
             //paragraph "Enter the SmartThings Mode Name for the Matching Blue Iris Profiles (Inactive, and #1-7). Be sure to enter it exactly. To ignore a profile number, leave it blank."
@@ -299,7 +300,9 @@ def parse(description) {
 def parseBody(body) {
     try {
     	def presetCommandTest = body.split()
-        if (presetCommandTest.size() <= 1) {  //First determine if it came from a preset movement command
+        
+        //First determine if it came from a preset movement command
+        if (presetCommandTest.size() <= 1) {
             log.info "Camera Moved to Preset Successfully" //todo- Can I determine which camera? Pass this as a notification or device status?
         
         //If not preset, then it's a traffic light/profile/trigger response:
@@ -539,7 +542,7 @@ def hubTalksToBI(command) {
 def serverOfflineChecker() {
     if (state.debugLogging) log.debug "serverOfflineChecker() has state.hubCommandReceivedTime at ${state.hubCommandReceivedTime} and state.hubCommandSentTime at ${state?.hubCommandSentTime}"
     if (state.hubCommandReceivedTime && state.hubCommandSentTime) {
-        double responseTime = (state.hubCommandSentTime - state.hubCommandReceivedTime).abs() / 1000  //response time in seconds
+        double responseTime = (state.hubCommandReceivedTime - state.hubCommandSentTime).abs() / 1000  //response time in seconds
         if (state.debugLogging) log.debug "serverOfflineChecker() found server response time was ${responseTime}"
         if (responseTime > state.serverResponseThreshold) {
             log.error "error 9: Server Response time was ${responseTime} seconds, the server is offline."
