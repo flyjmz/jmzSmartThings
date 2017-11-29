@@ -39,6 +39,7 @@ Version History:
                     Non-destructive install, it can be run standalone or through BI Fusion.
 2.1		1Nov17		Added Parse handling for preset movements from camera DTH
 2.2		26Nov17		Code Cleanup; fixed responseTime math in serverOfflineChecker(); fixed 'secure only' terminology after Blue Iris changed it
+2.3		29Nov17		Made error codes more descriptive to aid correction.
 
 To Do:
 -Nothing!
@@ -51,7 +52,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.2"}
+def appVersion() {"2.3"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -578,8 +579,8 @@ def getprofileName(number) {
     else if (number == 7) {name = state.profile7mode}
     else if (number == 8) {name = "OFFLINE!"}
     else {
-        log.error "error 10: getprofileName(number) got a profile number outside of the 0-7 range, check the settings of what you passed it."
-        sendEvent(name: "errorMessage", value: "Error! A Blue Iris Profile number was passed outside of the 0-7 range. Check settings.", descriptionText: "Error! A Blue Iris Profile number was passed outside of the 0-7 range. Check settings.", displayed: true)
+        log.error "error 10: getprofileName(number) got a profile number '${number}', which is outside of the 0-7 range, check the settings of what you passed it."
+        sendEvent(name: "errorMessage", value: "Error! A Blue Iris Profile number (${number}) was passed, which is outside of the 0-7 range. Check settings.", descriptionText: "Error! A Blue Iris Profile number (${number}) was passed, which is outside of the 0-7 range. Check settings.", displayed: true)
     }
     if (state.debugLogging) log.debug "getprofileName returning ${name}"
     return name
@@ -598,8 +599,8 @@ def getprofileNumber(name) {
     else if (name == state.profile7mode) {number = 7}
     else if (name == "OFFLINE!") {number = 8}
     else {
-        log.error "error 11: getprofileNumber(name) got a name that isn't one of the user defined profiles, check profile name settings"
-        sendEvent(name: "errorMessage", value: "Error! A Blue Iris Profile name was passed that isn't one of the user defined profiles. Check settings.", descriptionText: "Error! A Blue Iris profile name was passed that isn't one of the user defined profiles. Check settings.", displayed: true)
+        log.error "error 11: getprofileNumber(name) got a name (${name}) that isn't one of the user defined profiles, check profile name settings"
+        sendEvent(name: "errorMessage", value: "Error! A Blue Iris Profile name (${name}) was passed, which isn't one of the user defined profiles. Check settings.", descriptionText: "Error! A Blue Iris Profile name (${name}) was passed, which isn't one of the user defined profiles. Check settings.", displayed: true)
     }
     if (state.debugLogging) log.debug "getprofileNumber returning ${number}"
     return number
