@@ -58,7 +58,9 @@ Version 3.0.1 - 28Oct2017	Fixed bug where server device map was would fail to in
                             Enabled full Camera Device DTH support even without using Server DTH.
                             Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
 Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Names after installation (can change in devices' settings, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).	                           
-Versino 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
+Version 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
+Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
+							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
 
 TODO:
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
@@ -69,7 +71,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.3"}
+def appVersion() {"3.0.4"}
 
 mappings {
     path("/active/:camera") {
@@ -138,7 +140,6 @@ def BIServerSetup() {
             paragraph "NOTE: If you want to remove the device but keep BI Fusion installed, just turn this off."
             paragraph "NOTE: The Blue Iris Server Device Type requires a 'local' connection between the ST hub and BI server.  BI Fusion can handle external connections, but not when using the Server Device."
             if(usingBIServer) {
-                paragraph "NOTE: If you already have the Server Device installed, you'll need to remove it before continuing. Apologies."
                 paragraph "NOTE: Ensure the Blue Iris Server Device Type Handler is already added to your account on the SmartThings API."
                 paragraph "NOTE: Once installed, do not edit the server device settings from within the device's preferences page. Make all changes within this BI Fusion app."
             }
@@ -223,15 +224,18 @@ def cameraDeviceSetup() {
                 paragraph "Ensure the Blue Iris Camera Device Type Handler is already added to your account on the SmartThings API."
                 input "howManyCameras", "number", title: "How many cameras do you want to install?", required: true, submitOnChange: true 
                 paragraph "Create a new device for each camera by entering the Blue Iris short name (case-sensitive, recommend no spaces or special characters)."
-                paragraph "Display Names are optional. They default to 'BI Cam - [short name]'."
+                paragraph "Display Names are optional. They default to 'BI Cam - [short name]'.  To change a Display Name after device creation, edit the name in the device's own settings page in the SmartThings App (it won't do anything if you change it here)."
                 paragraph "NOTE: You have to click 'Done' to complete BI Fusion setup prior to re-entering settings to create any any triggers."
                 for (int i = 0; i < howManyCameras; i++) {
                     input "camera${i}shortName", "text", title: "Camera ${i} Short Name", description: "e.g. frontporch", required: true
                     input "camera${i}displayName", "text", title: "Camera ${i} Display Name", description: "e.g. Front Porch", required: false
                 }
+                paragraph "If you're having trouble changing settings, you can turn off auto-deletion for old camera devices. ADVANCED USERS ONLY"
+                input "skipDeletion", "bool", title: "Do not delete old camera devices?", required: false
             }
+            
         }
-        section ("Blue Iris Motion Alert Setup") {
+        section ("Blue Iris Motion Alert Setup") { //todo - shouldn't this actually be under the "if (installCamaraDevices) {" section?  The motion alerts received won't go anywhere unless the devices are installed...
             paragraph "You will need to copy the addresses and change the camera names for each camera you want to get motion from. The addresses will display after clicking to open the page below."
             def createNewAddresses = false
             input "createNewAddresses", "bool", title: "Do you want to (re)create the URLs?", required: false, submitOnChange: true
@@ -377,7 +381,25 @@ def createInfoMaps() {
     }
 
     //Third create the Camera Devices Map:
-    //state.biCamera = [[:],[:]]		//[[deviceDNI: "", shortName: "", displayName: ""], [deviceDNI: "", shortName: "", displayName: ""]]
+
+    //Fix for having DNI tied to shortname:////  todo - only need this for a while to make sure everyone had updated names, then can delete.
+    if (installCamaraDevices) {
+        def previousChildDevices = getChildDevices(true)
+        if (loggingOn) log.debug "DNI fix step 1.  Found these devices: ${previousChildDevices}"
+        previousChildDevices.each {
+            if (it.deviceNetworkId.toString().startsWith("bicamera")) {
+                if (howManyCameras > 10 && howManyCameras < 99) {  //anything higher than bicamera9 (which started at 0, so bicamera9 is camera #10)
+                    if (loggingOn) log.debug "DNI fix step 2a.  Device '${it.deviceNetworkId}' is changing to '${it.deviceNetworkId.toString().take(10)}'"
+                    it.deviceNetworkId = it.deviceNetworkId.toString().take(10)
+                } else if (howManyCameras < 11) {   //bicamera0-bicamera9
+                    if (loggingOn) log.debug "DNI fix step 2b.  Device '${it.deviceNetworkId}' is changing to '${it.deviceNetworkId.toString().take(9)}'"
+                    it.deviceNetworkId = it.deviceNetworkId.toString().take(9)
+                } else log.error "Cannot rename cameras if more than 99 are installed"
+            }  //else, not a camera device, skip it
+                }
+    }
+	///////////////////////////////////////////
+
     state.cameradeviceDNI = []
     state.camerashortName = []
     state.cameradisplayName = []
@@ -385,7 +407,7 @@ def createInfoMaps() {
         for (int i = 0; i < howManyCameras; i++) {
             def cameraShortNameInput = "camera${i}shortName"
             def cameraDisplayNameInput = "camera${i}displayName"
-            state.cameradeviceDNI[i] = "bicamera" + i + settings[cameraShortNameInput].toString()
+            state.cameradeviceDNI[i] = "bicamera" + i
             state.camerashortName[i] = settings[cameraShortNameInput].toString()
             if (settings[cameraDisplayNameInput]?.toString() == null) state.cameradisplayName[i] = "BI Cam - " + settings[cameraShortNameInput].toString()
             else state.cameradisplayName[i] = settings[cameraDisplayNameInput].toString()
@@ -422,7 +444,7 @@ def makeDevices() {
     if (loggingOn) log.debug "installedChildDevices found: $installedChildDevices, and wantedChildDevices are: $wantedChildDevices"
     installedChildDevices.each {
         def childDNI = it.deviceNetworkId
-        if (it != null && !wantedChildDevices.contains(childDNI)) {
+        if (it != null && !wantedChildDevices.contains(childDNI) && !skipDeletion) {
             deleteChildDevice(it.deviceNetworkId) 
         } //else not deleting since we want it
     }
