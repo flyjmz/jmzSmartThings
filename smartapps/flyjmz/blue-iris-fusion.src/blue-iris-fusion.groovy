@@ -444,8 +444,12 @@ def makeDevices() {
     if (loggingOn) log.debug "installedChildDevices found: $installedChildDevices, and wantedChildDevices are: $wantedChildDevices"
     installedChildDevices.each {
         def childDNI = it.deviceNetworkId
-        if (it != null && !wantedChildDevices.contains(childDNI) && !skipDeletion) {
-            deleteChildDevice(it.deviceNetworkId) 
+        if (it != null && !wantedChildDevices.contains(childDNI)) {
+            if (!it.deviceNetworkId.toString().startsWith("bicamera")) {  //if not a camera, then it's a server, and we always delete and rebuild
+                deleteChildDevice(it.deviceNetworkId) 
+            } else {  //it is a camera
+                if (!skipDeletion)  deleteChildDevice(it.deviceNetworkId) //and we want to delete them 
+            }
         } //else not deleting since we want it
     }
     //Then install devices if user wants:
