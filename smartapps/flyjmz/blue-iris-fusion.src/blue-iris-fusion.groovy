@@ -61,6 +61,8 @@ Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Name
 Version 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
 Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
 							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
+Version 3.0.5 - 30Nov2017   Fixed Error where user tied a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
+
 
 TODO:
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
@@ -71,7 +73,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.4"}
+def appVersion() {"3.0.5"}
 
 mappings {
     path("/active/:camera") {
@@ -180,29 +182,29 @@ def integrationSetup() {
         section("Blue Iris Profile/SmartThings Mode Integration") {
             paragraph "You can have BI Fusion update Blue Iris Profiles based on SmartThings Modes."
             input "autoModeProfileSync", "bool", title: "Auto Sync Profile to Mode?", required: true
-            paragraph "Enter your Blue Iris Profile Number (0-7) for the matching SmartThings mode. To ignore a mode leave it blank. (Remember '0' normally sets Blue Iris to 'Inactive')."
+            paragraph "Enter your Blue Iris Profile Number (1-7, use 0 for Inactive) for the matching SmartThings mode. To ignore a mode leave it blank."
             location.modes.each { mode ->
                 def modeId = mode.id.toString()  
                 input "mode-${modeId}", "number", title: "Mode ${mode}", required: false, submitOnChange: true
             }
             if (usingBIServer) {
                 paragraph "To give remaining BI Profiles a custom name that are not linked to a SmartThings mode, enter the name under the available Profiles below (leave blank to ignore a profile or use the default)."
-                def takenProfiles = [9,10] //make sure it creates a list, we know 9 and 10 are garbage, so it won't matter.
+                def takenProfiles = []
                 location.modes.each { mode ->
                     def checkMode = "mode-${mode.id.toString()}"
-                    if (settings[checkMode]) {
+                    if (settings[checkMode] != null) {
                         takenProfiles += settings[checkMode].toInteger()
                     }
                 }
                 if (loggingOn) log.debug "takenProfiles is ${takenProfiles}"
-                if (!takenProfiles.contains(0)) input "profile0", "text", title: "ST Mode for BI Inactive (Profile 0)", description: "Default: Inactive", required:false
-                if (!takenProfiles.contains(1)) input "profile1", "text", title: "ST Mode for BI Profile #1", description: "Default: Profile 1", required:false
-                if (!takenProfiles.contains(2)) input "profile2", "text", title: "ST Mode for BI Profile #2", description: "Default: Profile 2", required:false
-                if (!takenProfiles.contains(3)) input "profile3", "text", title: "ST Mode for BI Profile #3", description: "Default: Profile 3", required:false
-                if (!takenProfiles.contains(4)) input "profile4", "text", title: "ST Mode for BI Profile #4", description: "Default: Profile 4", required:false
-                if (!takenProfiles.contains(5)) input "profile5", "text", title: "ST Mode for BI Profile #5", description: "Default: Profile 5", required:false
-                if (!takenProfiles.contains(6)) input "profile6", "text", title: "ST Mode for BI Profile #6", description: "Default: Profile 6", required:false
-                if (!takenProfiles.contains(7)) input "profile7", "text", title: "ST Mode for BI Profile #7", description: "Default: Profile 7", required:false
+               if (!takenProfiles.contains(0)) input "profile0", "text", title: "ST Mode for BI Inactive", description: "Default: Inactive", required:false
+               if (!takenProfiles.contains(1)) input "profile1", "text", title: "ST Mode for BI Profile #1", description: "Default: Profile 1", required:false
+               if (!takenProfiles.contains(2)) input "profile2", "text", title: "ST Mode for BI Profile #2", description: "Default: Profile 2", required:false
+               if (!takenProfiles.contains(3)) input "profile3", "text", title: "ST Mode for BI Profile #3", description: "Default: Profile 3", required:false
+               if (!takenProfiles.contains(4)) input "profile4", "text", title: "ST Mode for BI Profile #4", description: "Default: Profile 4", required:false
+               if (!takenProfiles.contains(5)) input "profile5", "text", title: "ST Mode for BI Profile #5", description: "Default: Profile 5", required:false
+               if (!takenProfiles.contains(6)) input "profile6", "text", title: "ST Mode for BI Profile #6", description: "Default: Profile 6", required:false
+               if (!takenProfiles.contains(7)) input "profile7", "text", title: "ST Mode for BI Profile #7", description: "Default: Profile 7", required:false
             }
             paragraph "You can make the profile changes either 'Hold' or 'Temporary.'"
             paragraph "Hold changes remain until the next change is made, even through computer/server restart.  Temporary changes will only be in effect for the 'Temp Time' duration set for each profile in Blue Iris Settings > Profiles. At the end of that time, Blue Iris will change profiles according to your schedule."
@@ -335,6 +337,7 @@ def initialize() {
 //					BI FUSION 3.X Code (Uses Device Type Handlers)		///
 ///////////////////////////////////////////////////////////////////////////
 def createInfoMaps() {
+log.trace "creating maps"
     //First create Profile:
     if (state.profileModeMap != null) state.profileModeMap.clear()  //wipes it clean to prevent weird carryover
     state.profileModeMap = [[modeName: "Inactive"],
@@ -345,6 +348,7 @@ def createInfoMaps() {
                             [modeName: "Profile 5"],
                             [modeName: "Profile 6"],
                             [modeName: "Profile 7"]]  //Don't need the numbers, to get Profile 1's Mode's Name use: state.profileModeMap[1].modeName
+                            log.trace "state.profileModeMap is starting as $state.profileModeMap"
     if (profile0 != null) state.profileModeMap[0].modeName = profile0
     if (profile1 != null) state.profileModeMap[1].modeName = profile1
     if (profile2 != null) state.profileModeMap[2].modeName = profile2
@@ -353,9 +357,10 @@ def createInfoMaps() {
     if (profile5 != null) state.profileModeMap[5].modeName = profile5
     if (profile6 != null) state.profileModeMap[6].modeName = profile6
     if (profile7 != null) state.profileModeMap[7].modeName = profile7
+    log.trace "state.profileModeMap is now $state.profileModeMap"
     location.modes.each { mode ->
         def checkMode = "mode-${mode.id.toString()}"
-        if (settings[checkMode]) {
+        if (settings[checkMode] != null) {
             state.profileModeMap[settings[checkMode].toInteger()].modeName = "${mode.name}"	//For each ST mode, it determines if the user made profile number for it in settings, then uses that profile number as the map value number and fills the name.
         }
     }
@@ -683,7 +688,7 @@ def modeChange(evt) {
         }
     }
 
-    if (checkMode != "" && settings[checkMode]) {
+    if (checkMode != "" && settings[checkMode] != null) {
         if (loggingOn) log.debug "BI_Found profile " + settings[checkMode]
         def profile = settings[checkMode].toInteger()
         if (usingBIServer) {
@@ -703,7 +708,7 @@ def modeChange(evt) {
                 }
                 def profileChangeCommand = "/admin?profile=${profile}&lock=${lock}&user=${username}&pw=${password}"
                 localAction(profileChangeCommand)	//sends profile change through local lan (like device) except through the app
-            } else externalAction(settings[checkMode])  //sends profile change from SmartThings cloud to BI server
+            } else externalAction(profile)  //sends profile change from SmartThings cloud to BI server
         }  
     }
 }
