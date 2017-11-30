@@ -61,7 +61,7 @@ Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Name
 Version 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
 Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
 							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
-Version 3.0.5 - 30Nov2017   Fixed Error where user tied a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
+Version 3.0.5 - BETA   Fixed Error where user tied a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
 
 
 TODO:
@@ -73,7 +73,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.5"}
+def appVersion() {"3.0.4"}
 
 mappings {
     path("/active/:camera") {
