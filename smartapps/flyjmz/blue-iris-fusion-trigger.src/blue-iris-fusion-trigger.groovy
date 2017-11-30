@@ -48,13 +48,13 @@ Version 3.0.2 - 31Oct2017	Added triggers for: acceleration, presence, shock, smo
                             Remind Users to click on each Trigger app instance to confirm settings & tap 'done' to ensure initialize() runs.
 Version 3.0.3 - 26Nov2017	Changed variable "actionName" to "processName" to fixed java error everyone had (it's a class name, can't be a variable).
 							Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
-BETA						Fixed typos, Fixed issue where it required a preset number
+Version 3.0.4 - 29Nov2017	Fixed typos, Fixed issue where it required a preset number during initialization.  Confirmed the external mode works as well!!
 
 To Do:
 -see todos
 */
 
-def appVersion() {"3.0.3"}
+def appVersion() {"3.0.4"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
