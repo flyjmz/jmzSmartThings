@@ -48,6 +48,7 @@ Version 3.0.2 - 31Oct2017	Added triggers for: acceleration, presence, shock, smo
                             Remind Users to click on each Trigger app instance to confirm settings & tap 'done' to ensure initialize() runs.
 Version 3.0.3 - 26Nov2017	Changed variable "actionName" to "processName" to fixed java error everyone had (it's a class name, can't be a variable).
 							Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
+BETA						Fixed typos, Fixed issue where it required a preset number
 
 To Do:
 -see todos
@@ -202,12 +203,14 @@ def initialize() {
         }
     } else {
         names += biCamera
-        presets +=biPreset.toInteger()
+        if (usePreset) {
+            presets +=biPreset.toInteger()
+        }
     }
     state.shortNameList = names
     state.presetList = presets
     state.listSize =  state.shortNameList.size()
-    log.info "intialized, listSize is $state.listSize, cameras are $state.shortNameList, and presets are $state.presetList"
+    log.info "initialized, listSize is $state.listSize, cameras are $state.shortNameList, and presets are $state.presetList"
 }
 
 def eventHandlerBinary(evt) {
