@@ -40,6 +40,7 @@ Version History:
 2.1		1Nov17		Added Parse handling for preset movements from camera DTH
 2.2		26Nov17		Code Cleanup; fixed responseTime math in serverOfflineChecker(); fixed 'secure only' terminology after Blue Iris changed it
 2.3		29Nov17		Made error codes more descriptive to aid correction.
+2.4		BETA		Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (for example)
 
 To Do:
 -Nothing!
@@ -316,7 +317,7 @@ def parseBody(body) {
             def bodyArray = body.split()
             def newSignal = bodyArray[0] - "signal="
             def newProfile = bodyArray[1] - "profile="
-            def newProfileNum = newProfile.toInteger()
+            def newProfileNum = newProfile.toInteger().abs()   //added in v2.4, one user was getting '-1' (which would indicated a hold change to profile one), but no one else is getting it.  abs() doesn't matter here unless we start to use something to know if 'held' was successful.
             def newProfileName = getprofileName(newProfileNum)
             log.info "parsing results: profile is number '$newProfileNum', named '$newProfileName', signal is '$newSignal'"
 
