@@ -40,7 +40,8 @@ Version History:
 2.1		1Nov17		Added Parse handling for preset movements from camera DTH
 2.2		26Nov17		Code Cleanup; fixed responseTime math in serverOfflineChecker(); fixed 'secure only' terminology after Blue Iris changed it
 2.3		29Nov17		Made error codes more descriptive to aid correction.
-2.4		BETA		Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (for example)
+2.4		8Dec17		Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (for example)
+					Improved settings and operation when not using profile<>mode integration
 
 To Do:
 -Nothing!
@@ -53,7 +54,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.3"}
+def appVersion() {"2.4"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -95,6 +96,7 @@ metadata {
         standardTile("sync", "device.sync", width: 2, height: 1, decoration: "flat") {
             state("default", label:'Sync BI to ST', action: "syncBIprofileToSmarthThings", nextState:"syncing")
             state("syncing", label:"Syncing", backgroundColor: "#00a0dc")
+            state("userDisabled", label:"(disabled)")
         } 
         standardTile("profile0", "device.profile0mode", width: 2, height: 1, decoration: "flat") {
             state("default", label:'${currentValue}', action: "setBlueIrisProfile0", backgroundColor: "#ffffff", nextState:"turningOn")
@@ -162,6 +164,7 @@ metadata {
         }
         section("Blue Iris Profile <=> SmartThings Mode Matching:"){
             //paragraph "Enter the SmartThings Mode Name for the Matching Blue Iris Profiles (Inactive, and #1-7). Be sure to enter it exactly. To ignore a profile number, leave it blank."
+            input "autoModeProfileSync", "bool", title: "Auto Sync BI Profile to ST Mode?", required: true
             input "profile0", "text", title: "ST Mode for BI Inactive (Profile 0)", description: "Default: Inactive", required:false, displayDuringSetup: true
             input "profile1", "text", title: "ST Mode for BI Profile #1", description: "Leave blank to Ignore", required:false, displayDuringSetup: true
             input "profile2", "text", title: "ST Mode for BI Profile #2", description: "Leave blank to Ignore", required:false, displayDuringSetup: true
@@ -223,6 +226,10 @@ def initialize() {
         state.hubCommandReceivedTime = now()
         state.hubCommandSentTime = now()
         state.hubOnline = true
+        state.sync = autoModeProfileSync
+        if (state.sync) {
+            sendEvent(name: "sync", value: "default", displayed: false)
+        } else sendEvent(name: "sync", value: "userDisabled", displayed: false)
         state.profile0mode = (profile0 != null) ? profile0 : "Inactive"
         state.profile1mode = (profile1 != null) ? profile1 : "Profile 1"
         state.profile2mode = (profile2 != null) ? profile2 : "Profile 2"
@@ -261,6 +268,10 @@ def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but 
     state.hubCommandReceivedTime = now()
     state.hubCommandSentTime = now()
     state.hubOnline = true
+    state.sync = state.blueIrisServerSettings.autoModeProfileSync
+    if (state.sync) {
+        sendEvent(name: "sync", value: "default", displayed: false)
+    } else sendEvent(name: "sync", value: "userDisabled", displayed: false)
     def profileModeMap = state.blueIrisServerSettings.profileModeMap
     state.profile0mode = profileModeMap[0].modeName
     state.profile1mode = profileModeMap[1].modeName
@@ -329,7 +340,7 @@ def parseBody(body) {
                 state.hubOnline = true
             }
             sendEvent(name: "stoplight", value: "$newSignal", descriptionText: "Blue Iris Traffic Signal is ${newSignal}", displayed: true)
-            sendEvent(name: "sync", value: "default", displayed: false)
+            if (state.sync) sendEvent(name: "sync", value: "default", displayed: false)
             sendEvent(name: "refresh", value: "default", displayed: false)
             if (newProfileNum ==0) sendEvent(name: "profile0mode", value: "on", displayed: false)
             if (newProfileNum ==1) sendEvent(name: "profile1mode", value: "on", displayed: false)
@@ -349,6 +360,7 @@ def parseBody(body) {
             if (newProfileNum !=7) sendEvent(name: "profile7mode", value: "${state.profile7mode}", displayed: false)
 
             //Finally, notify if there are errors
+            if(state.debugLogging) log.debug "Profile Error Check: want '${state?.desiredNewProfile}' == '${newProfileName}' or '${state?.desiredNewProfile}' == false."
             if(state?.desiredNewProfile && state?.desiredNewProfile != newProfileName) {
                 log.error "error 1: ${state.desiredNewProfile} != ${newProfileName}"
                 sendEvent(name: "errorMessage", value: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", descriptionText: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", displayed: true)
@@ -432,12 +444,14 @@ def customPolling() {
 }
 
 def retrieveCurrentStatus() {
+	state.desiredNewProfile = false
     log.info "Executing 'retrieveCurrentStatus()'"
     def retrieveProfileCommand = "/admin&user=${state.username}&pw=${state.password}"
     hubTalksToBI(retrieveProfileCommand)
 }
 
 def refresh() {
+	state.desiredNewProfile = false
     if (state.debugLogging) log.debug "Executing 'refresh'"
     if (state.updatedFromBIFusion) initializeServer(state.blueIrisServerSettings)
     else initialize()
@@ -568,7 +582,7 @@ def serverOfflineChecker() {
 }
 
 def getprofileName(number) {
-    if (state.debugLogging) log.debug "getprofileName got ${number}"
+    if (state.debugLogging) log.debug "getprofileName got number ${number}"
     def name = 'Away'
     if (number == 0) {name = state.profile0mode}
     else if (number == 1) {name = state.profile1mode}
@@ -583,12 +597,12 @@ def getprofileName(number) {
         log.error "error 10: getprofileName(number) got a profile number '${number}', which is outside of the 0-7 range, check the settings of what you passed it."
         sendEvent(name: "errorMessage", value: "Error! A Blue Iris Profile number (${number}) was passed, which is outside of the 0-7 range. Check settings.", descriptionText: "Error! A Blue Iris Profile number (${number}) was passed, which is outside of the 0-7 range. Check settings.", displayed: true)
     }
-    if (state.debugLogging) log.debug "getprofileName returning ${name}"
+    if (state.debugLogging) log.debug "getprofileName returning name ${name}"
     return name
 }
 
 def getprofileNumber(name) {
-    if (state.debugLogging) log.debug "getprofileNumber got ${name}"
+    if (state.debugLogging) log.debug "getprofileNumber got name ${name}"
     def number = 1
     if (name == state.profile0mode) {number = 0}
     else if (name == state.profile1mode) {number = 1}
@@ -603,7 +617,7 @@ def getprofileNumber(name) {
         log.error "error 11: getprofileNumber(name) got a name (${name}) that isn't one of the user defined profiles, check profile name settings"
         sendEvent(name: "errorMessage", value: "Error! A Blue Iris Profile name (${name}) was passed, which isn't one of the user defined profiles. Check settings.", descriptionText: "Error! A Blue Iris Profile name (${name}) was passed, which isn't one of the user defined profiles. Check settings.", displayed: true)
     }
-    if (state.debugLogging) log.debug "getprofileNumber returning ${number}"
+    if (state.debugLogging) log.debug "getprofileNumber returning number ${number}"
     return number
 }
 
