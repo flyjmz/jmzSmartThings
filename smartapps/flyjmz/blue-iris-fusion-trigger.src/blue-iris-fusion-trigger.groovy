@@ -49,12 +49,13 @@ Version 3.0.2 - 31Oct2017	Added triggers for: acceleration, presence, shock, smo
 Version 3.0.3 - 26Nov2017	Changed variable "actionName" to "processName" to fixed java error everyone had (it's a class name, can't be a variable).
 							Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
 Version 3.0.4 - 29Nov2017	Fixed typos, Fixed issue where it required a preset number during initialization.  Confirmed the external mode works as well!!
+Version 3.0.5 - 8Dec2017	Removed extra log.trace calls.
 
 To Do:
 -see todos
 */
 
-def appVersion() {"3.0.4"}
+def appVersion() {"3.0.5"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -261,7 +262,6 @@ def localAction() {
 
 def talkToHub(commandPath) {  //todo can I use a 'callback' function to parse results?  Otherwise the trigger app really isn't confirming it worked...
     def biHost = "${parent.host}:${parent.port}"
-    log.trace "sending GET to SmartThings hub"
     def httpMethod = "GET"
     def httpRequest = [
         method:     httpMethod,
@@ -298,7 +298,7 @@ def externalAction() {
 
                                 ////////////////////Trigger to Record////////////////////////////////////////////////////
                                 if (!disableRecording) {
-                                	log.trace "Triggering: ${state.shortNameList}"
+                                	 if (parent.loggingOn) log.debug "Triggering: ${state.shortNameList}"
                                     for (int i = 0; i < state.listSize; i++) {
                                         def shortName = state.shortNameList[i]
                                         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
@@ -317,7 +317,7 @@ def externalAction() {
 
                                 ////////////////////Move to Preset Position//////////////////////////////////////////////
                                 if (usePreset) {
-                                    log.trace "Moving ${state.shortNameList} to preset ${state.presetList}"
+                                     if (parent.loggingOn) log.debug "Moving ${state.shortNameList} to preset ${state.presetList}"
                                     for (int i = 0; i < state.listSize; i++) {
                                         def shortName = state.shortNameList[i]
                                         def presetNumber = state.presetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20

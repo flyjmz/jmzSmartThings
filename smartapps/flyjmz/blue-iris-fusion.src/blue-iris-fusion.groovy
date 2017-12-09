@@ -61,8 +61,9 @@ Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Name
 Version 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
 Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
 							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
-Version 3.0.5 - BETA   Fixed Error where user tied a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
-
+Version 3.0.5 - 8Dec17  	Fixed Error when user ties a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
+							Improved settings and operation when not using profile<>mode integration.
+                            Added step in DNI fix method to prevent renaming already renamed devices.
 
 TODO:
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
@@ -73,7 +74,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.4"}
+def appVersion() {"3.0.5"}
 
 mappings {
     path("/active/:camera") {
@@ -147,6 +148,7 @@ def BIServerSetup() {
             }
         }
         section("Blue Iris Server Login Settings") {
+            paragraph "Note: Username, Password, and camera Shortnames cannot contain special characters."
             input "username", "text", title: "Blue Iris Username", required: true
             input "password", "password", title: "Blue Iris Password", required: true
             paragraph "Note: Blue Iris only allows Admin Users to toggle profiles."
@@ -180,15 +182,17 @@ def BIServerSetup() {
 def integrationSetup() {
     dynamicPage(name:"integrationSetup", title: "Blue Iris Profile <=> SmartThings Mode Integration", submitOnChange: true) {
         section("Blue Iris Profile/SmartThings Mode Integration") {
-            paragraph "You can have BI Fusion update Blue Iris Profiles based on SmartThings Modes."
-            input "autoModeProfileSync", "bool", title: "Auto Sync Profile to Mode?", required: true
-            paragraph "Enter your Blue Iris Profile Number (1-7, use 0 for Inactive) for the matching SmartThings mode. To ignore a mode leave it blank."
-            location.modes.each { mode ->
-                def modeId = mode.id.toString()  
-                input "mode-${modeId}", "number", title: "Mode ${mode}", required: false, submitOnChange: true
+            paragraph "You can have BI Fusion update Blue Iris Profiles when SmartThings Modes Change (e.g. SmartThings goes to away, set Blue Iris to away)."
+            input "autoModeProfileSync", "bool", title: "Auto Sync BI Profile to ST Mode?", required: true, submitOnChange: true
+            if (autoModeProfileSync) {
+                paragraph "Enter your Blue Iris Profile Number (1-7, use 0 for Inactive) for the matching SmartThings mode. To ignore a mode leave it blank.  Each Blue Iris Profile can only be used once (e.g. BI Profile 1 cannot be used for ST modes Home and Away, it has to be only one or the other)."
+                location.modes.each { mode ->
+                    def modeId = mode.id.toString()  
+                    input "mode-${modeId}", "number", title: "Mode ${mode}", required: false, submitOnChange: true
+                }
             }
             if (usingBIServer) {
-                paragraph "To give remaining BI Profiles a custom name that are not linked to a SmartThings mode, enter the name under the available Profiles below (leave blank to ignore a profile or use the default)."
+                paragraph "You can optionally add the Blue Iris Profile Names (leave blank to ignore a profile or use the default)."
                 def takenProfiles = []
                 location.modes.each { mode ->
                     def checkMode = "mode-${mode.id.toString()}"
@@ -197,21 +201,23 @@ def integrationSetup() {
                     }
                 }
                 if (loggingOn) log.debug "takenProfiles is ${takenProfiles}"
-               if (!takenProfiles.contains(0)) input "profile0", "text", title: "ST Mode for BI Inactive", description: "Default: Inactive", required:false
-               if (!takenProfiles.contains(1)) input "profile1", "text", title: "ST Mode for BI Profile #1", description: "Default: Profile 1", required:false
-               if (!takenProfiles.contains(2)) input "profile2", "text", title: "ST Mode for BI Profile #2", description: "Default: Profile 2", required:false
-               if (!takenProfiles.contains(3)) input "profile3", "text", title: "ST Mode for BI Profile #3", description: "Default: Profile 3", required:false
-               if (!takenProfiles.contains(4)) input "profile4", "text", title: "ST Mode for BI Profile #4", description: "Default: Profile 4", required:false
-               if (!takenProfiles.contains(5)) input "profile5", "text", title: "ST Mode for BI Profile #5", description: "Default: Profile 5", required:false
-               if (!takenProfiles.contains(6)) input "profile6", "text", title: "ST Mode for BI Profile #6", description: "Default: Profile 6", required:false
-               if (!takenProfiles.contains(7)) input "profile7", "text", title: "ST Mode for BI Profile #7", description: "Default: Profile 7", required:false
+                if (!takenProfiles.contains(0)  || !autoModeProfileSync) input "profile0", "text", title: "BI Inactive", description: "Default: Inactive", required:false
+                if (!takenProfiles.contains(1) || !autoModeProfileSync) input "profile1", "text", title: "BI Profile #1", description: "Default: Profile 1", required:false
+                if (!takenProfiles.contains(2) || !autoModeProfileSync) input "profile2", "text", title: "BI Profile #2", description: "Default: Profile 2", required:false
+                if (!takenProfiles.contains(3) || !autoModeProfileSync) input "profile3", "text", title: "BI Profile #3", description: "Default: Profile 3", required:false
+                if (!takenProfiles.contains(4) || !autoModeProfileSync) input "profile4", "text", title: "BI Profile #4", description: "Default: Profile 4", required:false
+                if (!takenProfiles.contains(5) || !autoModeProfileSync) input "profile5", "text", title: "BI Profile #5", description: "Default: Profile 5", required:false
+                if (!takenProfiles.contains(6) || !autoModeProfileSync) input "profile6", "text", title: "BI Profile #6", description: "Default: Profile 6", required:false
+                if (!takenProfiles.contains(7) || !autoModeProfileSync) input "profile7", "text", title: "BI Profile #7", description: "Default: Profile 7", required:false
             }
-            paragraph "You can make the profile changes either 'Hold' or 'Temporary.'"
-            paragraph "Hold changes remain until the next change is made, even through computer/server restart.  Temporary changes will only be in effect for the 'Temp Time' duration set for each profile in Blue Iris Settings > Profiles. At the end of that time, Blue Iris will change profiles according to your schedule."
-            paragraph "Note: if Blue Iris restarts while a temporary profile is set, it will set the profile according to it's schedule."
-            input "holdTemp", "bool", title: "Make Hold changes?", required: true
-            paragraph "Profile changes will display in SmartThings Notifications Feed.  Do you also want to receive PUSH/SMS notifications?"
-            input "receiveAlerts", "enum", title: "Receive PUSH/SMS on Profile Change?", options: ["Yes", "Errors Only", "No"], required: true
+            if (autoModeProfileSync) {
+                paragraph "You can make the automatic profile changes either 'Hold' or 'Temporary' changes."
+                paragraph "Hold changes remain until the next change is made, even through computer/server restart.  Temporary changes will only be in effect for the 'Temp Time' duration set for each profile in Blue Iris Settings > Profiles. At the end of that time, Blue Iris will change profiles according to your schedule."
+                paragraph "Note: if Blue Iris restarts while a temporary profile is set, it will set the profile according to it's schedule."
+                input "holdTemp", "bool", title: "Make Hold changes?", required: true
+                paragraph "Profile changes will display in SmartThings Notifications Feed.  Do you also want to receive PUSH/SMS notifications?"
+                input "receiveAlerts", "enum", title: "Receive PUSH/SMS on Profile Change?", options: ["Yes", "Errors Only", "No"], required: true
+            } 
         }
     }
 }
@@ -225,7 +231,7 @@ def cameraDeviceSetup() {
             if (installCamaraDevices) {
                 paragraph "Ensure the Blue Iris Camera Device Type Handler is already added to your account on the SmartThings API."
                 input "howManyCameras", "number", title: "How many cameras do you want to install?", required: true, submitOnChange: true 
-                paragraph "Create a new device for each camera by entering the Blue Iris short name (case-sensitive, recommend no spaces or special characters)."
+                paragraph "Create a new device for each camera by entering the Blue Iris short name (case-sensitive, do not use special characters)."
                 paragraph "Display Names are optional. They default to 'BI Cam - [short name]'.  To change a Display Name after device creation, edit the name in the device's own settings page in the SmartThings App (it won't do anything if you change it here)."
                 paragraph "NOTE: You have to click 'Done' to complete BI Fusion setup prior to re-entering settings to create any any triggers."
                 for (int i = 0; i < howManyCameras; i++) {
@@ -337,7 +343,6 @@ def initialize() {
 //					BI FUSION 3.X Code (Uses Device Type Handlers)		///
 ///////////////////////////////////////////////////////////////////////////
 def createInfoMaps() {
-log.trace "creating maps"
     //First create Profile:
     if (state.profileModeMap != null) state.profileModeMap.clear()  //wipes it clean to prevent weird carryover
     state.profileModeMap = [[modeName: "Inactive"],
@@ -348,7 +353,6 @@ log.trace "creating maps"
                             [modeName: "Profile 5"],
                             [modeName: "Profile 6"],
                             [modeName: "Profile 7"]]  //Don't need the numbers, to get Profile 1's Mode's Name use: state.profileModeMap[1].modeName
-                            log.trace "state.profileModeMap is starting as $state.profileModeMap"
     if (profile0 != null) state.profileModeMap[0].modeName = profile0
     if (profile1 != null) state.profileModeMap[1].modeName = profile1
     if (profile2 != null) state.profileModeMap[2].modeName = profile2
@@ -357,11 +361,14 @@ log.trace "creating maps"
     if (profile5 != null) state.profileModeMap[5].modeName = profile5
     if (profile6 != null) state.profileModeMap[6].modeName = profile6
     if (profile7 != null) state.profileModeMap[7].modeName = profile7
-    log.trace "state.profileModeMap is now $state.profileModeMap"
-    location.modes.each { mode ->
-        def checkMode = "mode-${mode.id.toString()}"
-        if (settings[checkMode] != null) {
-            state.profileModeMap[settings[checkMode].toInteger()].modeName = "${mode.name}"	//For each ST mode, it determines if the user made profile number for it in settings, then uses that profile number as the map value number and fills the name.
+    if (autoModeProfileSync) {
+        location.modes.each { mode ->								//todo- this section prevents users from using the same BI profile number for multiple ST Modes (ie home and night are both profile 2).  
+                                                                    //Probably need to run a script to see if multiple modes have the same number and combine the name, eg "Home/Night".  Then in this and in the server DTH,
+                                                                    //instead of comparing the actual ST mode to the result of getProfileName(), have it compare the number from BI's return to getProfileNumber()
+            def checkMode = "mode-${mode.id.toString()}"
+            if (settings[checkMode] != null) {
+                state.profileModeMap[settings[checkMode].toInteger()].modeName = "${mode.name}"	//For each ST mode, it determines if the user made profile number for it in settings, then uses that profile number as the map value number and fills the name.
+            }
         }
     }
     if (loggingOn) log.debug "state.profileModeMap map: ${state.profileModeMap}"
@@ -373,6 +380,7 @@ log.trace "creating maps"
         state.blueIrisServerSettings.port = port
         state.blueIrisServerSettings.username = username
         state.blueIrisServerSettings.password = password
+        state.blueIrisServerSettings.autoModeProfileSync = autoModeProfileSync
         state.blueIrisServerSettings.profileModeMap = state.profileModeMap
         //the network ID needs to be the hex ip:port or mac address for the BI Server Computer (I use IP because it's easier for user, but mac would be easier to code):
         def hosthex = convertIPtoHex(host).toUpperCase()  //Note: it needs to be set to uppercase for the new deviceNetworkId to work in SmartThings
@@ -390,18 +398,22 @@ log.trace "creating maps"
     //Fix for having DNI tied to shortname:////  todo - only need this for a while to make sure everyone had updated names, then can delete.
     if (installCamaraDevices) {
         def previousChildDevices = getChildDevices(true)
-        if (loggingOn) log.debug "DNI fix step 1.  Found these devices: ${previousChildDevices}"
+        if (loggingOn) log.debug "DNI fix step 1a.  Found these devices: ${previousChildDevices}"
         previousChildDevices.each {
             if (it.deviceNetworkId.toString().startsWith("bicamera")) {
-                if (howManyCameras > 10 && howManyCameras < 99) {  //anything higher than bicamera9 (which started at 0, so bicamera9 is camera #10)
-                    if (loggingOn) log.debug "DNI fix step 2a.  Device '${it.deviceNetworkId}' is changing to '${it.deviceNetworkId.toString().take(10)}'"
-                    it.deviceNetworkId = it.deviceNetworkId.toString().take(10)
-                } else if (howManyCameras < 11) {   //bicamera0-bicamera9
-                    if (loggingOn) log.debug "DNI fix step 2b.  Device '${it.deviceNetworkId}' is changing to '${it.deviceNetworkId.toString().take(9)}'"
-                    it.deviceNetworkId = it.deviceNetworkId.toString().take(9)
-                } else log.error "Cannot rename cameras if more than 99 are installed"
-            }  //else, not a camera device, skip it
-                }
+                if (loggingOn) log.debug "DNI fix step 1b.  Device '${it.deviceNetworkId.toString()}' is a camera"
+                if (it.deviceNetworkId.toString().length() > 11) {
+                    if (loggingOn) log.debug "DNI fix step 1c.  Device '${it.deviceNetworkId.toString()}' has an old name, proceeding to step 2"
+                    if (howManyCameras > 10 && howManyCameras < 99) {  //anything higher than bicamera9 (which started at 0, so bicamera9 is camera #10)
+                        if (loggingOn) log.debug "DNI fix step 2.  Device '${it.deviceNetworkId}' is changing to '${it.deviceNetworkId.toString().take(10)}'"
+                        it.deviceNetworkId = it.deviceNetworkId.toString().take(10)
+                    } else if (howManyCameras < 11) {   //bicamera0-bicamera9
+                        if (loggingOn) log.debug "DNI fix step 2.  Device '${it.deviceNetworkId}' is changing to '${it.deviceNetworkId.toString().take(9)}'"
+                        it.deviceNetworkId = it.deviceNetworkId.toString().take(9)
+                    } else log.error "Cannot rename cameras if more than 99 are installed"
+                }  //else, not a camera device, skip it
+            }
+        }
     }
 	///////////////////////////////////////////
 
@@ -620,8 +632,8 @@ def cameraActiveHandler() {
             def cameraDevice = getChildDevice(cameraDNI)
             cameraDevice.active()
         } else {
-            log.error "error 30a: Camera Motion Received but received camera shortname not in list.  Check Blue Iris Alert settings for camera."
-            sendEvent(name: "errorMessage", value: "Camera Motion Received but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", descriptionText: "Camera Motion Received but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", displayed: true)
+            log.error "error 30a: Camera Motion Received but received camera shortname '$cameraShortName' not in list.  Check Blue Iris Alert settings for camera."
+            sendEvent(name: "errorMessage", value: "Camera Motion Received but received camera shortname '$cameraShortName' not in list.  Check Blue Iris Alert settings for camera.", descriptionText: "Camera Motion Received but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", displayed: true)
         }
     } catch (Exception e) {
         log.error "error 30: Camera Motion Received but failed to send motion to ST device. Error: $e"
@@ -641,8 +653,8 @@ def cameraInactiveHandler() {
             def cameraDevice = getChildDevice(cameraDNI)
             cameraDevice.inactive()
         } else {
-            log.error "error 31a: Camera Motion stopped but received camera shortname not in list.  Check Blue Iris Alert settings for camera."
-            sendEvent(name: "errorMessage", value: "Camera Motion stopped but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", descriptionText: "Camera Motion stopped but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", displayed: true)
+            log.error "error 31a: Camera Motion stopped but received camera shortname '$cameraShortName' not in list.  Check Blue Iris Alert settings for camera."
+            sendEvent(name: "errorMessage", value: "Camera Motion stopped but received camera shortname '$cameraShortName' not in list.  Check Blue Iris Alert settings for camera.", descriptionText: "Camera Motion stopped but received camera shortname not in list.  Check Blue Iris Alert settings for camera.", displayed: true)
         }
     } catch (Exception e) {
         log.error "error 31: Camera Motion Stopped but failed to update ST device. Error: $e"
