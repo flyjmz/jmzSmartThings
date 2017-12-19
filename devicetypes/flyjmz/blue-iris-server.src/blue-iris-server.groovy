@@ -42,6 +42,9 @@ Version History:
 2.3		29Nov17		Made error codes more descriptive to aid correction.
 2.4		8Dec17		Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (for example)
 					Improved settings and operation when not using profile<>mode integration
+2.5		19Dec17		Updated Parse() to be more robust, and prepped code to allow for upcoming lock status!
+					When toggling between Temporary and Hold changes, it'll actually resent the profile to Blue Iris in the new mode.
+                    Added ability for user to set polling interval.
 
 To Do:
 -Nothing!
@@ -54,7 +57,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.4"}
+def appVersion() {"2.5"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -177,6 +180,7 @@ metadata {
         section("Blue Iris Server Health Monitor"){
             double waitThreshold = 5
             input "waitThreshold", "number", title: "Enter how many seconds to wait after the server request is made before deaming it offline:", description: "Default: 5 sec", required:false, displayDuringSetup: true 
+            input "pollingInterval", "number", title: "You can set a custom polling interval as well", description: "Default: 15 minutes", required: false, displayDuringSetup: true 
         }
         section("Debug"){
             //paragraph "You can turn on debug logging, viewed in Live Logging on the API website."
@@ -211,6 +215,7 @@ def initialize() {
     	unschedule()
         state.debugLogging = (loggingOn != null) ? loggingOn : false
         state.serverResponseThreshold = (waitThreshold != null) ? waitThreshold : 5
+        state.pollingInterval = (pollingInterval != null) ? pollingInterval : 15
         log.info "initialize() called, debug logging is ${state.debugLogging}, serverResponseThreshold is ${state.serverResponseThreshold}"
 
         //initialize variables and set the profile names to the tiles
@@ -240,7 +245,7 @@ def initialize() {
         state.profile7mode = (profile7 != null) ? profile7 : "Profile 7"
 		setTileProfileModesToName()
         if(state.debugLogging) log.debug "profile0mode is ${state.profile0mode}, profile1mode is ${state.profile1mode}, profile2mode is ${state.profile2mode}, profile3mode is ${state.profile3mode}, profile4mode is ${state.profile4mode}, profile5mode is ${state.profile5mode}, profile6mode is ${state.profile6mode}, profile7mode is ${state.profile7mode}"
-        runEvery15Minutes(retrieveCurrentStatus)
+        customPolling()
         schedule(now(), checkForUpdates)
         checkForUpdates()
     }
@@ -253,6 +258,7 @@ def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but 
     state.debugLogging = (state.blueIrisServerSettings.loggingOn != null) ? state.blueIrisServerSettings.loggingOn : false 
     if(state.debugLogging) log.debug "initializeServer() received these settings from BI Fusion: ${state.blueIrisServerSettings}"
     state.serverResponseThreshold = (state.blueIrisServerSettings.waitThreshold != null) ? state.blueIrisServerSettings.waitThreshold : 5
+    state.pollingInterval = (state.blueIrisServerSettings.pollingInterval != null) ? state.blueIrisServerSettings.pollingInterval : 15
     state.holdChange = state.blueIrisServerSettings.holdTemp
     if (state.holdChange == null) {
         state.holdChange = true
@@ -284,7 +290,7 @@ def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but 
 	if(state.debugLogging) log.debug "state.correctdeviceNetworkId is ${state.correctdeviceNetworkId}"
 	setTileProfileModesToName()
     if(state.debugLogging) log.debug "profile0mode is ${state.profile0mode}, profile1mode is ${state.profile1mode}, profile2mode is ${state.profile2mode}, profile3mode is ${state.profile3mode}, profile4mode is ${state.profile4mode}, profile5mode is ${state.profile5mode}, profile6mode is ${state.profile6mode}, profile7mode is ${state.profile7mode}"
-    runEvery15Minutes(retrieveCurrentStatus)
+    customPolling()
 }
 
 def parse(description) {
@@ -312,68 +318,91 @@ def parse(description) {
 
 def parseBody(body) {
     try {
-    	def presetCommandTest = body.split()
-        
-        //First determine if it came from a preset movement command
-        if (presetCommandTest.size() <= 1) {
-            log.info "Camera Moved to Preset Successfully" //todo- Can I determine which camera? Pass this as a notification or device status?
-        
-        //If not preset, then it's a traffic light/profile/trigger response:
-        } else { 
-            //First separate out if a camera was triggered or not
-            def bodyArrayForTrigger = body.split('=')  //turns "signal=green profile=3 camera=Porch" into "signal,green profile,3 camera,Porch" //Using just split() would split any two-word camera names into two separate things.
-            if (bodyArrayForTrigger.size() > 3) {parseTrigger(bodyArrayForTrigger[3])}	//we know we have a triggered camera
-
-            //Then parse out traffic signal and profile
-            def bodyArray = body.split()
-            def newSignal = bodyArray[0] - "signal="
-            def newProfile = bodyArray[1] - "profile="
-            def newProfileNum = newProfile.toInteger().abs()   //added in v2.4, one user was getting '-1' (which would indicated a hold change to profile one), but no one else is getting it.  abs() doesn't matter here unless we start to use something to know if 'held' was successful.
-            def newProfileName = getprofileName(newProfileNum)
-            log.info "parsing results: profile is number '$newProfileNum', named '$newProfileName', signal is '$newSignal'"
-
-            //Then update Tiles
-            sendEvent(name: "blueIrisProfile", value: "${newProfileName}", descriptionText: "Blue Iris Profile is ${newProfileName}", displayed: true)
-            if (!state.hubOnline) {  	//Sends a notification that it is back online since we had previously said it was offline
-                log.info "BI Server is back online"
-                sendEvent(name: "errorMessage", value: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", descriptionText: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", displayed: true)
-                state.hubOnline = true
+        if (state.sync) {
+            sendEvent(name: "sync", value: "default", displayed: false)
+        } else {
+            sendEvent(name: "sync", value: "userDisabled", displayed: false)
+        }
+        sendEvent(name: "refresh", value: "default", displayed: false)
+        def newSignal
+        def newProfile
+        def newLock
+        def newCamera
+        def newProfileName
+        def bodyList = body.split().toList()
+        if (state.debugLogging) log.debug "bodyList is '$bodyList'"
+        for (int i = 0; i < bodyList.size(); i++) {
+            def checkValue = bodyList[i].toString().toLowerCase()
+            if (checkValue.contains('ok')) {
+                log.info "Camera Moved to Preset Successfully"	//todo - add error checking (probably some state that goes true if the preset command is sent and then here it checks that if that state is true then this should happen (actually put in the error checker below, and add a state variable here that turns true)
             }
-            sendEvent(name: "stoplight", value: "$newSignal", descriptionText: "Blue Iris Traffic Signal is ${newSignal}", displayed: true)
-            if (state.sync) sendEvent(name: "sync", value: "default", displayed: false)
-            sendEvent(name: "refresh", value: "default", displayed: false)
-            if (newProfileNum ==0) sendEvent(name: "profile0mode", value: "on", displayed: false)
-            if (newProfileNum ==1) sendEvent(name: "profile1mode", value: "on", displayed: false)
-            if (newProfileNum ==2) sendEvent(name: "profile2mode", value: "on", displayed: false)
-            if (newProfileNum ==3) sendEvent(name: "profile3mode", value: "on", displayed: false)
-            if (newProfileNum ==4) sendEvent(name: "profile4mode", value: "on", displayed: false)
-            if (newProfileNum ==5) sendEvent(name: "profile5mode", value: "on", displayed: false)
-            if (newProfileNum ==6) sendEvent(name: "profile6mode", value: "on", displayed: false)
-            if (newProfileNum ==7) sendEvent(name: "profile7mode", value: "on", displayed: false)
-            if (newProfileNum !=0) sendEvent(name: "profile0mode", value: "${state.profile0mode}", displayed: false)
-            if (newProfileNum !=1) sendEvent(name: "profile1mode", value: "${state.profile1mode}", displayed: false)
-            if (newProfileNum !=2) sendEvent(name: "profile2mode", value: "${state.profile2mode}", displayed: false)
-            if (newProfileNum !=3) sendEvent(name: "profile3mode", value: "${state.profile3mode}", displayed: false)
-            if (newProfileNum !=4) sendEvent(name: "profile4mode", value: "${state.profile4mode}", displayed: false)
-            if (newProfileNum !=5) sendEvent(name: "profile5mode", value: "${state.profile5mode}", displayed: false)
-            if (newProfileNum !=6) sendEvent(name: "profile6mode", value: "${state.profile6mode}", displayed: false)
-            if (newProfileNum !=7) sendEvent(name: "profile7mode", value: "${state.profile7mode}", displayed: false)
-
-            //Finally, notify if there are errors
-            if(state.debugLogging) log.debug "Profile Error Check: want '${state?.desiredNewProfile}' == '${newProfileName}' or '${state?.desiredNewProfile}' == false."
-            if(state?.desiredNewProfile && state?.desiredNewProfile != newProfileName) {
-                log.error "error 1: ${state.desiredNewProfile} != ${newProfileName}"
-                sendEvent(name: "errorMessage", value: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", descriptionText: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", displayed: true)
+            if (checkValue.contains('signal')) {		//todo - add this into error checking
+            	newSignal = bodyList[i] - "signal="
+                sendEvent(name: "stoplight", value: "$newSignal", descriptionText: "Blue Iris Traffic Signal is ${newSignal}", displayed: true)
             }
-            if(state?.desiredNewStoplightColor && state?.desiredNewStoplightColor != newSignal) {
-                if(state.desiredNewStoplightColor == 'yellow' && newSignal == 'green'){
-                    //Do nothing, not a problem, if the user has Blue Iris to skip yellow, or the yellow delay is a very short time, it'll end up on green
-                } else {
-                    log.error "error 2: ${state.desiredNewStoplightColor} != ${newSignal}"
-                    sendEvent(name: "errorMessage", value: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", descriptionText: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", displayed: true)
-                }
+            if (checkValue.contains('profile')) {
+                newProfile = bodyList[i] - "profile="
+                state.newProfileNum = newProfile.toInteger().abs()
+                newProfileName = getprofileName(state.newProfileNum)
+                sendEvent(name: "blueIrisProfile", value: "${newProfileName}", descriptionText: "Blue Iris Profile is ${newProfileName}", displayed: true)
+                if (state.newProfileNum ==0) sendEvent(name: "profile0mode", value: "on", displayed: false)
+                if (state.newProfileNum ==1) sendEvent(name: "profile1mode", value: "on", displayed: false)
+                if (state.newProfileNum ==2) sendEvent(name: "profile2mode", value: "on", displayed: false)
+                if (state.newProfileNum ==3) sendEvent(name: "profile3mode", value: "on", displayed: false)
+                if (state.newProfileNum ==4) sendEvent(name: "profile4mode", value: "on", displayed: false)
+                if (state.newProfileNum ==5) sendEvent(name: "profile5mode", value: "on", displayed: false)
+                if (state.newProfileNum ==6) sendEvent(name: "profile6mode", value: "on", displayed: false)
+                if (state.newProfileNum ==7) sendEvent(name: "profile7mode", value: "on", displayed: false)
+                if (state.newProfileNum !=0) sendEvent(name: "profile0mode", value: "${state.profile0mode}", displayed: false)
+                if (state.newProfileNum !=1) sendEvent(name: "profile1mode", value: "${state.profile1mode}", displayed: false)
+                if (state.newProfileNum !=2) sendEvent(name: "profile2mode", value: "${state.profile2mode}", displayed: false)
+                if (state.newProfileNum !=3) sendEvent(name: "profile3mode", value: "${state.profile3mode}", displayed: false)
+                if (state.newProfileNum !=4) sendEvent(name: "profile4mode", value: "${state.profile4mode}", displayed: false)
+                if (state.newProfileNum !=5) sendEvent(name: "profile5mode", value: "${state.profile5mode}", displayed: false)
+                if (state.newProfileNum !=6) sendEvent(name: "profile6mode", value: "${state.profile6mode}", displayed: false)
+                if (state.newProfileNum !=7) sendEvent(name: "profile7mode", value: "${state.profile7mode}", displayed: false)
+            }
+            if (checkValue.contains('lock')) {
+                newLock = bodyList[i] - "lock="
+                if (lock == 2) holdTempName = "Hold"
+                if (lock == 1) holdTempName = "Temporary"
+                if (lock == 0) holdTempName = "Schedule"
+                //sendEvent(name: "holdTemp", value: "${holdTempName}", displayed: false)  //todo - enable this when lock becomes an option
+            } 
+            if (checkValue.contains('camera')) {
+                newCamera = bodyList[i] - "camera="
+                log.info "Camera '$newCamera' triggered successfully"  //todo - add this into error checking
+        		//sendEvent(name: "cameraMotionActive", value: "${shortName[0]}", displayed: false)  //This was part of trying to not use OAuth.  Todo - make it work
+        		//sendEvent(name: "cameraMotionInactive", value: "${shortName[0]}", displayed: false) //This was part of trying to not use OAuth.  Todo - make it work
             }
         }
+		log.info "parsing results: profile is number '$state.newProfileNum', named '$newProfileName', signal is '$newSignal', lock is '$newLock', triggered camera is '$newCamera'"
+          
+        if (!state.hubOnline) {  	//Sends a notification that it is back online since we had previously said it was offline
+            log.info "BI Server is back online"
+            sendEvent(name: "errorMessage", value: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", descriptionText: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", displayed: true)
+            state.hubOnline = true
+        }
+
+        //Finally, notify if there are errors
+        if (state.debugLogging) log.debug "Profile Error Check: want '${state?.desiredNewProfile}' == '${newProfileName}' or '${state?.desiredNewProfile}' == false."
+        if (state?.desiredNewProfile && state?.desiredNewProfile != newProfileName) {
+            log.error "error 1: ${state.desiredNewProfile} != ${newProfileName}"
+            sendEvent(name: "errorMessage", value: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", descriptionText: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", displayed: true)
+        }
+        if (state?.desiredNewStoplightColor && state?.desiredNewStoplightColor != newSignal) {
+            if (state.desiredNewStoplightColor == 'yellow' && newSignal == 'green') {
+                //Do nothing, not a problem, if the user has Blue Iris to skip yellow, or the yellow delay is a very short time, it'll end up on green
+            } else {
+                log.error "error 2: ${state.desiredNewStoplightColor} != ${newSignal}"
+                sendEvent(name: "errorMessage", value: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", descriptionText: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", displayed: true)
+            }
+        }
+/*      if (state?.lockNumber && state?.lockNumber != newLock) {		//todo - add this when lock is in status updates
+        	log.error "error 5: Change mode didn't change, it is still '${holdTempName}'"
+            sendEvent(name: "errorMessage", value: "Error! Blue Iris change mode failed to update, it is currently '${holdTempName}'", descriptionText: "Error! Blue Iris change mode failed to update, it is currently '${holdTempName}'", displayed: true)
+        }
+*/        
     } catch (Exception e) {
         log.error "error 21: Parsing parseBody() error, body is '$body'.  Error: $e"
         setTileProfileModesToName()
@@ -400,18 +429,6 @@ def parseStatus(status) {
     }
 }
 
-def parseTrigger(triggeredCameraName) { 
-    def shortName = triggeredCameraName.split()
-    try {
-        log.info "parsing results: triggered Camera short name is '${shortName[0]}'"
-        //This was part of trying to not use OAuth.  Todo - make it work
-        //sendEvent(name: "cameraMotionActive", value: "${shortName[0]}", displayed: false)  
-        //sendEvent(name: "cameraMotionInactive", value: "${shortName[0]}", displayed: false)
-    } catch (Exception e) {
-        log.error "error 23: Parsing parseTrigger() error, triggeredCameraName is '$shortName[0]'.  Error: $e"
-    }
-}
-
 def setTileProfileModesToName() {
     sendEvent(name: "profile0mode", value: "${state.profile0mode}", displayed: false)
     sendEvent(name: "profile1mode", value: "${state.profile1mode}", displayed: false)
@@ -427,25 +444,32 @@ def changeHoldTemp() {
     if(state.debugLogging) log.debug "changeHoldTemp() called, state.holdChange is ${state.holdChange}"
     if(state.holdChange) {
         state.holdChange = false
-        sendEvent(name: "holdTemp", value: "Temporary", displayed: false)
+        state.lockNumber = 1
+        sendEvent(name: "holdTemp", value: "Temporary", displayed: false)  //todo - can remove this once lock is in the status return (just have it update there)
+        setProfile(state.newProfileNum)
     }
     else {
         state.holdChange = true
-        sendEvent(name: "holdTemp", value: "Hold", displayed: false)
+        state.lockNumber = 2
+        sendEvent(name: "holdTemp", value: "Hold", displayed: false)  //todo - can remove this once lock is in the status return (just have it update there)
+        setProfile(state.newProfileNum)
     }
-    if(state.debugLogging) log.debug "changeHoldTemp() done, state.holdChange is now ${state.holdChange}"
+    if (state.debugLogging) log.debug "changeHoldTemp() done, state.holdChange is now ${state.holdChange}"
 }
 
 def customPolling() {
     double timesSinceContact = (now() - state.hubCommandReceivedTime).abs() / 60000  //time since last contact from server in minutes
-    if (timesSinceContact > 15) {
-        retrieveCurrentStatus()		//Only does a check ('poll') if we haven't heard from the server in more than 15 mintues.
+    log.trace "customPolling() running, timesSinceContact is '$timesSinceContact', state.pollingInterval is '$state.pollingInterval'"  //todo - delete log.trace
+    if (timesSinceContact > state.pollingInterval) {
+        log.trace "timesSinceContact > pollingInterval is true"
+        retrieveCurrentStatus()		//Only does a check ('poll') if we haven't heard from the server in more than the polling interval.
     }    
+    runIn(state.pollingInterval*60, customPolling)
 }
 
 def retrieveCurrentStatus() {
 	state.desiredNewProfile = false
-    log.info "Executing 'retrieveCurrentStatus()'"
+    log.info "Retrieving Current Status"
     def retrieveProfileCommand = "/admin&user=${state.username}&pw=${state.password}"
     hubTalksToBI(retrieveProfileCommand)
 }
