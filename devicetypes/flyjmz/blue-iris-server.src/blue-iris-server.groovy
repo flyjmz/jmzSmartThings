@@ -40,14 +40,17 @@ Version History:
 2.1		1Nov17		Added Parse handling for preset movements from camera DTH
 2.2		26Nov17		Code Cleanup; fixed responseTime math in serverOfflineChecker(); fixed 'secure only' terminology after Blue Iris changed it
 2.3		29Nov17		Made error codes more descriptive to aid correction.
-2.4		8Dec17		Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (for example)
+2.4		8Dec17		Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (negative sign comes from the schedule being used in BI)
 					Improved settings and operation when not using profile<>mode integration
 2.5		19Dec17		Updated Parse() to be more robust, and prepped code to allow for upcoming lock status!
 					When toggling between Temporary and Hold changes, it'll actually resent the profile to Blue Iris in the new mode.
-                    Added ability for user to set polling interval.
+2.6		24Dec17     Added ability for user to set polling interval.
+					Fixed lock status stuff after bug in BI
 
 To Do:
--Nothing!
+- add the new device stuff from the PM w/@kramttocs
+- add camera triggering to error checking
+- add signal to error checking
 
 Wish List:
 -"Commands that take parameters" cannot be called with their parameters from tile action, resulting in a different command for each profile.  Some solutions may exist using child device buttons/switches.
@@ -57,7 +60,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.5"}
+def appVersion() {"2.6"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -109,6 +112,7 @@ metadata {
         standardTile("holdTemp", "device.holdTemp", width: 2, height: 1, decoration: "flat") {
             state("Hold", label:'${currentValue}', action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
             state("Temporary", label:'${currentValue}', action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
+            state("Schedule", label:'${currentValue}', action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
             state("changing", label:"Changing...", backgroundColor: "#ffffff")
         }
         standardTile("profile1", "device.profile1mode", width: 2, height: 2, decoration: "flat") {
@@ -222,8 +226,7 @@ def initialize() {
         if (state.holdChange == null) {
             state.holdChange = true
             sendEvent(name: "holdTemp", value: "Hold", displayed: false)
-        } else if (state.holdChange) {sendEvent(name: "holdTemp", value: "Hold", displayed: false)}
-        else if (state.holdChange == false) {sendEvent(name: "holdTemp", value: "Temporary", displayed: false)}
+        }
         state.host = host
         state.port = port
         state.username = username
@@ -262,9 +265,7 @@ def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but 
     state.holdChange = state.blueIrisServerSettings.holdTemp
     if (state.holdChange == null) {
         state.holdChange = true
-        sendEvent(name: "holdTemp", value: "Hold", displayed: false)
-    } else if (state.holdChange) {sendEvent(name: "holdTemp", value: "Hold", displayed: false)}
-    else if (state.holdChange == false) {sendEvent(name: "holdTemp", value: "Temporary", displayed: false)}
+    }
     log.info "initializeServer() called, debug logging is ${state.debugLogging}, serverResponseThreshold is ${state.serverResponseThreshold}"
     state.host = state.blueIrisServerSettings.host
     state.port = state.blueIrisServerSettings.port
@@ -327,6 +328,7 @@ def parseBody(body) {
         def newSignal
         def newProfile
         def newLock
+        def newLockName
         def newCamera
         def newProfileName
         def bodyList = body.split().toList()
@@ -363,11 +365,13 @@ def parseBody(body) {
                 if (state.newProfileNum !=7) sendEvent(name: "profile7mode", value: "${state.profile7mode}", displayed: false)
             }
             if (checkValue.contains('lock')) {
-                newLock = bodyList[i] - "lock="
-                if (lock == 2) holdTempName = "Hold"
-                if (lock == 1) holdTempName = "Temporary"
-                if (lock == 0) holdTempName = "Schedule"
-                //sendEvent(name: "holdTemp", value: "${holdTempName}", displayed: false)  //todo - enable this when lock becomes an option
+                //Blue Iris status "lock=0/1/2" makes profile changes as: run/temp/hold
+                def a = bodyList[i] - "lock="
+                newLock = a.toInteger()
+                if (newLock == 1) newLockName = "Temporary"
+                if (newLock == 2) newLockName = "Hold"
+                if (newLock == 0) newLockName = "Schedule"
+                sendEvent(name: "holdTemp", value: "${newLockName}")  
             } 
             if (checkValue.contains('camera')) {
                 newCamera = bodyList[i] - "camera="
@@ -376,7 +380,7 @@ def parseBody(body) {
         		//sendEvent(name: "cameraMotionInactive", value: "${shortName[0]}", displayed: false) //This was part of trying to not use OAuth.  Todo - make it work
             }
         }
-		log.info "parsing results: profile is number '$state.newProfileNum', named '$newProfileName', signal is '$newSignal', lock is '$newLock', triggered camera is '$newCamera'"
+		log.info "parsing results: profile is number '$state.newProfileNum' ('$newProfileName'), signal is '$newSignal', lock is '$newLock' ('$newLockName'), triggered camera is '$newCamera'"
           
         if (!state.hubOnline) {  	//Sends a notification that it is back online since we had previously said it was offline
             log.info "BI Server is back online"
@@ -398,11 +402,11 @@ def parseBody(body) {
                 sendEvent(name: "errorMessage", value: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", descriptionText: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", displayed: true)
             }
         }
-/*      if (state?.lockNumber && state?.lockNumber != newLock) {		//todo - add this when lock is in status updates
-        	log.error "error 5: Change mode didn't change, it is still '${holdTempName}'"
-            sendEvent(name: "errorMessage", value: "Error! Blue Iris change mode failed to update, it is currently '${holdTempName}'", descriptionText: "Error! Blue Iris change mode failed to update, it is currently '${holdTempName}'", displayed: true)
+	    if (state?.lockNumber && state?.lockNumber != newLock) {		
+        	log.error "error 5: Change Profile lock didn't update, it is still '${newLockName}'"
+            sendEvent(name: "errorMessage", value: "Error! Blue Iris profile changing mode failed to update, it is still '${newLockName}', you wanted it '${state.lockName}'", descriptionText: "Error! Blue Iris profile changing mode failed to update, it is still '${newLockName}', you wanted it '${state.lockName}'", displayed: true)
         }
-*/        
+        
     } catch (Exception e) {
         log.error "error 21: Parsing parseBody() error, body is '$body'.  Error: $e"
         setTileProfileModesToName()
@@ -441,17 +445,17 @@ def setTileProfileModesToName() {
 }
 
 def changeHoldTemp() {
-    if(state.debugLogging) log.debug "changeHoldTemp() called, state.holdChange is ${state.holdChange}"
-    if(state.holdChange) {
-        state.holdChange = false
+    if (state.debugLogging) log.debug "changeHoldTemp() called, state.holdChange is ${state.holdChange}"
+    if (device.currentState("holdTemp").value == "Hold") {  //If it is hold, change it to temp
+    	state.holdChange = false
         state.lockNumber = 1
-        sendEvent(name: "holdTemp", value: "Temporary", displayed: false)  //todo - can remove this once lock is in the status return (just have it update there)
-        setProfile(state.newProfileNum)
+        state.lockName = "Temporary"
+		setProfile(state.newProfileNum)
     }
-    else {
-        state.holdChange = true
+    else if (device.currentState("holdTemp").value == "Temporary" || device.currentState("holdTemp").value == "Schedule") { //else it is temp (or 'run'), change it to hold
+    	state.holdChange = true
         state.lockNumber = 2
-        sendEvent(name: "holdTemp", value: "Hold", displayed: false)  //todo - can remove this once lock is in the status return (just have it update there)
+        state.lockName = "Hold"
         setProfile(state.newProfileNum)
     }
     if (state.debugLogging) log.debug "changeHoldTemp() done, state.holdChange is now ${state.holdChange}"
@@ -459,9 +463,7 @@ def changeHoldTemp() {
 
 def customPolling() {
     double timesSinceContact = (now() - state.hubCommandReceivedTime).abs() / 60000  //time since last contact from server in minutes
-    log.trace "customPolling() running, timesSinceContact is '$timesSinceContact', state.pollingInterval is '$state.pollingInterval'"  //todo - delete log.trace
     if (timesSinceContact > state.pollingInterval) {
-        log.trace "timesSinceContact > pollingInterval is true"
         retrieveCurrentStatus()		//Only does a check ('poll') if we haven't heard from the server in more than the polling interval.
     }    
     runIn(state.pollingInterval*60, customPolling)
@@ -556,7 +558,7 @@ def setProfile(profile) {
     def name = getprofileName(profile)
     log.info "Changing Blue Iris Profile to '${profile}', named '${name}'"
     state.desiredNewProfile = name
-    //Blue Iris Param "&lock=0/1/2" makes profile changes as: run/temp/hold
+    //Blue Iris Param "&lock=0/2/1" makes profile changes as: run/hold/temp
     def lock = 1
     if (state.holdChange) {lock = 2}
     def changeProfileCommand = "/admin?profile=${profile}&lock=${lock}&user=${state.username}&pw=${state.password}"
