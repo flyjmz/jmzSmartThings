@@ -64,8 +64,16 @@ Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i]
 Version 3.0.5 - 8Dec17  	Fixed Error when user ties a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
 							Improved settings and operation when not using profile<>mode integration.
                             Added step in DNI fix method to prevent renaming already renamed devices.
+Version 3.0.6 - 24Dec17		Cleaned up log.info verbage
+							Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
+                            Added ability to add custom polling interval for server DTH
+
 
 TODO:
+Todo - there may be a problem in external profile changing... It is getting result fail despite changing the profile...
+todo - there is a todo for adding call back to local mode when not using bi server dth...
+
+-Add ability to enter both LAN and WAN address for: failover, camera live feed
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
 https://community.smartthings.com/t/smartthings-labs-and-lan-devices/1100/11
 https://community.smartthings.com/t/poll-or-subscribe-example-to-network-events/72862/15
@@ -74,7 +82,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.5"}
+def appVersion() {"3.0.6"}
 
 mappings {
     path("/active/:camera") {
@@ -158,7 +166,8 @@ def BIServerSetup() {
                 input "port", "number", title: "Blue Iris Server Port", description: "e.g. 81", required:true
                 paragraph "NOTE: Ensure 'Use secure session keys and login page' is not checked in Blue Iris Webserver - Advanced settings."
                 double waitThreshold = 5
-                input "waitThreshold", "number", title: "Blue Iris Server Health Monitor: Enter the max server response time:", description: "Default: 5 seconds", required:false, displayDuringSetup: true 
+                input "waitThreshold", "number", title: "Blue Iris Server Health Monitor: Enter the max server response time:", description: "Default: 5 seconds", required:false, displayDuringSetup: true
+                input "pollingInterval", "number", title: "You can set a custom polling interval as well", description: "Default: 15 minutes", required: false, displayDuringSetup: true 
             } else {
                 paragraph "Local or External Connection to Blue Iris Server (i.e. LAN vs WAN)?"
                 paragraph "(External requires port forwarding/VPN/etc so the SmartThings Cloud can reach your BI server.)"
@@ -283,6 +292,7 @@ def oauthSetup() {
 
 def oauthView() {
     dynamicPage(name:"oauthView", title: "CURRENT Blue Iris Alert URLs") {
+        if (state.accessToken == null) createBIFusionToken()
         section("") {
             paragraph "Take a screenshot of this page, then enter the addresses following the directions on the previous page."
         }
@@ -622,7 +632,7 @@ log.debug "lanEventHandler() got msg $msg and body $body"
 
 def cameraActiveHandler() {
     def cameraShortName = params.camera
-    log.info "cameraActiveHandler() got $cameraShortName is active."
+    log.info "'$cameraShortName' is active."
     try {
         def cameraDNI = ""
         for (int i = 0; i < state.cameradeviceDNI.size(); i++) {
@@ -643,7 +653,7 @@ def cameraActiveHandler() {
 
 def cameraInactiveHandler() {
     def cameraShortName = params.camera
-    log.info "cameraInactiveHandler() got $cameraShortName is inactive."
+    log.info "'$cameraShortName' is inactive."
     try {
         def cameraDNI = ""
         for (int i = 0; i < state.cameradeviceDNI.size(); i++) {
@@ -690,7 +700,7 @@ private String convertPortToHex(port) {
 ///////////////////////////////////////////////////////////////////////////
 def modeChange(evt) {
     if (evt.name != "mode") {return;}
-    log.info "BI_modeChange detected mode now: " + evt.value
+    log.info "mode change detected, mode now: " + evt.value
     def checkMode = ""
 
     location.modes.each { mode ->
@@ -737,7 +747,7 @@ def localAction(command) {
         ]
     ]
     def hubAction = new physicalgraph.device.HubAction(httpRequest)
-    sendHubCommand(hubAction)
+    sendHubCommand(hubAction)  //todo - add callback function for error checking
     if (loggingOn) log.debug hubAction
 }
 
@@ -759,45 +769,45 @@ def externalAction(stringCommand) {  //can accept string of either: number for p
 
     try {
         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
-            if (loggingOn) log.debug response.data
+            if (loggingOn) log.debug "response 1: " + response.data
             if (response.data.result == "fail") {
-                if (loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
+                if (loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"  //todo - does this do anything?  shouldn't it include the last session (as a state variable) and then if it is logged in, then skip to the task? (which would need to be a separate method then)
                 def session = response.data.session
                 def hash = username + ":" + response.data.session + ":" + password
                 hash = hash.encodeAsMD5()
                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
-                    if (loggingOn) log.debug response2.data
+                    if (loggingOn) log.debug "response 2: " + response2.data
                     if (response2.data.result == "success") {
                         def BIprofileNames = response2.data.data.profiles
                         if (loggingOn) log.debug ("BI_Logged In")
                         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
-                            if (loggingOn) log.debug response3.data
+                            if (loggingOn) log.debug "response 3: " + response3.data
                             if (response3.data.result == "success"){
                                 if (loggingOn) log.debug ("BI_Retrieved Status")
-                                if (isProfileChange) {   
+                                if (isProfileChange) {   //todo - something to try to get this back to normal, create a bodyCommand using if loops so you don't have to break up the code here, it's just say body: [body]
                                     //Begin Profile Change Code
-                                    if (response3.data.data.profile != profile){        
+                                    if (response3.data.data.profile != profile) {        
                                         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"lock":lock,"session":session]) { response4 ->
-                                            if (loggingOn) log.debug response4.data
+                                            if (loggingOn) log.debug "response 4: " + response4.data
                                             if (response4.data.result == "success") {
                                                 if (response4.data.data.profile.toInteger() == profile) {
-                                                    log.info ("Blue Iris to profile ${profileName(BIprofileNames,profile)}!")
-                                                    if(receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("Blue Iris Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-                                                    if (receiveAlerts == "Yes") send("Blue Iris Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                    log.info ("Blue Iris is now in profile ${profileName(BIprofileNames,profile)}!")
+                                                    if(receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                    if (receiveAlerts == "Yes") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                 } else {
                                                     log.error ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Change to ${profileName(BIprofileNames,profile)} failed. Check your user permissions.")
-                                                    if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                    if (receiveAlerts == "No") sendNotificationEvent("BI Fusion failed to fully change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion failed to fully change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                                 }
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                    if (loggingOn) log.debug response5.data
+                                                    if (loggingOn) log.debug "response 5: " + response5.data
                                                     if (loggingOn) log.debug "Logged out"
                                                 }
                                             } else {
                                                 log.error "Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions."
-                                                if (loggingOn) log.debug(response4.data.data.reason)
-                                                if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                if (loggingOn) log.debug "response 6: " + response4.data.data.reason
+                                                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
                                             }
                                         }
                                     } else {
@@ -808,18 +818,18 @@ def externalAction(stringCommand) {  //can accept string of either: number for p
                                 } else {
                                     //Begin Trigger code
                                     httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
-                                        if (loggingOn) log.debug response4.data
+                                        if (loggingOn) log.debug "response 7: " + response4.data
                                         if (response4.data.result == "success") {
                                             log.info "${shortName} triggered"
                                             if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion triggered camera '${shortName}'")
                                             if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion triggered camera '${shortName}'")
                                             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                if (loggingOn) log.debug response5.data
+                                                if (loggingOn) log.debug "response 8: " + response5.data
                                                 if (loggingOn) log.debug "Logged out"
                                             }
                                         } else {
                                             log.error "BI Fusion Error: ${shortName} not triggered"
-                                            if (loggingOn) log.debug(response4.data.data.reason)
+                                            if (loggingOn) log.debug "response 9: " + response4.data.data.reason
                                             if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: ${shortName} not triggered")
                                             if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: ${shortName} not triggered")
                                         }
@@ -828,21 +838,21 @@ def externalAction(stringCommand) {  //can accept string of either: number for p
                                 }
                             } else {
                                 log.error "BI Fusion Error: Could not retrieve current status"
-                                if (loggingOn) log.debug(response3.data.data.reason)
+                                if (loggingOn) log.debug "response 10: " + response3.data.data.reason
                                 if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not retrieve current status")
                                 if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not retrieve current status")
                             }
                         }
                     } else {
                         log.error "BI Fusion Error: Could not login"
-                        if (loggingOn) log.debug(response2.data.data.reason)
+                        if (loggingOn) log.debug "response 11: " + response2.data.data.reason
                         if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not login")
                         if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not login")
                     }
                 }
             } else {
                 log.error "BI Fusion Error: Could not login"
-                if (loggingOn) log.debug(response.data.data.reason)
+                if (loggingOn) log.debug "response 12: " + response.data.data.reason
                 if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not login")
                 if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not login")
             }
