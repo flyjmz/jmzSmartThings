@@ -19,7 +19,10 @@ Version History:
     1.1 - 10Oct2016, all tweaks rolled into public release
  	1.2 - 5Oct2017, added temperature sensor alert capability
     1.3 - 10Oct2017, added lock locked/unlocked capability
+    1.4 - 1Feb2018, added timestamp to messages and debug logging option
 */
+
+def appVersion() {"1.4"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -72,9 +75,10 @@ def settings() {
             }
     	}
 
-        section("Message Timing") {
+        section("Message Details") {
             paragraph "Minimum time between messages (optional, defaults to every message)"
             input "frequency", "decimal", title: "Minutes", required: false
+            input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
         }
 
         section() {
@@ -113,12 +117,12 @@ def certainTime() {
 }
 
 def installed() {
-	log.debug "Installed with settings: ${settings}"
+	log.info "Installed with settings: ${settings}"
 	subscribeToEvents()
 }
 
 def updated() {
-	log.debug "Updated with settings: ${settings}"
+	log.info "Updated with settings: ${settings}"
 	unsubscribe()
 	subscribeToEvents()
 }
@@ -156,27 +160,27 @@ def gettooHot() {
 
 def tempHandler(evt) {
     def tempState = temp.currentState("temperature")  //trigger is based on the event subcription, but the temp value for notifications is a direct state pull
-    if(tempState.doubleValue > tooHot || tempState.doubleValue < tooCold) {
+    if (tempState.doubleValue > tooHot || tempState.doubleValue < tooCold) {
     	eventHandler(evt)
-    } else log.debug "Temp within limits, no action taken."
+    } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
 }
 
 def eventHandler(evt) {
-	log.debug "Notify got event ${evt} from ${evt.displayName}"
+	if (parent.loggingOn) log.debug "Notify got event ${evt} from ${evt.displayName}"
 	if (frequency) {
 		def lastTime = state[evt.deviceId]
 		if (lastTime == null || now() - lastTime >= frequency * 60000) {
-        	log.debug "frequency used and it is time for new message, checking if within time & date period"
-            if(allOk) createInstantMessage(evt)
+        	if (parent.loggingOn) log.debug "frequency used and it is time for new message, checking if within time & date period"
+            if (allOk) createInstantMessage(evt)
             state[evt.deviceId] = now()
 		}
         else {
-        	log.debug "frequency used but it is too early to send a new message"
+        	if (parent.loggingOn) log.debug "frequency used but it is too early to send a new message"
         }
 	}
 	else {
-    	log.debug "frequency not used, checking if within time & date period"
-		if(allOk) createInstantMessage(evt)
+    	if (parent.loggingOn) log.debug "frequency not used, checking if within time & date period"
+		if (allOk) createInstantMessage(evt)
 	}
 }
 
@@ -195,7 +199,11 @@ def createInstantMessage(evt) {
 		}
         msg = messageDefault
 	}
-	log.debug "created message to send. msg is ${msg}"
+    if (useTimeStamp) {
+    	def stamp = new Date().format('yyyy-M-d hh:mm:ss',location.timeZone)
+        msg = msg + " (" + stamp + ")"
+    }
+	if (parent.loggingOn) log.debug "created message to send. msg is ${msg}"
     sendMessage(msg)
 }
 
@@ -216,7 +224,7 @@ private getDaysOk() {
 		def day = df.format(new Date())
 		result = days.contains(day)
 	}
-	log.trace "daysOk = $result"
+	if (parent.loggingOn) log.debug "daysOk = $result"
 	return result
 }
 
@@ -239,7 +247,7 @@ private getTimeOk() {
 		else if(ending) stop = timeToday(ending,location.timeZone).time
 		result = start < stop ? currTime >= start && currTime <= stop : currTime <= stop || currTime >= start
 	}
-	log.trace "TimeOk = $result"
+	if (parent.loggingOn) log.debug "TimeOk = $result"
 	return result
 }
 
@@ -278,7 +286,7 @@ private sendMessage(msg) {
 		Map options = [:]
         if (phone) {
 			options.phone = phone
-			log.debug 'sending SMS'
+			if (parent.loggingOn) log.debug 'sending SMS'
 		} else if (pushAndPhone == 'Yes') {
         	options.method = 'both'
             options.phone = phone

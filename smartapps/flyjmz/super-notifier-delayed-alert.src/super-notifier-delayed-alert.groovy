@@ -21,7 +21,10 @@ Version History:
     1.3 - 29Aug2017, added ability to snooze periodic notifications.  Just add a virtual switch device.  (I have a virtual switch device type in my Github repository, linked above).
 	1.4 - 5Oct2017, added temperature sensor monitoring.
     1.5 - 10Oct2017, added lock monitoring.
+    1.6 - 1Feb2018, added timestamp to messages and debug logging option
 */
+
+def appVersion() {"1.6"}
  
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -60,12 +63,10 @@ def settings() {
                 input "lockedUnlocked", "enum", title: "When left locked or left unlocked?", required: true, options: ["Locked", "Unlocked"]
             }
         }
-        section("For more than this many minutes") {
-            input "waitThreshold", "number", description: "Number of minutes", required: true
-        }
-
-        section("Send this custom message (optional, sends standard status message if not specified)"){
-                input "messageText", "text", title: "Message Text", required: false
+        section("Message Details") {
+            input "waitThreshold", "number", description: "How long before alerting (minutes):", required: true
+            input "messageText", "text", title: "Custom Message Text (optional)", required: false
+            input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
         }
 
         section("Periodic Notificaitons") {
@@ -124,12 +125,12 @@ def certainTime() {
 }
 
 def installed() {
-	log.trace "installed with settings: ${settings}"
+	log.info "installed with settings: ${settings}"
 	initialize()
 }
 
 def updated() {
-	log.trace "updated with settings: ${settings}"
+	log.info "updated with settings: ${settings}"
 	unsubscribe()
     unschedule()
     initialize()
@@ -156,7 +157,7 @@ def initialize () {
         subscribe(myLock, "lock.locked", okHandler)
     } else if (temp) {
     	subscribe(temp, "temperature", tempHandler)
-    } else log.debug "Not subscribing to any device events"
+    } else {if (parent.loggingOn) log.debug "Not subscribing to any device events"}
     if (modeChange) subscribe(location, "mode", periodicNotifier) //checks status every time mode changes (in case it missed it)
     if (sunChange) {				//checks status every sun rises/sets (in case it missed it)
         subscribe(location, "sunrise", periodicNotifier)
@@ -178,18 +179,18 @@ def gettooHot() {
 }
 
 def tempHandler(evt) {
-	log.debug "tempHandler has ${evt.displayName} and ${temp?.currentState("temperature")}"
+	log.info "tempHandler has ${evt.displayName} and ${temp?.currentState("temperature")}"
     if (!atomicState.msgSent) {  //need this check because temperatures report at intervals on a scale of values (unlike switches and contact sensors), if we didn't check this, every time it recieved a new temp that was still out of limits, it'd reset the event time and start the periodic notifcations over.
         def tempState1 = temp.currentState("temperature")  //trigger is based on the event subcription, but the temp value for notifications is a direct state pull
         if (tempState1.doubleValue > tooHot || tempState1.doubleValue < tooCold) {
-            log.debug "Temp out of limits, sending to eventHandler"
+            if (parent.loggingOn) log.debug "Temp out of limits, sending to eventHandler"
             eventHandler(evt)
-        } else log.debug "Temp within limits, no action taken."
+        } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
     }
 }
 
 def eventHandler(evt) {
-	log.trace "eventHandler has ${evt.displayName}: ${evt.name}: ${evt.value}, scheduling stillWrong() in ${waitThreshold} minutes"
+	log.info "eventHandler has ${evt.displayName}: ${evt.name}: ${evt.value}, scheduling stillWrong() in ${waitThreshold} minutes"
     runIn((waitThreshold * 60), stillWrong)
     atomicState.problemTime = now()
 }
@@ -202,47 +203,47 @@ def stillWrong() {
     if (openClosed) {
     	if (openClosed == "Open") {
 			if (myContactState.value == "open") {
-            	log.debug "Contact is still open"
+            	if (parent.loggingOn) log.debug "Contact is still open"
                 stillWrongMsger()
             } else log.debug "the contact is closed and you want it that way"  //okHandler will send the it's ok messages for all these cases
         } else {
         	if (myContactState.value == "closed") {
-            	log.debug "Contact is still closed"
+            	if (parent.loggingOn) log.debug "Contact is still closed"
                 stillWrongMsger()
-            } else log.debug "the contact is open and you want it that way"
+            } else {if (parent.loggingOn) log.debug "the contact is open and you want it that way"}
     	}
     }
     if (onOff) {
     	if (onOff == "On") {
 			if (mySwitchState.value == "on") {
-            	log.debug "Switch is still on"
+            	if (parent.loggingOn) log.debug "Switch is still on"
 				stillWrongMsger()
             } else log.debug "the switch is off and you want it that way"
         } else {
         	if (mySwitchState.value == "off") {
-	            log.debug "Switch is still off"
+	            if (parent.loggingOn) log.debug "Switch is still off"
 				stillWrongMsger()
-            } else log.debug "the switch is on and you want it that way"
+            } else {if (parent.loggingOn) log.debug "the switch is on and you want it that way"}
     	}
     }
         if (lockedUnlocked) {
     	if (lockedUnlocked == "locked") {
 			if (myLockState.value == "locked") {
-            	log.debug "Lock is still locked"
+            	if (parent.loggingOn) log.debug "Lock is still locked"
 				stillWrongMsger()
-            } else log.debug "the lock is unlocked and you want it that way"
+            } else {if (parent.loggingOn) log.debug "the lock is unlocked and you want it that way"}
         } else {
         	if (myLockState.value == "unlocked") {
-	            log.debug "Lock is still unlocked"
+	            if (parent.loggingOn) log.debug "Lock is still unlocked"
 				stillWrongMsger()
-            } else log.debug "the lock is lcoked and you want it that way"
+            } else {if (parent.loggingOn) log.debug "the lock is lcoked and you want it that way"}
     	}
     }
     if (temp) {
         if (tempState2.doubleValue > tooHot || tempState2.doubleValue < tooCold) {
-            log.debug "Temperature is still out of limits"
+            if (parent.loggingOn) log.debug "Temperature is still out of limits"
             stillWrongMsger()
-        } else log.debug "Temp within limits, no action taken."
+        } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
     }
 }
 
@@ -252,18 +253,18 @@ def stillWrongMsger() {
     def myLockState2 = myLock?.currentState("lock")
     def tempState3 = temp?.currentState("temperature")
     if (allOk) {
-        log.debug "Event within time/day/mode constraints"
+        if (parent.loggingOn) log.debug "Event within time/day/mode constraints"
     	if (!atomicState.msgSent) {
             if (myContact) sendMessage("${myContact?.displayName} is still ${myContactState2?.value}!")
             if (mySwitch) sendMessage("${mySwitch?.displayName} is still ${mySwitchState2?.value}!")
             if (myLock) sendMessage("${myLock?.displayName} is still ${myLockState2?.value}!")
             if (temp) sendMessage("${temp?.displayName} is still ${tempState3?.value}!")
             atomicState.msgSent = true
-            log.debug "sending first message, set atomicState.msgSent to ${atomicState.msgSent}"
+            if (parent.loggingOn) log.debug "sending first message, set atomicState.msgSent to ${atomicState.msgSent}"
        		if (periodicNotifications) {
             	if (waitMinutes) {
                 	runIn((waitMinutes * 60), stillWrong)
-                	log.debug "periodic notifications is on, scheduling stillWrong() to run again in ${waitMinutes} minutes"
+                	if (parent.loggingOn) log.debug "periodic notifications is on, scheduling stillWrong() to run again in ${waitMinutes} minutes"
             	}
             }
         } else if (periodicNotifications && atomicState.msgSent) {
@@ -286,13 +287,13 @@ def stillWrongMsger() {
             }
             if (waitMinutes) {
             	runIn((waitMinutes * 60), stillWrong)
-            	log.debug "periodic notifications is scheduling the next stillWrong() to run in ${waitMinutes} minutes"
+            	if (parent.loggingOn) log.debug "periodic notifications is scheduling the next stillWrong() to run in ${waitMinutes} minutes"
         	}
         } else if (!periodicNotifications && atomicState.msgSent) {
-        	log.debug "message already sent once, not using periodic notifcations, so not sending another message"
+        	if (parent.loggingOn) log.debug "message already sent once, not using periodic notifcations, so not sending another message"
         }
     } else {
-    	log.debug "event is outside of time/day/mode conditions, no message sent, but monitoring in case it doesn't return to normal before it is within those time/day/mode conditions"
+    	if (parent.loggingOn) log.debug "event is outside of time/day/mode conditions, no message sent, but monitoring in case it doesn't return to normal before it is within those time/day/mode conditions"
     	runIn((waitThreshold * 60), stillWrong)
     }
 }
@@ -301,12 +302,12 @@ def okHandler(evt) {
 	if (atomicState.msgSent) {
     	sendMessage("${evt.device.displayName} is now ${evt.value}.")
         atomicState.msgSent = false
-        log.debug "okHandler() evoked, message sent, atomicState.msgSent is now: ${atomicState.msgSent}"
-    } else log.debug "it's okay now, and never sent left open/closed/on/off message, so no need to send an 'ok' message"
+        if (parent.loggingOn)log.debug "okHandler() evoked, message sent, atomicState.msgSent is now: ${atomicState.msgSent}"
+    } else {if (parent.loggingOn) log.debug "it's okay now, and never sent left open/closed/on/off message, so no need to send an 'ok' message"}
 }
 
 def periodicNotifier(evt) {
-	log.debug "periodic notifier got ${evt.descriptionText}, sending to stillWrong()"
+	if (parent.loggingOn) log.debug "periodic notifier got ${evt.descriptionText}, sending to stillWrong()"
     stillWrong()
 }
 
@@ -327,7 +328,7 @@ private getDaysOk() {
 		def day = df.format(new Date())
 		result = days.contains(day)
 	}
-	log.trace "daysOk = $result"
+	if (parent.loggingOn) log.debug "daysOk = $result"
 	return result
 }
 
@@ -350,7 +351,7 @@ private getTimeOk() {
 		else if(ending) stop = timeToday(ending,location.timeZone).time
 		result = start < stop ? currTime >= start && currTime <= stop : currTime <= stop || currTime >= start
 	}
-	log.trace "timeOk = $result"
+	if (parent.loggingOn) log.debug "timeOk = $result"
 	return result
 }
 
@@ -388,7 +389,11 @@ private timeIntervalLabel() {
 }
 
 private sendMessage(msg) {
-	if (location.contactBookEnabled) {
+    if (useTimeStamp) {
+    	def stamp = new Date().format('yyyy-M-d hh:mm:ss',location.timeZone)
+        msg = msg + " (" + stamp + ")"
+    }
+    if (location.contactBookEnabled) {
 		sendNotificationToContacts(msg, recipients)
 	} else {
 		Map options = [:]
@@ -401,5 +406,5 @@ private sendMessage(msg) {
         } else options.method = 'push'
 		sendNotification(msg, options)
 	}
-    log.debug "sent message: ${msg}"
+    if (parent.loggingOn) log.debug "sent message: ${msg}"
 }
