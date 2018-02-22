@@ -22,9 +22,10 @@ Version History:
 	1.4 - 5Oct2017, added temperature sensor monitoring.
     1.5 - 10Oct2017, added lock monitoring.
     1.6 - 1Feb2018, added timestamp to messages and debug logging option
+   	1.7 - 21Feb2018, fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
 */
 
-def appVersion() {"1.6"}
+def appVersion() {"1.7"}
  
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -390,7 +391,7 @@ private timeIntervalLabel() {
 
 private sendMessage(msg) {
     if (useTimeStamp) {
-    	def stamp = new Date().format('yyyy-M-d hh:mm:ss',location.timeZone)
+    	def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
         msg = msg + " (" + stamp + ")"
     }
     if (location.contactBookEnabled) {

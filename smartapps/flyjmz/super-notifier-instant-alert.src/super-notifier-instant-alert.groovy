@@ -20,9 +20,10 @@ Version History:
  	1.2 - 5Oct2017, added temperature sensor alert capability
     1.3 - 10Oct2017, added lock locked/unlocked capability
     1.4 - 1Feb2018, added timestamp to messages and debug logging option
+    1.5 - 21Feb2018, fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
 */
 
-def appVersion() {"1.4"}
+def appVersion() {"1.5"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -200,7 +201,7 @@ def createInstantMessage(evt) {
         msg = messageDefault
 	}
     if (useTimeStamp) {
-    	def stamp = new Date().format('yyyy-M-d hh:mm:ss',location.timeZone)
+    	def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
         msg = msg + " (" + stamp + ")"
     }
 	if (parent.loggingOn) log.debug "created message to send. msg is ${msg}"
