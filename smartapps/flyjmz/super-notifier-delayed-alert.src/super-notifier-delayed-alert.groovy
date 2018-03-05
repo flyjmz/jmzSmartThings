@@ -22,10 +22,11 @@ Version History:
 	1.4 - 5Oct2017, added temperature sensor monitoring.
     1.5 - 10Oct2017, added lock monitoring.
     1.6 - 1Feb2018, added timestamp to messages and debug logging option
-   	1.7 - 21Feb2018, fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
+   	1.7 - 21Feb2018, bugfix - fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
+    1.8 - 5Mar2018, bugfix - fixed waitThreshold title in preferences
 */
 
-def appVersion() {"1.7"}
+def appVersion() {"1.8"}
  
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -65,7 +66,7 @@ def settings() {
             }
         }
         section("Message Details") {
-            input "waitThreshold", "number", description: "How long before alerting (minutes):", required: true
+            input "waitThreshold", "number", title: "Delay time before alerting (minutes):", required: true
             input "messageText", "text", title: "Custom Message Text (optional)", required: false
             input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
         }
@@ -74,7 +75,7 @@ def settings() {
             paragraph "You'll receive an alert when it is left that way after your defined time period (above) and also onces it returns to normal.  Optionally, you can set periodic notifications for times in between as well." 
             input "periodicNotifications", "bool", title: "Receive periodic notifications?", required: false, submitOnChange: true
             if (periodicNotifications) {
-            	input "waitMinutes", "number", title: "Timed periodic notifications? (minutes in-between)", required: false
+            	input "waitMinutes", "number", title: "Time between periodic notifications?", required: false
                 input "modeChange", "bool", title: "Notify on mode change?", required: false
                 input "sunChange", "bool", title: "Notify at sunrise/sunset?", required: false
                 paragraph "Periodic Notifications can be snoozed easily with a virtual switch device type.  This is useful when you are unable to resolve an issue and the notifications become irritable.  A 'snooze' switch in your Things is easier to hit than changeing these settings." 
