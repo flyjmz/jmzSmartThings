@@ -50,12 +50,14 @@ Version 3.0.3 - 26Nov2017	Changed variable "actionName" to "processName" to fixe
 							Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
 Version 3.0.4 - 29Nov2017	Fixed typos, Fixed issue where it required a preset number during initialization.  Confirmed the external mode works as well!!
 Version 3.0.5 - 8Dec2017	Removed extra log.trace calls.
+Version 3.1 - 5mar0217		Updates to support camera DTH changes
+                            Added ability to move the camera back to it’s original preset after the triggered event. (per @jrfarrar's request)
 
 To Do:
 -see todos
 */
 
-def appVersion() {"3.0.5"}
+def appVersion() {"3.1"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -81,7 +83,7 @@ def mainPage() {
         }
         if (usingCameraDTH) {
             section("Select Blue Iris Camera(s) to Trigger") {   
-                input "biCamerasSelected", "capability.imageCapture", title: "Blue Iris Cameras", required: false, multiple: true  
+                input "biCamerasSelected", "capability.videoCamera", title: "Blue Iris Cameras", required: false, multiple: true  
                 paragraph "NOTE: Be sure to only select Blue Iris cameras."
             }
         } else {
@@ -105,18 +107,22 @@ def mainPage() {
             input "myWater", "capability.waterSensor", title: "Water Detected", required: false, multiple: true
         }
         section("Camera Trigger and/or PTZ") {
-            paragraph "This is trigger camera(s) to record by default, you can also choose to move the camera(s) to a preset:"
+            paragraph "This will trigger camera(s) to record by default, you can also choose to move the camera(s) to a preset:"
             input "usePreset", "bool", title: "Move to Preset?", required: true, submitOnChange: true
             def disableRecording = false
             if (usePreset) {
                 input "disableRecording", "bool", title: "Disable Recording (and only move to preset)?", required: false
+                input "returnPreset", "bool", title: "Have camera return to original preset after the trigger event?", required: false, submitOnChange: true
+                if (returnPreset) input "returnPresetWaitTime", "number", title: "Wait period (seconds) before returning to orignal preset", required: true
                 if (usingCameraDTH) {
                     biCamerasSelected.each { camera ->
                         def cameraName = camera.displayName  
                         input "preset-${cameraName}", "number", title: "Preset # for Camera: ${cameraName}", required: true
+                        if (returnPreset) input "returnPreset-${cameraName}", "number", title: "Preset # to Return to for '${cameraName}'", required: true
                     }
                 } else {
                     input "biPreset", "number", title: "Preset # for Camera: ${biCamera}", required: true
+                    if (returnPreset) input "returnBiPreset", "number", title: "Preset # to Return to", required: true
                 }
             }
         }
@@ -193,23 +199,32 @@ def initialize() {
     subscribe(mySmoke, "carbonMonoxide.detected", eventHandlerBinary)
     subscribe(myWater, "water.detected", eventHandlerBinary)
     def names = []
-    def presets = []   
+    def presets = [] 
+    def returnPresets = []  
     if (usingCameraDTH) { 
         biCamerasSelected.each { camera ->
             names += camera.name
             if (usePreset) {
                 def presetInput = "preset-${camera.displayName}"
                 presets += settings[presetInput].toInteger()
+                if (returnPreset) {
+                    def returnPresetInput = "returnPreset-${cameraName}"
+                    returnPresets += settings[returnPresetInput].toInteger()
+                }
             }
         }
     } else {
         names += biCamera
         if (usePreset) {
-            presets +=biPreset.toInteger()
+            presets += biPreset.toInteger()
+            if (returnPreset) {
+                returnPresets += returnBiPreset.toInteger()
+            }
         }
     }
     state.shortNameList = names
     state.presetList = presets
+    state.returnPresetList = returnPresets
     state.listSize =  state.shortNameList.size()
     log.info "initialized, listSize is $state.listSize, cameras are $state.shortNameList, and presets are $state.presetList"
 }
@@ -251,6 +266,7 @@ def localAction() {
             def presetString = 7 + state.presetList[i]  //1-7 are other actions, presets start at number 8.
             presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}"
             talkToHub(presetCommand)
+            if (returnPreset) runIn(returnPresetWaitTime, returnPresetLocalAction(i), [overwrite: false])
         }
         if (!disableRecording) {
             log.info "Triggering: ${state.shortNameList[i]}"
@@ -258,6 +274,14 @@ def localAction() {
             talkToHub(triggerCommand)
         }
     }
+}
+
+def returnPresetLocalAction(i) {
+    def presetCommand = ""
+    log.info "Moving ${state.shortNameList[i]} to back to preset ${state.returnPresetList[i]}"
+    def presetString = 7 + state.returnPresetList[i]  //1-7 are other actions, presets start at number 8.
+    presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}"
+    talkToHub(presetCommand)
 }
 
 def talkToHub(commandPath) {  //todo can I use a 'callback' function to parse results?  Otherwise the trigger app really isn't confirming it worked...
@@ -317,7 +341,7 @@ def externalAction() {
 
                                 ////////////////////Move to Preset Position//////////////////////////////////////////////
                                 if (usePreset) {
-                                     if (parent.loggingOn) log.debug "Moving ${state.shortNameList} to preset ${state.presetList}"
+                                    if (parent.loggingOn) log.debug "Moving ${state.shortNameList} to preset ${state.presetList}"
                                     for (int i = 0; i < state.listSize; i++) {
                                         def shortName = state.shortNameList[i]
                                         def presetNumber = state.presetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
@@ -325,6 +349,7 @@ def externalAction() {
                                             if (parent.loggingOn) log.debug response4.data
                                             if (response4.data.result == "success") {
                                                 log.info "BI Fusion moved $shortName to preset '${state.presetList[i]}'"
+                                                if (returnPreset) runIn(returnPresetWaitTime, returnPresetExternalAction(i), [overwrite: false])
                                             } else {
                                                 log.error "BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName"
                                                 if (parent.loggingOn) log.debug(response4.data.data.reason)
@@ -335,6 +360,76 @@ def externalAction() {
                                     }
                                 }
 
+                                ////////////////////Logout///////////////////////////////////////////////////////////////
+                                httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
+                                    if (parent.loggingOn) log.debug response5.data
+                                    if (parent.loggingOn) log.debug "Logged out"
+                                }
+                                
+                            } else {
+                                log.error "BI Fusion Failure: didn't receive status"
+                                if (parent.loggingOn) log.debug(response3.data.data.reason)
+                                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: Couldn't Login to Blue Iris")
+                                if (receiveNotifications) parent.send("BI Fusion Failure: Couldn't Login to Blue Iris")
+                            }
+                        }
+                    } else {
+                        log.error "BI Fusion Failure: Couldn't Login to Blue Iris"
+                        if (parent.loggingOn) log.debug(response2.data.data.reason)
+                        if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: Couldn't Login to Blue Iris")
+                        if (receiveNotifications) parent.send("BI Fusion Failure: Couldn't Login to Blue Iris")
+                    }
+                }
+            } else {
+                log.error "BI Fusion Failure: Couldn't Login to Blue Iris"
+                if (parent.loggingOn) log.debug(response.data.data.reason)
+                if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: Couldn't Login to Blue Iris")
+                if (receiveNotifications) parent.send("BI Fusion Failure: Couldn't Login to Blue Iris")
+            }
+        }
+    } catch(Exception e) {
+        log.error "BI Fusion Failure: $e"
+        if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure, turn on debugging and check logs")
+        if (receiveNotifications) parent.send("BI Fusion Failure, turn on debugging and check logs")
+    }
+}
+
+def returnPresetExternalAction(i) {
+    log.info "Running externalAction"
+    try {
+        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login"]) { response ->
+            if (parent.loggingOn) log.debug response.data
+            if (parent.loggingOn) log.debug "logging in"
+            if (response.data.result == "fail") {
+                if (parent.loggingOn) log.debug "BI_Inside initial call fail, proceeding to login"
+                def session = response.data.session
+                def hash = parent.username + ":" + response.data.session + ":" + parent.password
+                hash = hash.encodeAsMD5()
+                httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login","session":session,"response":hash]) { response2 ->
+                    if (response2.data.result == "success") {
+                        if (parent.loggingOn) log.debug ("BI_Logged In")
+                        if (parent.loggingOn) log.debug response2.data
+                        httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
+                            if (response3.data.result == "success"){
+                                if (parent.loggingOn) log.debug ("BI_Retrieved Status")
+                                if (parent.loggingOn) log.debug response3.data
+
+                                ////////////////////Move Back to Return Preset Position//////////////////////////////////////////////
+                                def shortName = state.shortNameList[i]
+                                def presetNumber = state.returnPresetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
+                                if (parent.loggingOn) log.debug "Moving ${shortName} back to preset ${presetNumber}"
+                                httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":shortName,"button":presetNumber, "session":session]) { response4 -> 
+                                    if (parent.loggingOn) log.debug response4.data
+                                    if (response4.data.result == "success") {
+                                        log.info "BI Fusion moved $shortName to preset '${state.presetList[i]}'"
+                                        if (returnPreset) runIn(returnPresetWaitTime, returnPresetExternalAction(i), [overwrite: false])
+                                    } else {
+                                        log.error "BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName"
+                                        if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                        if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName")
+                                        if (receiveNotifications) parent.send("BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName")
+                                    }
+                                }
                                 ////////////////////Logout///////////////////////////////////////////////////////////////
                                 httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
                                     if (parent.loggingOn) log.debug response5.data
@@ -433,13 +528,13 @@ private offset(value) {
 
 private timeIntervalLabel() {
     def result = ""
-    if (startingX == "Sunrise" && endingX == "Sunrise") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
-    else if (startingX == "Sunrise" && endingX == "Sunset") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-        else if (startingX == "Sunset" && endingX == "Sunrise") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
-            else if (startingX == "Sunset" && endingX == "Sunset") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-                else if (startingX == "Sunrise" && ending) result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")
-                    else if (startingX == "Sunset" && ending) result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")
-                        else if (starting && endingX == "Sunrise") result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)
-                            else if (starting && endingX == "Sunset") result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)
-                                else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
-                                    }
+    if (startingX == "Sunrise" && endingX == "Sunrise") {result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunrise" + offset(endSunriseOffset)}
+    else if (startingX == "Sunrise" && endingX == "Sunset") {result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunset" + offset(endSunsetOffset)}
+    else if (startingX == "Sunset" && endingX == "Sunrise") {result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)}
+    else if (startingX == "Sunset" && endingX == "Sunset") {result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)}
+    else if (startingX == "Sunrise" && ending) {result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")}
+    else if (startingX == "Sunset" && ending) {result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")}
+    else if (starting && endingX == "Sunrise") {result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)}
+    else if (starting && endingX == "Sunset") {result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)}
+    else if (starting && ending) {result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")}
+}

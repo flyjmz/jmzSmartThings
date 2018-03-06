@@ -52,21 +52,22 @@ Version 2.4 - 22Jan2017     Fixed error in profile change notifications (they al
 Version 2.5 - 23Jan2017     Slight tweak to notifications.
 Version 2.6 - 17Jun2017		Fixed Profile names when using in LAN (localAction was throwing NULL). Thanks Zaxxon!
 Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration with motion, profile integration, manual triggering and manual profile switching.
-							Also added App Update Notifications, cleaned up notifications, added OAuth for motion alerts
+-							Also added App Update Notifications, cleaned up notifications, added OAuth for motion alerts
 Version 3.0.1 - 28Oct2017	Fixed bug where server device map was would fail to initialize when user wasn't using it (so now it doesn't generate unless desired) - it would make install fail even if not using the Server DTH 
-                            Fixed bug that would only only allow one camera device to install.
-                            Enabled full Camera Device DTH support even without using Server DTH.
-                            Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
+-							Fixed bug that would only only allow one camera device to install.
+-							Enabled full Camera Device DTH support even without using Server DTH.
+-							Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
 Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Names after installation (can change in devices' settings, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).	                           
 Version 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
 Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
-							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
+-							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
 Version 3.0.5 - 8Dec17  	Fixed Error when user ties a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
-							Improved settings and operation when not using profile<>mode integration.
-                            Added step in DNI fix method to prevent renaming already renamed devices.
+-							Improved settings and operation when not using profile<>mode integration.
+-							Added step in DNI fix method to prevent renaming already renamed devices.
 Version 3.0.6 - 24Dec17		Cleaned up log.info verbage
-							Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
-                            Added ability to add custom polling interval for server DTH
+-							Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
+-							Added ability to add custom polling interval for server DTH
+Version 3.1 - 5Mar18		Added handling for "cameradevice.moveToPreset" command w/error checing	//NOTE: I need folks to test this for me!
 
 
 TODO:
@@ -82,7 +83,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.0.6"}
+def appVersion() {"3.1"}
 
 mappings {
     path("/active/:camera") {
@@ -161,7 +162,6 @@ def BIServerSetup() {
             input "password", "password", title: "Blue Iris Password", required: true
             paragraph "Note: Blue Iris only allows Admin Users to toggle profiles."
             if(usingBIServer) {
-
                 input "host", "text", title: "Blue Iris Server IP (only include the IP)", description: "e.g. 192.168.0.14", required:true
                 input "port", "number", title: "Blue Iris Server Port", description: "e.g. 81", required:true
                 paragraph "NOTE: Ensure 'Use secure session keys and login page' is not checked in Blue Iris Webserver - Advanced settings."
@@ -250,23 +250,25 @@ def cameraDeviceSetup() {
                 paragraph "If you're having trouble changing settings, you can turn off auto-deletion for old camera devices. ADVANCED USERS ONLY"
                 input "skipDeletion", "bool", title: "Do not delete old camera devices?", required: false
             }
-            
+
         }
-        section ("Blue Iris Motion Alert Setup") { //todo - shouldn't this actually be under the "if (installCamaraDevices) {" section?  The motion alerts received won't go anywhere unless the devices are installed...
-            paragraph "You will need to copy the addresses and change the camera names for each camera you want to get motion from. The addresses will display after clicking to open the page below."
-            def createNewAddresses = false
-            input "createNewAddresses", "bool", title: "Do you want to (re)create the URLs?", required: false, submitOnChange: true
-            paragraph "(Leave Off in Order to VIEW ONLY...Not Change)"
-            input "debugDisplaysURLs", "bool", title: "Display URLs in API Logs?", required: false
-            paragraph "If turned on, the URLs will populate in SmartThings API's Live Logging when you initialize this smartapp.  If you open the API on the computer running Blue Iris, you can then copy and paste the URLs."
-        }
-        if (createNewAddresses) {
-            section("CHANGE & View Motion Alert URLs") {
-                href(name: "oauthSetup", title: "CHANGE & View Motion Alert URLs", required: false, page: "oauthSetup")
+        if (installCamaraDevices) {
+            section ("Blue Iris Motion Alert Setup") {
+                paragraph "You will need to copy the addresses and change the camera names for each camera you want to get motion from. The addresses will display after clicking to open the page below."
+                def createNewAddresses = false
+                input "createNewAddresses", "bool", title: "Do you want to (re)create the URLs?", required: false, submitOnChange: true
+                paragraph "(Leave Off in Order to VIEW ONLY...Not Change)"
+                input "debugDisplaysURLs", "bool", title: "Display URLs in API Logs?", required: false
+                paragraph "If turned on, the URLs will populate in SmartThings API's Live Logging when you initialize this smartapp.  If you open the API on the computer running Blue Iris, you can then copy and paste the URLs."
             }
-        } else {
-            section("View Only Motion Alert URLs") {
-                href(name: "oauthView", title: "View Only Motion Alert URLs", required: false, page: "oauthView")
+            if (createNewAddresses) {
+                section("CHANGE & View Motion Alert URLs") {
+                    href(name: "oauthSetup", title: "CHANGE & View Motion Alert URLs", required: false, page: "oauthSetup")
+                }
+            } else {
+                section("View Only Motion Alert URLs") {
+                    href(name: "oauthView", title: "View Only Motion Alert URLs", required: false, page: "oauthView")
+                }
             }
         }
     }
@@ -335,9 +337,9 @@ def initialize() {
     if (autoModeProfileSync) subscribe(location, modeChange)
     if (loggingOn) log.debug "Initialized with settings: ${settings}"
     if (debugDisplaysURLs) {
-    	log.info "PLEASE REMEMBER TO SELECT HTTPS:// FROM THE DROPDOWN AND DON'T TYPE IT IN"
+        log.info "PLEASE REMEMBER TO SELECT HTTPS:// FROM THE DROPDOWN AND DON'T TYPE IT IN"
         for (int i = 0; i < howManyCameras; i++) {
-			def cameraShortNameInput = "camera${i}shortName"
+            def cameraShortNameInput = "camera${i}shortName"
             def cameraShortName = settings[cameraShortNameInput].toString()
             def activeURL = apiServerUrl("/api/smartapps/installations/${app.id}/active/${cameraShortName}?access_token=${state.accessToken}")
             def inactiveURL = apiServerUrl("/api/smartapps/installations/${app.id}/inactive/${cameraShortName}?access_token=${state.accessToken}")
@@ -373,8 +375,8 @@ def createInfoMaps() {
     if (profile7 != null) state.profileModeMap[7].modeName = profile7
     if (autoModeProfileSync) {
         location.modes.each { mode ->								//todo- this section prevents users from using the same BI profile number for multiple ST Modes (ie home and night are both profile 2).  
-                                                                    //Probably need to run a script to see if multiple modes have the same number and combine the name, eg "Home/Night".  Then in this and in the server DTH,
-                                                                    //instead of comparing the actual ST mode to the result of getProfileName(), have it compare the number from BI's return to getProfileNumber()
+            //Probably need to run a script to see if multiple modes have the same number and combine the name, eg "Home/Night".  Then in this and in the server DTH,
+            //instead of comparing the actual ST mode to the result of getProfileName(), have it compare the number from BI's return to getProfileNumber()
             def checkMode = "mode-${mode.id.toString()}"
             if (settings[checkMode] != null) {
                 state.profileModeMap[settings[checkMode].toInteger()].modeName = "${mode.name}"	//For each ST mode, it determines if the user made profile number for it in settings, then uses that profile number as the map value number and fills the name.
@@ -425,7 +427,7 @@ def createInfoMaps() {
             }
         }
     }
-	///////////////////////////////////////////
+    ///////////////////////////////////////////
 
     state.cameradeviceDNI = []
     state.camerashortName = []
@@ -439,7 +441,7 @@ def createInfoMaps() {
             if (settings[cameraDisplayNameInput]?.toString() == null) state.cameradisplayName[i] = "BI Cam - " + settings[cameraShortNameInput].toString()
             else state.cameradisplayName[i] = settings[cameraDisplayNameInput].toString()
         }
-       if (loggingOn) log.debug "state.cameradeviceDNI: ${state.cameradeviceDNI}, state.camerashortName: ${state.camerashortName}, state.cameradisplayName: ${state.cameradisplayName}"
+        if (loggingOn) log.debug "state.cameradeviceDNI: ${state.cameradeviceDNI}, state.camerashortName: ${state.camerashortName}, state.cameradisplayName: ${state.cameradisplayName}"
     }
     state.cameraSettings = [:]
     state.cameraSettings.host = host
@@ -503,6 +505,7 @@ def createBlueIrisServerDevice() {
 
     //Update the Server Settings regardless of whether it was just created or not, and subscribe to it's events:
     serverDevice.initializeServer(state.blueIrisServerSettings)
+    subscribe(serverDevice, "cameraPresetOk", cameraPresetOkHandler)
     if (receiveAlerts == "Errors Only") {
         subscribe(serverDevice, "errorMessage", serverDeviceErrorMessageHandler)  //returns a message string
     } else if (receiveAlerts == "Yes") {
@@ -529,7 +532,7 @@ def serverDeviceStopLightHandler(evt) {
 }
 
 def serverDeviceErrorMessageHandler(evt) {
-    if (loggingOn) log.debug "serverDeviceErrorMessageHandler() received {$evt}"
+    log.error "serverDeviceErrorMessageHandler() received {$evt}"
     send("${evt.descriptionText}")
 }
 
@@ -572,6 +575,7 @@ def createCameraDevice() {
                 cameraDevice = addChildDevice("flyjmz", "Blue Iris Camera", state.cameradeviceDNI[i], location.hubs[0].id, [name: "${state.camerashortName[i]}", label: "${state.cameradisplayName[i]}", completedSetup: true])
                 if (loggingOn) log.debug "'${state.cameradisplayName[i]}' Device Created"
                 subscribe(cameraDevice, "switch.on", cameraTriggerHandler)
+                subscribe(cameraDevice, "cameraPreset", cameraPresetHandler)
                 state.cameraSettings.shortName = state.camerashortName[i]
                 cameraDevice.initializeCamera(state.cameraSettings)  //pass settings
             } catch (e) {
@@ -580,6 +584,7 @@ def createCameraDevice() {
         } else {
             if (loggingOn) log.debug "Camera with dni of '${state.cameradeviceDNI[i]}' already exists."
             subscribe(cameraDevice, "switch.on", cameraTriggerHandler) //still have to subscribe (intialize() wiped old subscriptions)
+            subscribe(cameraDevice, "cameraPreset", cameraPresetHandler)
             state.cameraSettings.shortName = state.camerashortName[i]
             cameraDevice.initializeCamera(state.cameraSettings)  //pass/update settings
         }
@@ -599,9 +604,41 @@ def cameraTriggerHandler(evt) {  //sends command to camera to start recording wh
             def triggerCameraCommand = "/admin?camera=${shortName}&trigger&user=${username}&pw=${password}"
             localAction(triggerCameraCommand)      //sends command through local action if not using the BI Server Device
         } else {
-            externalAction(shortName)		//sends command through external action if not using the BI Server Device
+            externalAction("trigger",shortName)		//sends command through external action if not using the BI Server Device
         }
     }
+}
+
+def cameraPresetHandler(evt) {
+    if (loggingOn) log.debug "cameraPresetHandler() got event ${evt.displayName} is preset ${evt.value}"
+    def shortName = evt.device.name
+    def preset = evt.value.toInteger()
+    if (loggingOn) log.debug "preset is $preset"
+    if (usingBIServer || localOnly) {
+        def localPreset = 7 + preset //1-7 are other actions, presets start at number 8.  //todo - no idea if evt.value will give the preset name...
+        log.info "Moving ${shortName} to preset ${preset} via local command"
+        if (loggingOn) log.debug "localPreset is $localPreset"
+        def presetCommand = "/cam/${shortName}/pos=${localPreset}&user=${username}&pw=${password}"
+        localAction(presetCommand)
+        runIn(waitThreshold,cameraPresetErrorChecker)
+    } else {
+        log.info "Moving ${shortName} to preset ${evt.value} via external command"
+        def externalPreset = preset + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
+        if (loggingOn) log.debug "externalPreset is $externalPreset"
+        externalAction("preset",["shortName":shortName,"preset":externalPreset])
+    }
+}
+
+def cameraPresetOkHandler(evt) {
+    state.cameraPresetOk = true
+}
+
+def cameraPresetErrorChecker() {
+    if (!state.cameraPresetOk && (receiveAlerts == "Errors Only" || receiveAlerts == "Yes")) {
+        log.error "BI Camera did not move to commanded preset"
+        send("BI Camera did not move to commanded preset")
+    }
+    state.cameraPresetOk = false
 }
 
 
@@ -730,7 +767,7 @@ def modeChange(evt) {
                 }
                 def profileChangeCommand = "/admin?profile=${profile}&lock=${lock}&user=${username}&pw=${password}"
                 localAction(profileChangeCommand)	//sends profile change through local lan (like device) except through the app
-            } else externalAction(profile)  //sends profile change from SmartThings cloud to BI server
+            } else externalAction("profile",profile)  //sends profile change from SmartThings cloud to BI server
         }  
     }
 }
@@ -751,22 +788,9 @@ def localAction(command) {
     if (loggingOn) log.debug hubAction
 }
 
-def externalAction(stringCommand) {  //can accept string of either: number for profile change or shortname for camera trigger
-    def isProfileChange = true
-    def profile = 1
-    def shortName = ""
-    if (stringCommand.isNumber()) {
-        isProfileChange = true
-        profile = stringCommand.toInteger()
-        log.info "Changing Blue Iris Profile to ${profile} via external command"
-    } else {
-        isProfileChange = false
-        shortName = stringCommand
-        log.info "Triggering $shortName via external command"
-    }
+def externalAction(commandType,stringCommand) {  //can accept string of either: number for profile change or shortname for camera trigger
     def lock = 2
     if (!holdTemp) lock = 1
-
     try {
         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
             if (loggingOn) log.debug "response 1: " + response.data
@@ -782,17 +806,19 @@ def externalAction(stringCommand) {  //can accept string of either: number for p
                         if (loggingOn) log.debug ("BI_Logged In")
                         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","session":session]) { response3 ->
                             if (loggingOn) log.debug "response 3: " + response3.data
-                            if (response3.data.result == "success"){
+                            if (response3.data.result == "success") {
                                 if (loggingOn) log.debug ("BI_Retrieved Status")
-                                if (isProfileChange) {   //todo - something to try to get this back to normal, create a bodyCommand using if loops so you don't have to break up the code here, it's just say body: [body]
-                                    //Begin Profile Change Code
+                                //Begin Profile Change Code
+                                if (commandType == "profile") {
+                                    def profile = stringCommand.toInteger()
+                                    log.info "Changing Blue Iris Profile to ${profile} via external command"
                                     if (response3.data.data.profile != profile) {        
                                         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"lock":lock,"session":session]) { response4 ->
                                             if (loggingOn) log.debug "response 4: " + response4.data
                                             if (response4.data.result == "success") {
                                                 if (response4.data.data.profile.toInteger() == profile) {
                                                     log.info ("Blue Iris is now in profile ${profileName(BIprofileNames,profile)}!")
-                                                    if(receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
+                                                    if (receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                     if (receiveAlerts == "Yes") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
                                                 } else {
                                                     log.error ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Change to ${profileName(BIprofileNames,profile)} failed. Check your user permissions.")
@@ -815,8 +841,10 @@ def externalAction(stringCommand) {  //can accept string of either: number for p
                                         sendNotificationEvent("Blue Iris is already in profile ${profileName(BIprofileNames,profile)}.")
                                     }
                                     //End Profile Change Code
-                                } else {
+                                } else if (commandType == "trigger") {
                                     //Begin Trigger code
+                                    def shortName = stringCommand
+                                    log.info "Triggering $shortName via external command"
                                     httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
                                         if (loggingOn) log.debug "response 7: " + response4.data
                                         if (response4.data.result == "success") {
@@ -835,7 +863,23 @@ def externalAction(stringCommand) {  //can accept string of either: number for p
                                         }
                                     }
                                     //End Trigger code
-                                }
+                                } else if (commandType == "preset") {
+                                    def shortName = stringCommand.shortName
+                                    def preset = stringCommand.preset.toInteger()
+                                    if (loggingOn) log.debug "Moving ${state.shortNameList} to preset ${preset}"
+                                    def presetNumber = state.presetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
+                                    httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":shortName,"button":presetNumber, "session":session]) { response4 -> 
+                                        if (parent.loggingOn) log.debug response4.data
+                                        if (response4.data.result == "success") {
+                                            log.info "BI Fusion moved $shortName to preset $preset"
+                                        } else {
+                                            log.error "BI Fusion Failure: preset $preset not sent to $shortName"
+                                            if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                            if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: preset $preset not sent to $shortName")
+                                            if (receiveNotifications) parent.send("BI Fusion Failure: preset $preset not sent to $shortName")
+                                        }
+                                    }
+                                } else {log.error "externalAction() commandType is ${commandType}, not supported"}
                             } else {
                                 log.error "BI Fusion Error: Could not retrieve current status"
                                 if (loggingOn) log.debug "response 10: " + response3.data.data.reason
@@ -880,12 +924,12 @@ def checkForTriggerUpdates() {
     if (childApps[0] != null) {
         installedVersion = childApps[0].appVersion()
         installed = true
-    } else  //no triggers installed
-        if (loggingOn) log.debug "Trigger child app installedVersion is $installedVersion"
-        def name = "BI Fusion - Trigger"
-        def website = "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/blue-iris-fusion-trigger.src/version.txt"
-        if (installed) checkUpdates(name, installedVersion, website)
-        }
+    } else {}  //no triggers installed
+    if (loggingOn) log.debug "Trigger child app installedVersion is $installedVersion"
+    def name = "BI Fusion - Trigger"
+    def website = "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/blue-iris-fusion-trigger.src/version.txt"
+    if (installed) checkUpdates(name, installedVersion, website)
+}
 
 def checkForFusionUpdates() {
     log.info "Checking for BI Fusion app updates"
