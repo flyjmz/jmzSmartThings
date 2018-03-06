@@ -33,33 +33,38 @@ v1.1 2Nov17		BI Fusion updated to allow user to change Camera Device Names after
 				(Must change in devices' settings page, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).
                 Beta - Added Video Live Stream, but doesn't seem to work
 v1.2 26Nov17	Video did work! Only change for v1.2 is updated log.info/trace/debug to not post passwords all the time.
+v1.3 5Mar18		Tried Image capture, but it gets weird because the captured image would go to the BI Server DTH's parse, 
+				so you'd either have to go there to see it, or figure out how to send it back here...Abandoned
+                Added "Sensor" and "actuator" Capability
+                Added "moveToPreset" command so webcore (and others) can call "moveToPreset.cameraPreset(#)" to move camera to specific presets. -requested by @jrfarrar
 
 
 ToDo:
--Image capture
 */
 
-def appVersion() {"1.2"}
+def appVersion() {"1.3"}
 
 metadata {
     definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
         capability "Motion Sensor"  //To treat cameras as a motion sensor for other apps (e.g. BI camera senses motion, setting this device to active so an alarm can subscribe to it and go off
         capability "Switch"  //To trigger camera recording for other smartapps that may not accept momentary
         capability "Momentary" //To trigger camera recording w/momentary on
-        capability "Image Capture"
         capability "Video Camera"
-		capability "Video Capture"
 		capability "Refresh"
+        capability "Sensor"
+        capability "Actuator"
         attribute "cameraShortName", "string"
         attribute "errorMessage", "String"
-        attribute "Image", "string"
+       	//attribute "image", "string"
+        attribute "cameraPreset", "Number"
         command "active"
         command "inactive"
         command "on"
         command "off"
-        command "take"
+        //command "take"
         command "start"
         command "initializeCamera"
+        command "moveToPreset", ["number"]
     }
 
 
@@ -67,38 +72,32 @@ metadata {
     }
 
     tiles (scale: 2) {
-       		multiAttributeTile(name: "videoPlayer", type: "videoPlayer", width: 6, height: 4) {
-			/*tileAttribute("device.switch", key: "CAMERA_STATUS") {
-				attributeState("on", label: "Active", icon: "st.camera.dlink-indoor", action: "switch.off", backgroundColor: "#79b821", defaultState: true)
-				attributeState("off", label: "Inactive", icon: "st.camera.dlink-indoor", action: "switch.on", backgroundColor: "#ffffff")
-				attributeState("restarting", label: "Connecting", icon: "st.camera.dlink-indoor", backgroundColor: "#53a7c0")
-				attributeState("unavailable", label: "Unavailable", icon: "st.camera.dlink-indoor", action: "refresh.refresh", backgroundColor: "#F22000")
-			}*/
+        multiAttributeTile(name: "videoPlayer", type: "videoPlayer", width: 6, height: 4) {
+            tileAttribute("device.errorMessage", key: "CAMERA_ERROR_MESSAGE") {
+                attributeState("errorMessage", label: "", value: "", defaultState: true)
+            }
 
-			tileAttribute("device.errorMessage", key: "CAMERA_ERROR_MESSAGE") {
-				attributeState("errorMessage", label: "", value: "", defaultState: true)
-			}
+            tileAttribute("device.camera", key: "PRIMARY_CONTROL") {
+                attributeState("on", label: "Active", backgroundColor: "#79b821", defaultState: true)
+                attributeState("off", label: "Inactive", backgroundColor: "#ffffff")
+                attributeState("restarting", label: "Connecting", backgroundColor: "#53a7c0")
+                attributeState("unavailable", label: "Unavailable", backgroundColor: "#F22000")
+            }
 
-			tileAttribute("device.camera", key: "PRIMARY_CONTROL") {
-				attributeState("on", label: "Active", backgroundColor: "#79b821", defaultState: true)
-				attributeState("off", label: "Inactive", backgroundColor: "#ffffff")
-				attributeState("restarting", label: "Connecting", backgroundColor: "#53a7c0")
-				attributeState("unavailable", label: "Unavailable", backgroundColor: "#F22000")
-			}
+            tileAttribute("device.startLive", key: "START_LIVE") {
+                attributeState("live", action: "start", defaultState: true)
+            }
 
-			tileAttribute("device.startLive", key: "START_LIVE") {
-				attributeState("live", action: "start", defaultState: true)
-			}
+            tileAttribute("device.stream", key: "STREAM_URL") {
+                attributeState("activeURL", defaultState: true)
+            }
+        }
 
-			tileAttribute("device.stream", key: "STREAM_URL") {
-				attributeState("activeURL", defaultState: true)
-			}
-       }
-       
-       standardTile("motion", "device.motion", width: 4, height: 2, canChangeIcon: false, canChangeBackground: true) {
+        standardTile("motion", "device.motion", width: 4, height: 2, canChangeIcon: false, canChangeBackground: true) {
             state "inactive", label: 'No Motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
             state "active", label: 'Motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
         }
+        
         standardTile("button", "device.switch", width: 2, height: 2, canChangeIcon: false, canChangeBackground: true) {
             state "off", label: 'Record', action: "switch.on", icon: "st.switch.switch.off", backgroundColor: "#ffffff"
             state "on", label: 'Recording', icon: "st.switch.switch.on", backgroundColor: "#53a7c0"  //no action because you can't untrigger a camera
@@ -106,7 +105,6 @@ metadata {
         main (["motion"])
         details(["videoPlayer","motion","button"])
     }
-
     preferences {
     }
 }
@@ -114,11 +112,11 @@ metadata {
 def initializeCamera(cameraSettings) {
 	state.cameraSettings = cameraSettings
     sendEvent(name: "motion", value: "inactive", descriptionText: "Camera Motion Inactive", displayed: false)  //initializes camera motion state
-    log.trace "${state.cameraSettings.shortName} camera DTH initialized"
+    log.info "${state.cameraSettings.shortName} camera DTH initialized"
 }
 
 def parse(String description) {  //Don't need to parse anything because it's all to/from server device then service manager app.
-	log.debug "Parsing '${description}'"
+	log.info "Parsing '${description}'"
 }
 
 def on() {   //Trigger to start recording with BI Camera
@@ -147,14 +145,17 @@ def push() {
 	on()
 }
 
-def take() {
-	log.info "${state.cameraSettings.shortName} Executing 'take'"
-    //todo - add image capture
+def moveToPreset(preset) {
+	def receivedPreset = preset
+	log.info "${state.cameraSettings.shortName} commanded to move to preset '${receivedPreset}'"
+    sendEvent(name: "cameraPreset", value: "$receivedPreset", descriptionText: "Camera Commanded to Preset $receivedPreset", displayed: true)
 }
 
 def start() {
-	log.trace "${state.cameraSettings.shortName} start()"
-   	def cameraStreamPath = "http://${state.cameraSettings.username}:${state.cameraSettings.password}@${state.cameraSettings.host}:${state.cameraSettings.port}/mjpg/${state.cameraSettings.shortName}"
+	log.info "${state.cameraSettings.shortName} start()"
+   	def cameraStreamPath = "http://${state.cameraSettings.username}:${state.cameraSettings.password}@${state.cameraSettings.host}:${state.cameraSettings.port}/mjpg/${state.cameraSettings.shortName}"  //todo 
+    //todo - (continued) if the user is using external and enters "http://" in the host entry like they should, then you get http:// twice and it breaks.  
+    //I don't think this is the right path to use for true external anyway...look that up.
     def dataLiveVideo = [
 		OutHomeURL  : cameraStreamPath,
 		InHomeURL   : cameraStreamPath,

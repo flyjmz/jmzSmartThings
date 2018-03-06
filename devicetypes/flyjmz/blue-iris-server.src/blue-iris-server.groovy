@@ -19,38 +19,44 @@ for the specific language governing permissions and limitations under the Licens
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-///										App Info											//
+///                                     App Info                                            //
 //////////////////////////////////////////////////////////////////////////////////////////////
 /*
 SmartThings Community Thread:  
-		https://community.smartthings.com/t/release-blue-iris-device-handler/ 
+        https://community.smartthings.com/t/release-blue-iris-device-handler/ 
 
 Github: 
-		https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src
+        https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src
         
 BI Fusion SmartThings Community Thread: 
-		https://community.smartthings.com/t/release-bi-fusion-v3-0-adds-blue-iris-device-type-handler-blue-iris-camera-dth-motion-sensing/103032
+        https://community.smartthings.com/t/release-bi-fusion-v3-0-adds-blue-iris-device-type-handler-blue-iris-camera-dth-motion-sensing/103032
         
 Version History:
 1.0     14Oct2017   Initial Commit of Standalone DTH
 1.01    14Oct2017   Re-fixed bug I accidentally reintroduced where the network ID doesn't get updated properly
-2.0		26Oct17		Now can be installed through the BI Fusion smartapp (preferred method).
-					Also added software update notifications, and BI camera integration (via BI Fusion)..
+2.0     26Oct17     Now can be installed through the BI Fusion smartapp (preferred method).
+                    Also added software update notifications, and BI camera integration (via BI Fusion)..
                     Non-destructive install, it can be run standalone or through BI Fusion.
-2.1		1Nov17		Added Parse handling for preset movements from camera DTH
-2.2		26Nov17		Code Cleanup; fixed responseTime math in serverOfflineChecker(); fixed 'secure only' terminology after Blue Iris changed it
-2.3		29Nov17		Made error codes more descriptive to aid correction.
-2.4		8Dec17		Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (negative sign comes from the schedule being used in BI)
-					Improved settings and operation when not using profile<>mode integration
-2.5		19Dec17		Updated Parse() to be more robust, and prepped code to allow for upcoming lock status!
-					When toggling between Temporary and Hold changes, it'll actually resent the profile to Blue Iris in the new mode.
-2.6		24Dec17     Added ability for user to set polling interval.
-					Fixed lock status stuff after bug in BI
+2.1     1Nov17      Added Parse handling for preset movements from camera DTH
+2.2     26Nov17     Code Cleanup; fixed responseTime math in serverOfflineChecker(); fixed 'secure only' terminology after Blue Iris changed it
+2.3     29Nov17     Made error codes more descriptive to aid correction.
+2.4     8Dec17      Added '.abs()' in the parse method for returned profile numbers to prevent and error for profile being set to '-1' (negative sign comes from the schedule being used in BI)
+                    Improved settings and operation when not using profile<>mode integration
+2.5     19Dec17     Updated Parse() to be more robust, and prepped code to allow for upcoming lock status!
+                    When toggling between Temporary and Hold changes, it'll actually resent the profile to Blue Iris in the new mode.
+2.6     24Dec17     Added ability for user to set polling interval.
+                    Fixed lock status stuff after bug in BI
+2.7     5Mar18      Added "Sensor" and "Actuator" Capability, other code cleanup, minor UI improvements
+                    Attempted multiAttributeTile but reverted (left as todo)
+                    Added error checking for moving camera to presets and triggering. Signal changes already had error checking.
+                    Added then removed error checking for triggering.  Worked well unless there were a lot of simultanous camera triggers, 
+                        then the issues of "state" and multiple app executions end up corupting the state lists.  Todo for later.
+                    NOTE: User must enter BI Fusion settings and save in order to get error checking state variables initialized.
 
 To Do:
-- add the new device stuff from the PM w/@kramttocs
-- add camera triggering to error checking
-- add signal to error checking
+-Fix camera trigger error checking, search for "//for trigger error checking" and look at note in v2.7.  
+    --http://docs.smartthings.com/en/latest/smartapp-developers-guide/state.html#state-and-potential-race-conditions
+-Finish attempted multiAttributeTile
 
 Wish List:
 -"Commands that take parameters" cannot be called with their parameters from tile action, resulting in a different command for each profile.  Some solutions may exist using child device buttons/switches.
@@ -60,12 +66,14 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.6"}
+def appVersion() {"2.7"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
         capability "Refresh"
         capability "Bridge"
+        capability "Sensor"
+        capability "Actuator"
         attribute "blueIrisProfile", "Number"
         attribute "stoplight", "enum", ["red", "green", "yellow"]
         attribute "errorMessage", "String"
@@ -84,7 +92,7 @@ metadata {
         command "changeHoldTemp"
         command "initializeServer"
         command "setProfile", ["number"]
-       	command "triggerCamera", ["string"]
+        command "triggerCamera", ["string"]
     }
 
     simulator {
@@ -92,6 +100,24 @@ metadata {
     }
 
     tiles(scale: 2) {
+        /*   todo--make this work per: https://community.smartthings.com/t/playing-around-with-the-device-handler/109653
+        multiAttributeTile(name:"summary", type: "thermostat", width: 6, height: 4) {
+            tileAttribute("device.blueIrisProfile", key: "PRIMARY_CONTROL") {
+                attributeState("blueIrisProfile", label: '${currentValue}', icon:"st.camera.take-photo", defaultState: true, backgroundColor:"#00A0DC")
+            }
+
+            tileAttribute("device.holdTemp",  inactiveLabel: false, key: "SECONDARY_CONTROL") {               
+                attributeState("Hold", label:"Hold Change", icon:"st.Health & Wellness.health7")
+                attributeState("Temporary", label:"Temporary Change", icon:"st.custom.buttons.subtract-icon")                
+                attributeState("Schedule", label:"Schedule", icon:"st.Health & Wellness.health12")
+            }
+            
+            tileAttribute ("device.stoplight", key: "VALUE_CONTROL") {  
+                attributeState("VALUE_UP", action: "setBlueIrisStopLight")
+                attributeState("VALUE_DOWN", action: "setBlueIrisStopLight")                  
+            }
+        }
+        */
         valueTile("blueIrisProfile", "device.blueIrisProfile", width: 4, height: 2, canChangeIcon: false, decoration: "flat") {
             state("default", label: '${currentValue}'/*, icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo.png"*/)    //todo - can I have the icon displayed on the 'My Home' page but not on the actual device tile?
         }
@@ -100,8 +126,8 @@ metadata {
             state("refreshing", label:"Refreshing", backgroundColor: "#00a0dc")
         } 
         standardTile("sync", "device.sync", width: 2, height: 1, decoration: "flat") {
-            state("default", label:'Sync BI to ST', action: "syncBIprofileToSmarthThings", nextState:"syncing")
-            state("syncing", label:"Syncing", backgroundColor: "#00a0dc")
+            state("default", label:'Sync BI', icon: "st.motion.motion.active", action: "syncBIprofileToSmarthThings", nextState:"syncing")
+            state("syncing", label:"Syncing", icon: "st.motion.motion.inactive", backgroundColor: "#00a0dc")
             state("userDisabled", label:"(disabled)")
         } 
         standardTile("profile0", "device.profile0mode", width: 2, height: 1, decoration: "flat") {
@@ -110,10 +136,10 @@ metadata {
             state("turningOn", label:"Turning On", backgroundColor: "#00a0dc")
         }
         standardTile("holdTemp", "device.holdTemp", width: 2, height: 1, decoration: "flat") {
-            state("Hold", label:'${currentValue}', action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
-            state("Temporary", label:'${currentValue}', action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
-            state("Schedule", label:'${currentValue}', action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
-            state("changing", label:"Changing...", backgroundColor: "#ffffff")
+            state("Hold", label:'${currentValue}', icon: "st.motion.motion.active", action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
+            state("Temporary", label:'${currentValue}', icon: "st.motion.motion.active", action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
+            state("Schedule", label:'${currentValue}', icon: "st.motion.motion.active", action: "changeHoldTemp", backgroundColor: "#ffffff", nextState:"changing")
+            state("changing", label:"Changing...", icon: "st.motion.motion.inactive", backgroundColor: "#ffffff")
         }
         standardTile("profile1", "device.profile1mode", width: 2, height: 2, decoration: "flat") {
             state("default", label:'${currentValue}', action: "setBlueIrisProfile1", backgroundColor: "#ffffff", nextState:"turningOn")
@@ -157,20 +183,17 @@ metadata {
             state("changing", label:'Changing...', backgroundColor: "#ffffff")
         }
         main ('blueIrisProfile')
-        details('blueIrisProfile','refresh','sync','profile0','profile1','profile2','holdTemp','profile3','profile4','profile5','profile6','profile7','stoplight')
+        details('blueIrisProfile','refresh','sync','holdTemp','profile1','profile2','profile0','profile3','profile4','profile5','profile6','profile7','stoplight')
     }
 
     preferences {
         section("Blue Iris Server Login Settings:"){  //NOTE: Device Type Handler Preferences can't be a dynamic page, can't do notifications, and can't have paragraph's
-            //paragraph "This only functions on a Local Connection to the Blue Iris Server (i.e. LAN, the SmartThings hub is on the same network as the BI Server)?"
-            //paragraph "Ensure 'Use secure session keys and login page' is not checked in Blue Iris Webserver - Advanced settings."
             input "host", "text", title: "BI Webserver IP", description: "Must be a local connection", required:true, displayDuringSetup: true
             input "port", "number", title: "BI Webserver Port (e.g. 81)", required:true, displayDuringSetup: true
             input "username", "text", title: "BI Username", description: "Must be an Admin User", required: true, displayDuringSetup: true
             input "password", "password", title: "BI Password", description: "Don't check 'Use secure session...' in BI", required: true, displayDuringSetup: true
         }
         section("Blue Iris Profile <=> SmartThings Mode Matching:"){
-            //paragraph "Enter the SmartThings Mode Name for the Matching Blue Iris Profiles (Inactive, and #1-7). Be sure to enter it exactly. To ignore a profile number, leave it blank."
             input "autoModeProfileSync", "bool", title: "Auto Sync BI Profile to ST Mode?", required: true
             input "profile0", "text", title: "ST Mode for BI Inactive (Profile 0)", description: "Default: Inactive", required:false, displayDuringSetup: true
             input "profile1", "text", title: "ST Mode for BI Profile #1", description: "Leave blank to Ignore", required:false, displayDuringSetup: true
@@ -187,7 +210,6 @@ metadata {
             input "pollingInterval", "number", title: "You can set a custom polling interval as well", description: "Default: 15 minutes", required: false, displayDuringSetup: true 
         }
         section("Debug"){
-            //paragraph "You can turn on debug logging, viewed in Live Logging on the API website."
             def loggingOn = false
             input "loggingOn", "bool", title: "Debug Logging?"
         }
@@ -201,10 +223,10 @@ def updated() {
 def updateNetworkID() {  //sets the actual network ID so SmartThings knows what to listen to for Parse()
     if (state.debugLogging) log.debug "updateNetworkID() called, state.correctdeviceNetworkId is ${state.correctdeviceNetworkId}, state.host is ${state.host} and state.port is ${state.port}"
     if (state.correctdeviceNetworkId != null) {
-    	if (state.debugLogging) log.debug "updating network id from BI Fusion settings"
+        if (state.debugLogging) log.debug "updating network id from BI Fusion settings"
         device.deviceNetworkId = state.correctdeviceNetworkId
     } else if (state.host != null && state.port != null) {
-    	if (state.debugLogging) log.debug "updating network id from Blue Iris Server Device settings"  
+        if (state.debugLogging) log.debug "updating network id from Blue Iris Server Device settings"  
         def hosthex = convertIPtoHex(state.host).toUpperCase()  //Note: it needs to be set to uppercase for the new deviceNetworkId to work in SmartThings
         def porthex = convertPortToHex(state.port).toUpperCase()
         device.deviceNetworkId = "$hosthex:$porthex"
@@ -212,11 +234,11 @@ def updateNetworkID() {  //sets the actual network ID so SmartThings knows what 
 }
 
 def initialize() {  
-	if (state.updatedFromBIFusion) {
+    if (state.updatedFromBIFusion) {
         log.error "Error 0: The Blue Iris Server device was installed from BI Fusion, edit it's settings from BI Fusion, not device settings."
         sendEvent(name: "errorMessage", value: "Error! The Blue Iris Server device was installed from BI Fusion, edit it's settings from BI Fusion, not device settings.", descriptionText: "Error! The Blue Iris Server device was installed from BI Fusion, edit it's settings from BI Fusion, not device settings.", displayed: true)
     } else {
-    	unschedule()
+        unschedule()
         state.debugLogging = (loggingOn != null) ? loggingOn : false
         state.serverResponseThreshold = (waitThreshold != null) ? waitThreshold : 5
         state.pollingInterval = (pollingInterval != null) ? pollingInterval : 15
@@ -246,16 +268,18 @@ def initialize() {
         state.profile5mode = (profile5 != null) ? profile5 : "Profile 5"
         state.profile6mode = (profile6 != null) ? profile6 : "Profile 6"
         state.profile7mode = (profile7 != null) ? profile7 : "Profile 7"
-		setTileProfileModesToName()
+        setTileProfileModesToName()
         if(state.debugLogging) log.debug "profile0mode is ${state.profile0mode}, profile1mode is ${state.profile1mode}, profile2mode is ${state.profile2mode}, profile3mode is ${state.profile3mode}, profile4mode is ${state.profile4mode}, profile5mode is ${state.profile5mode}, profile6mode is ${state.profile6mode}, profile7mode is ${state.profile7mode}"
         customPolling()
         schedule(now(), checkForUpdates)
         checkForUpdates()
+        //state.triggeredCameraHistory = []  //for trigger error checking
+        //state.cameraTriggeredSuccessfulHistory = []  //for trigger error checking
     }
 }
 
 def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but run from the data pushed to the device from the Service Manager:
-	state.blueIrisServerSettings = blueIrisServerSettings
+    state.blueIrisServerSettings = blueIrisServerSettings
     unschedule()
     state.updatedFromBIFusion = true  //prevents the other initialize from setting all of this from the Device Preferences Settings
     state.debugLogging = (state.blueIrisServerSettings.loggingOn != null) ? state.blueIrisServerSettings.loggingOn : false 
@@ -288,10 +312,12 @@ def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but 
     state.profile5mode = profileModeMap[5].modeName
     state.profile6mode = profileModeMap[6].modeName
     state.profile7mode = profileModeMap[7].modeName
-	if(state.debugLogging) log.debug "state.correctdeviceNetworkId is ${state.correctdeviceNetworkId}"
-	setTileProfileModesToName()
+    if(state.debugLogging) log.debug "state.correctdeviceNetworkId is ${state.correctdeviceNetworkId}"
+    setTileProfileModesToName()
     if(state.debugLogging) log.debug "profile0mode is ${state.profile0mode}, profile1mode is ${state.profile1mode}, profile2mode is ${state.profile2mode}, profile3mode is ${state.profile3mode}, profile4mode is ${state.profile4mode}, profile5mode is ${state.profile5mode}, profile6mode is ${state.profile6mode}, profile7mode is ${state.profile7mode}"
     customPolling()
+    //state.triggeredCameraHistory = []  //for trigger error checking
+    //state.cameraTriggeredSuccessfulHistory = []  //for trigger error checking
 }
 
 def parse(description) {
@@ -336,10 +362,11 @@ def parseBody(body) {
         for (int i = 0; i < bodyList.size(); i++) {
             def checkValue = bodyList[i].toString().toLowerCase()
             if (checkValue.contains('ok')) {
-                log.info "Camera Moved to Preset Successfully"	//todo - add error checking (probably some state that goes true if the preset command is sent and then here it checks that if that state is true then this should happen (actually put in the error checker below, and add a state variable here that turns true)
+                log.info "Camera Moved to Preset Successfully"  
+                sendEvent(name: "cameraPresetOk", value: "Ok", displayed: false)
             }
-            if (checkValue.contains('signal')) {		//todo - add this into error checking
-            	newSignal = bodyList[i] - "signal="
+            if (checkValue.contains('signal')) {
+                newSignal = bodyList[i] - "signal="
                 sendEvent(name: "stoplight", value: "$newSignal", descriptionText: "Blue Iris Traffic Signal is ${newSignal}", displayed: true)
             }
             if (checkValue.contains('profile')) {
@@ -375,14 +402,21 @@ def parseBody(body) {
             } 
             if (checkValue.contains('camera')) {
                 newCamera = bodyList[i] - "camera="
-                log.info "Camera '$newCamera' triggered successfully"  //todo - add this into error checking
-        		//sendEvent(name: "cameraMotionActive", value: "${shortName[0]}", displayed: false)  //This was part of trying to not use OAuth.  Todo - make it work
-        		//sendEvent(name: "cameraMotionInactive", value: "${shortName[0]}", displayed: false) //This was part of trying to not use OAuth.  Todo - make it work
+                log.info "Camera '$newCamera' triggered successfully"
+                /*  //for trigger error checking
+                def cameraTriggeredSuccessfulHistoryNonstate = state.cameraTriggeredSuccessfulHistory
+                cameraTriggeredSuccessfulHistoryNonstate += newCamera
+                state.cameraTriggeredSuccessfulHistory = cameraTriggeredSuccessfulHistoryNonstate
+                log.trace "state.cameraTriggeredSuccessfulHistory is ${state.cameraTriggeredSuccessfulHistory}"
+                */
+
+                //sendEvent(name: "cameraMotionActive", value: "${shortName[0]}", displayed: false)  //This was part of trying to not use OAuth.  Todo - make it work
+                //sendEvent(name: "cameraMotionInactive", value: "${shortName[0]}", displayed: false) //This was part of trying to not use OAuth.  Todo - make it work
             }
         }
-		log.info "parsing results: profile is number '$state.newProfileNum' ('$newProfileName'), signal is '$newSignal', lock is '$newLock' ('$newLockName'), triggered camera is '$newCamera'"
+        log.info "parsing results: profile is number '$state.newProfileNum' ('$newProfileName'), signal is '$newSignal', lock is '$newLock' ('$newLockName'), triggered camera is '$newCamera'"
           
-        if (!state.hubOnline) {  	//Sends a notification that it is back online since we had previously said it was offline
+        if (!state.hubOnline) {     //Sends a notification that it is back online since we had previously said it was offline
             log.info "BI Server is back online"
             sendEvent(name: "errorMessage", value: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", descriptionText: "Blue Iris Server is back online, Profile is '${newProfileName}' and Traffic Light is '${newSignal}.'", displayed: true)
             state.hubOnline = true
@@ -402,11 +436,10 @@ def parseBody(body) {
                 sendEvent(name: "errorMessage", value: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", descriptionText: "Error! Blue Iris Traffic Light failed to change to ${state.desiredNewStoplightColor}; it is ${newSignal}", displayed: true)
             }
         }
-	    if (state?.lockNumber && state?.lockNumber != newLock) {		
-        	log.error "error 5: Change Profile lock didn't update, it is still '${newLockName}'"
+        if (state?.lockNumber && state?.lockNumber != newLock) {        
+            log.error "error 5: Change Profile lock didn't update, it is still '${newLockName}'"
             sendEvent(name: "errorMessage", value: "Error! Blue Iris profile changing mode failed to update, it is still '${newLockName}', you wanted it '${state.lockName}'", descriptionText: "Error! Blue Iris profile changing mode failed to update, it is still '${newLockName}', you wanted it '${state.lockName}'", displayed: true)
         }
-        
     } catch (Exception e) {
         log.error "error 21: Parsing parseBody() error, body is '$body'.  Error: $e"
         setTileProfileModesToName()
@@ -447,13 +480,13 @@ def setTileProfileModesToName() {
 def changeHoldTemp() {
     if (state.debugLogging) log.debug "changeHoldTemp() called, state.holdChange is ${state.holdChange}"
     if (device.currentState("holdTemp").value == "Hold") {  //If it is hold, change it to temp
-    	state.holdChange = false
+        state.holdChange = false
         state.lockNumber = 1
         state.lockName = "Temporary"
-		setProfile(state.newProfileNum)
+        setProfile(state.newProfileNum)
     }
     else if (device.currentState("holdTemp").value == "Temporary" || device.currentState("holdTemp").value == "Schedule") { //else it is temp (or 'run'), change it to hold
-    	state.holdChange = true
+        state.holdChange = true
         state.lockNumber = 2
         state.lockName = "Hold"
         setProfile(state.newProfileNum)
@@ -464,20 +497,20 @@ def changeHoldTemp() {
 def customPolling() {
     double timesSinceContact = (now() - state.hubCommandReceivedTime).abs() / 60000  //time since last contact from server in minutes
     if (timesSinceContact > state.pollingInterval) {
-        retrieveCurrentStatus()		//Only does a check ('poll') if we haven't heard from the server in more than the polling interval.
+        retrieveCurrentStatus()     //Only does a check ('poll') if we haven't heard from the server in more than the polling interval.
     }    
     runIn(state.pollingInterval*60, customPolling)
 }
 
 def retrieveCurrentStatus() {
-	state.desiredNewProfile = false
+    state.desiredNewProfile = false
     log.info "Retrieving Current Status"
     def retrieveProfileCommand = "/admin&user=${state.username}&pw=${state.password}"
     hubTalksToBI(retrieveProfileCommand)
 }
 
 def refresh() {
-	state.desiredNewProfile = false
+    state.desiredNewProfile = false
     if (state.debugLogging) log.debug "Executing 'refresh'"
     if (state.updatedFromBIFusion) initializeServer(state.blueIrisServerSettings)
     else initialize()
@@ -489,15 +522,15 @@ def setBlueIrisStopLight() {
     if(state.debugLogging) log.debug "Executing 'setBlueIrisStopLight' with stoplight currently ${device.currentState("stoplight").value}"  
     //Blue Iris http command "/admin?signal=x" Changes the traffic signal state and returns the current state.  
     //x=0 for red (not recording), x=1 for green (recording, x=2 for yellow (pause before starting to record).  This requires admin authentication.   
-    def stopligthNow = device.currentState("stoplight").value
+    def stoplightNow = device.currentState("stoplight").value
     def newStoplight = 2
-    if(stopligthNow == 'red') {
+    if(stoplightNow == 'red') {
         newStoplight = 2
         state.desiredNewStoplightColor = 'yellow'
-    } else if(stopligthNow == 'yellow'){
+    } else if(stoplightNow == 'yellow'){
         newStoplight = 1
         state.desiredNewStoplightColor = 'green'
-    } else if(stopligthNow == 'green'){
+    } else if(stoplightNow == 'green'){
         newStoplight = 0
         state.desiredNewStoplightColor = 'red'
     }
@@ -565,6 +598,19 @@ def setProfile(profile) {
     hubTalksToBI(changeProfileCommand)
 }
 
+def triggerCamera(cameraShortName) {
+    log.info "triggering '$cameraShortName'"
+    def triggerCameraCommand = "/admin?camera=${cameraShortName}&trigger&user=${state.username}&pw=${state.password}"
+    hubTalksToBI(triggerCameraCommand)
+    /*  //for trigger error checking
+    def triggeredCameraHistoryNonstate = state.triggeredCameraHistory
+    triggeredCameraHistoryNonstate += cameraShortName
+    state.triggeredCameraHistory = triggeredCameraHistoryNonstate
+    log.trace "state.triggeredCameraHistory is now ${state.triggeredCameraHistory}"
+    runIn(state.serverResponseThreshold,cameraTriggerErrorChecker)
+    */
+}
+
 def hubTalksToBI(command) {
     state.hubCommandSentTime = now()
     def biHost = "${state.host}:${state.port}"       //NOTE: For device type handlers, the host has to be the ip:port in lowercase hex, but in smartapps the host has to be either a web address or ip:port in normal decimal format (192.168....)
@@ -580,6 +626,32 @@ def hubTalksToBI(command) {
     runIn(state.serverResponseThreshold, serverOfflineChecker)
     sendHubCommand(sendHTTP)
 }
+
+/* //for trigger error checking
+def cameraTriggerErrorChecker() {
+    def cameraTriggeredSuccessfulHistoryNonstate = state.cameraTriggeredSuccessfulHistory
+    def triggeredCameraHistoryNonstate = state.triggeredCameraHistory  
+    //use this and triggeredCameraHistory, and as they match take each other off the list, then use the scheduled time to send an error message
+    log.trace "Started cameratriggererrorchecker, state.cameraTriggeredSuccessfulHistory is ${state.cameraTriggeredSuccessfulHistory} and state.triggeredCameraHistory is ${state.triggeredCameraHistory}"
+    for (int i = 0; i < triggeredCameraHistoryNonstate.size(); i++) {
+        for (int j = 0; j < cameraTriggeredSuccessfulHistoryNonstate.size(); j++) {
+            if (cameraTriggeredSuccessfulHistoryNonstate[j] == triggeredCameraHistoryNonstate[i]) {
+                cameraTriggeredSuccessfulHistoryNonstate -= cameraTriggeredSuccessfulHistoryNonstate[j]
+                triggeredCameraHistoryNonstate -= triggeredCameraHistoryNonstate[i]
+            }
+        }
+    }
+    state.cameraTriggeredSuccessfulHistory = cameraTriggeredSuccessfulHistoryNonstate
+    state.triggeredCameraHistory = triggeredCameraHistoryNonstate
+    log.trace "ended cameratriggererrorchecker, state.cameraTriggeredSuccessfulHistory is ${state.cameraTriggeredSuccessfulHistory} and state.triggeredCameraHistory is ${state.triggeredCameraHistory}"
+    if (state.triggeredCameraHistory != []) {
+        log.error "error 6: '${state.triggeredCameraHistory}' were not triggered."
+        sendEvent(name: "errorMessage", value: "Error! Blue Iris camera(s) '${state.triggeredCameraHistory}' failed to start recording.", descriptionText: "Error! Blue Iris camera(s) '${state.triggeredCameraHistory}' failed to start recording.", displayed: true) 
+    } else log.info "All cameras triggered successfully"
+    state.cameraTriggeredSuccessfulHistory = []
+    state.triggeredCameraHistory = []
+}
+*/
 
 def serverOfflineChecker() {
     if (state.debugLogging) log.debug "serverOfflineChecker() has state.hubCommandReceivedTime at ${state.hubCommandReceivedTime} and state.hubCommandSentTime at ${state?.hubCommandSentTime}"
@@ -597,13 +669,14 @@ def serverOfflineChecker() {
     if (!state.hubCommandReceivedTime) {  //shouldn't ever have a null received time because it is a state value setup in initialize()
         log.error "error 9.1: Server doesn't have a received time, so it is offline. (doesn't have one because it's the first health check and it is offline)"
         sendEvent(name: "errorMessage", value: "Error! Blue Iris Server is offline!", descriptionText: "Error! Blue Iris Server is offline!", displayed: true)  //It has to be the BI server or the SmartThing hub's connection to the BI Server (because otherwise you're hub would be offline too and the SmartThings app would tell you.)
-		sendEvent(name: "blueIrisProfile", value: "${getprofileName(8)}", descriptionText: "Blue Iris Profile is ${getprofileName(8)}", displayed: true)
-		state.hubOnline = false
+        sendEvent(name: "blueIrisProfile", value: "${getprofileName(8)}", descriptionText: "Blue Iris Profile is ${getprofileName(8)}", displayed: true)
+        state.hubOnline = false
     }
-    if (!state.hubCommandSentTime || ((state.hubCommandSentTime - now()).abs() / 1000) > (state.serverResponseThreshold + 10)) {  //checks to make sure the hubCommandSetTime is from the actual command we intend to compare against (it will always have a value, but if it didn't run correctly the value will be from a previous execution)
+    if (!state.hubCommandSentTime || ((state.hubCommandSentTime - now()).abs() / 1000) > (state.serverResponseThreshold + 10)) {  
+        //checks to make sure the hubCommandSetTime is from the actual command we intend to compare against (it will always have a value, but if it didn't run correctly the value will be from a previous execution)
         log.error "error 9.2: Server doesn't have a sent time, SmartThings never sent a command, check settings and hub."
         sendEvent(name: "errorMessage", value: "Error! Either SmartThings Hub or Blue Iris Server is offline!", descriptionText: "Either SmartThings Hub or Blue Iris Server is offline!", displayed: true)  //It has to be the BI server or the SmartThing hub's connection to the BI Server (because otherwise you're hub would be offline too and the SmartThings app would tell you.)
-    	state.hubOnline = false
+        state.hubOnline = false
     }
 }
 
@@ -672,7 +745,7 @@ private String convertPortToHex(port) {
     }
 }
 
-def checkForUpdates() {  	//max version size it can check is 4 levels, e.g. version 1.2.3.4
+def checkForUpdates() {     //max version size it can check is 4 levels, e.g. version 1.2.3.4
     log.info "Checking for software updates"
     def publishedVersion = "0.0"
     try {
@@ -689,7 +762,7 @@ def checkForUpdates() {  	//max version size it can check is 4 levels, e.g. vers
     }
     def installedVersion = appVersion()
     if (state.debugLogging) log.debug "publishedVersion from web is ${publishedVersion}, installedVersion is ${installedVersion}"
-    def instVerNum = 0			    
+    def instVerNum = 0              
     def webVerNum = 0
     if (publishedVersion && installedVersion) {  //make sure no null
         def instVerMap = installedVersion.tokenize('.')  //makes a map of each level of the version
@@ -728,10 +801,4 @@ def checkForUpdates() {  	//max version size it can check is 4 levels, e.g. vers
             log.error "Your installed version of the Blue Iris Server DTH seems to be higher than the published version."
         }
     } else if (!publishedVersion) {log.error "Cannot get published app version from the web."}
-}
-
-def triggerCamera(cameraShortName) {
-    log.info "triggering '$cameraShortName'"
-    def triggerCameraCommand = "/admin?camera=${cameraShortName}&trigger&user=${state.username}&pw=${state.password}"
-    hubTalksToBI(triggerCameraCommand)
 }
