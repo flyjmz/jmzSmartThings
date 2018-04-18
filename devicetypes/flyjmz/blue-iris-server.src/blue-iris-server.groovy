@@ -189,13 +189,13 @@ metadata {
 
     preferences {
         section("Blue Iris Server Login Settings:"){  //NOTE: Device Type Handler Preferences can't be a dynamic page, can't do notifications, and can't have paragraph's
-            input "host", "text", title: "BI Webserver IP", description: "Must be a local connection", required:true, displayDuringSetup: true
-            input "port", "number", title: "BI Webserver Port (e.g. 81)", required:true, displayDuringSetup: true
-            input "username", "text", title: "BI Username", description: "Must be an Admin User", required: true, displayDuringSetup: true
-            input "password", "password", title: "BI Password", description: "Don't check 'Use secure session...' in BI", required: true, displayDuringSetup: true
+            input "host", "text", title: "BI Webserver IP", description: "Must be a local connection", required:false, displayDuringSetup: true
+            input "port", "number", title: "BI Webserver Port (e.g. 81)", required:false, displayDuringSetup: true
+            input "username", "text", title: "BI Username", description: "Must be an Admin User", required: false, displayDuringSetup: true
+            input "password", "password", title: "BI Password", description: "Don't check 'Use secure session...' in BI", required: false, displayDuringSetup: true
         }
         section("Blue Iris Profile <=> SmartThings Mode Matching:"){
-            input "autoModeProfileSync", "bool", title: "Auto Sync BI Profile to ST Mode?", required: true
+            input "autoModeProfileSync", "bool", title: "Auto Sync BI Profile to ST Mode?", required: false
             input "profile0", "text", title: "ST Mode for BI Inactive (Profile 0)", description: "Default: Inactive", required:false, displayDuringSetup: true
             input "profile1", "text", title: "ST Mode for BI Profile #1", description: "Leave blank to Ignore", required:false, displayDuringSetup: true
             input "profile2", "text", title: "ST Mode for BI Profile #2", description: "Leave blank to Ignore", required:false, displayDuringSetup: true
