@@ -52,27 +52,27 @@ Version 2.4 - 22Jan2017     Fixed error in profile change notifications (they al
 Version 2.5 - 23Jan2017     Slight tweak to notifications.
 Version 2.6 - 17Jun2017		Fixed Profile names when using in LAN (localAction was throwing NULL). Thanks Zaxxon!
 Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration with motion, profile integration, manual triggering and manual profile switching.
--							Also added App Update Notifications, cleaned up notifications, added OAuth for motion alerts
+"   						Also added App Update Notifications, cleaned up notifications, added OAuth for motion alerts
 Version 3.0.1 - 28Oct2017	Fixed bug where server device map was would fail to initialize when user wasn't using it (so now it doesn't generate unless desired) - it would make install fail even if not using the Server DTH 
--							Fixed bug that would only only allow one camera device to install.
--							Enabled full Camera Device DTH support even without using Server DTH.
--							Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
+"							Fixed bug that would only only allow one camera device to install.
+"							Enabled full Camera Device DTH support even without using Server DTH.
+"							Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
 Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Names after installation (can change in devices' settings, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).	                           
 Version 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
 Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
--							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
+"							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
 Version 3.0.5 - 8Dec17  	Fixed Error when user ties a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
--							Improved settings and operation when not using profile<>mode integration.
--							Added step in DNI fix method to prevent renaming already renamed devices.
+"							Improved settings and operation when not using profile<>mode integration.
+"							Added step in DNI fix method to prevent renaming already renamed devices.
 Version 3.0.6 - 24Dec17		Cleaned up log.info verbage
--							Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
--							Added ability to add custom polling interval for server DTH
+"							Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
+"							Added ability to add custom polling interval for server DTH
 Version 3.1 - 5Mar18		Added handling for "cameradevice.moveToPreset" command w/error checing	//NOTE: I need folks to test this for me!
+Version 3.2 - 17Apr18       Hopefully fixed external profile switch error
 
 
 TODO:
-Todo - there may be a problem in external profile changing... It is getting result fail despite changing the profile...
-todo - there is a todo for adding call back to local mode when not using bi server dth...
+- there is a todo for adding call back to local mode when not using bi server dth...
 
 -Add ability to enter both LAN and WAN address for: failover, camera live feed
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
@@ -83,7 +83,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.1"}
+def appVersion() {"3.2"}
 
 mappings {
     path("/active/:camera") {
@@ -223,7 +223,7 @@ def integrationSetup() {
                 paragraph "You can make the automatic profile changes either 'Hold' or 'Temporary' changes."
                 paragraph "Hold changes remain until the next change is made, even through computer/server restart.  Temporary changes will only be in effect for the 'Temp Time' duration set for each profile in Blue Iris Settings > Profiles. At the end of that time, Blue Iris will change profiles according to your schedule."
                 paragraph "Note: if Blue Iris restarts while a temporary profile is set, it will set the profile according to it's schedule."
-                input "holdTemp", "bool", title: "Make Hold changes?", required: true
+                input "holdChanges", "bool", title: "Make Hold changes?", required: true
                 paragraph "Profile changes will display in SmartThings Notifications Feed.  Do you also want to receive PUSH/SMS notifications?"
                 input "receiveAlerts", "enum", title: "Receive PUSH/SMS on Profile Change?", options: ["Yes", "Errors Only", "No"], required: true
             } 
@@ -400,7 +400,7 @@ def createInfoMaps() {
         state.blueIrisServerSettings.DNI = "$hosthex:$porthex"   //Change: this was: if (usingBIServer) state.blueIrisServerSettings.DNI = "$hosthex:$porthex"
         //else state.blueIrisServerSettings.DNI = null
         state.blueIrisServerSettings.waitThreshold = waitThreshold
-        state.blueIrisServerSettings.holdTemp = holdTemp
+        state.blueIrisServerSettings.holdChanges = holdChanges
         state.blueIrisServerSettings.loggingOn = loggingOn
         if (loggingOn) log.debug "state.blueIrisServerSettings map: ${state.blueIrisServerSettings}"
     }
@@ -757,7 +757,7 @@ def modeChange(evt) {
             if(localOnly){
                 log.info "Changing Blue Iris Profile to ${profile} via local command"
                 def lock = 2  //Blue Iris Param "&lock=0/1/2" makes profile changes as: run/temp/hold, not sure what 'run' means...
-                if(holdTemp) {
+                if(holdChanges) {
                     if(receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profile}")
                     if(receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profile}")
                 } else {
@@ -790,7 +790,7 @@ def localAction(command) {
 
 def externalAction(commandType,stringCommand) {  //can accept string of either: number for profile change or shortname for camera trigger
     def lock = 2
-    if (!holdTemp) lock = 1
+    if (!holdChanges) lock = 1  //note, help file says 1 = hold, but that's not right.  1 is temp. 2 is hold
     try {
         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
             if (loggingOn) log.debug "response 1: " + response.data
@@ -811,29 +811,38 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                 //Begin Profile Change Code
                                 if (commandType == "profile") {
                                     def profile = stringCommand.toInteger()
+                                    def newProfile = null
                                     log.info "Changing Blue Iris Profile to ${profile} via external command"
                                     if (response3.data.data.profile != profile) {        
-                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile,"lock":lock,"session":session]) { response4 ->
+                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response4 -> //""lock":lock", cut out to see if that was causing the extraneous error message
                                             if (loggingOn) log.debug "response 4: " + response4.data
-                                            if (response4.data.result == "success") {
-                                                if (response4.data.data.profile.toInteger() == profile) {
-                                                    log.info ("Blue Iris is now in profile ${profileName(BIprofileNames,profile)}!")
-                                                    if (receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-                                                    if (receiveAlerts == "Yes") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)}")
-                                                } else {
-                                                    log.error ("Blue Iris ended up on profile ${profileName(BIprofileNames,response4.data.data.profile)}? Change to ${profileName(BIprofileNames,profile)} failed. Check your user permissions.")
-                                                    if (receiveAlerts == "No") sendNotificationEvent("BI Fusion failed to fully change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                    if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion failed to fully change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                            def lockStatus = response4.data.data.lock.toInteger()
+                                            def profileChangedTo = response4.data.data.profile.toInteger()
+                                            //////send command again to make it a hold change (this is the old method)/////
+                                            if (lock == 2) {
+                                                httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response6 ->
+                                                    if (loggingOn) log.debug "response 15: " + response6.data
+                                                    lockStatus = response6.data.data.lock.toInteger()
+                                                    profileChangedTo = response6.data.data.profile.toInteger()
                                                 }
-                                                httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                    if (loggingOn) log.debug "response 5: " + response5.data
-                                                    if (loggingOn) log.debug "Logged out"
-                                                }
-                                            } else {
-                                                log.error "Blue Iris Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions."
-                                                if (loggingOn) log.debug "response 6: " + response4.data.data.reason
-                                                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
-                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion failed to change Profiles, it is in ${profileName(BIprofileNames,response4.data.data.profile)}? Check your user permissions.")
+                                            }
+                                            //////////
+                                            log.info ("Blue Iris is now in profile ${profileName(BIprofileNames,profile)}, and lock is ${lockStatus}!")
+                                            if (profileChangedTo == profile && lockStatus == lock) {
+                                                if (receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully")
+                                                if (receiveAlerts == "Yes") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully")
+                                            } else if (profileChangedTo == profile && lockStatus != lock) {
+                                                log.error "BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${lockName(lockStatus)}'"
+                                                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${lockName(lockStatus)}.'")
+                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${lockName(lockStatus)}.'")
+                                            } else if (profileChangedTo != profile) {
+                                                log.error ("BI Fusion failed to change profiles, Blue Iris profile is '${profileName(BIprofileNames,response4.data.data.profile)}.'")
+                                                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion failed to change profiles, Blue Iris profile is '${profileName(BIprofileNames,response4.data.data.profile)}.'")
+                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion failed to change profiles, Blue Iris profile is '${profileName(BIprofileNames,response4.data.data.profile)}.'")
+                                            }   
+                                            httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
+                                                if (loggingOn) log.debug "response 5: " + response5.data
+                                                if (loggingOn) log.debug "Logged out"
                                             }
                                         }
                                     } else {
@@ -869,12 +878,12 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                     if (loggingOn) log.debug "Moving ${state.shortNameList} to preset ${preset}"
                                     def presetNumber = state.presetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
                                     httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":shortName,"button":presetNumber, "session":session]) { response4 -> 
-                                        if (parent.loggingOn) log.debug response4.data
+                                        if (parent.loggingOn) log.debug "response 10: " + response4.data
                                         if (response4.data.result == "success") {
                                             log.info "BI Fusion moved $shortName to preset $preset"
                                         } else {
                                             log.error "BI Fusion Failure: preset $preset not sent to $shortName"
-                                            if (parent.loggingOn) log.debug(response4.data.data.reason)
+                                            if (parent.loggingOn) log.debug "response 11: " + response4.data.data.reason
                                             if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure: preset $preset not sent to $shortName")
                                             if (receiveNotifications) parent.send("BI Fusion Failure: preset $preset not sent to $shortName")
                                         }
@@ -882,21 +891,21 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                 } else {log.error "externalAction() commandType is ${commandType}, not supported"}
                             } else {
                                 log.error "BI Fusion Error: Could not retrieve current status"
-                                if (loggingOn) log.debug "response 10: " + response3.data.data.reason
+                                if (loggingOn) log.debug "response 12: " + response3.data.data.reason
                                 if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not retrieve current status")
                                 if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not retrieve current status")
                             }
                         }
                     } else {
                         log.error "BI Fusion Error: Could not login"
-                        if (loggingOn) log.debug "response 11: " + response2.data.data.reason
+                        if (loggingOn) log.debug "response 13: " + response2.data.data.reason
                         if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not login")
                         if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not login")
                     }
                 }
             } else {
                 log.error "BI Fusion Error: Could not login"
-                if (loggingOn) log.debug "response 12: " + response.data.data.reason
+                if (loggingOn) log.debug "response 14: " + response.data.data.reason
                 if (receiveAlerts == "No") sendNotificationEvent("BI Fusion Error: Could not login")
                 if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: Could not login")
             }
@@ -914,6 +923,11 @@ def profileName(names, num) {
     } else {
         '#' + num
     }
+}
+def lockName(num) {
+    if (num == 0)  return "Schedule"
+    if (num == 1)  return "Temporary"
+    if (num == 2)  return "Hold"
 }
 
 def checkForTriggerUpdates() {

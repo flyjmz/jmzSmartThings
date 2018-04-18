@@ -44,20 +44,23 @@ Version 2.5 - 5Oct2017		Added Contact Closing and Switch turning off to trigger 
 Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration, and App Update Notifications
 Version 3.0.1 - 28Oct2017 	Enabled full Camera DTH support regardless of command method to Blue Iris (BI Server DTH/Local/External)
 Version 3.0.2 - 31Oct2017	Added triggers for: acceleration, presence, shock, smoke, carbonMonoxide, and water sensors.
-							Added ability to send preset commands to cameras when triggering.
-                            Remind Users to click on each Trigger app instance to confirm settings & tap 'done' to ensure initialize() runs.
+"   						Added ability to send preset commands to cameras when triggering.
+"                           Remind Users to click on each Trigger app instance to confirm settings & tap 'done' to ensure initialize() runs.
 Version 3.0.3 - 26Nov2017	Changed variable "actionName" to "processName" to fixed java error everyone had (it's a class name, can't be a variable).
-							Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
+"                           Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
 Version 3.0.4 - 29Nov2017	Fixed typos, Fixed issue where it required a preset number during initialization.  Confirmed the external mode works as well!!
 Version 3.0.5 - 8Dec2017	Removed extra log.trace calls.
-Version 3.1 - 5mar0217		Updates to support camera DTH changes
-                            Added ability to move the camera back to it’s original preset after the triggered event. (per @jrfarrar's request)
+Version 3.1 - 5Mar2018		Updates to support camera DTH changes
+"                           Added ability to move the camera back to it’s original preset after the triggered event. (per @jrfarrar's request)
+Version 3.2 - 17Apr2018     Added option to use mode change as a trigger option per @prjct92eh2 request 
+"                           Added knock sensing as a trigger option                       
 
 To Do:
+-fix preset extraneous error message (local I think)
 -see todos
 */
 
-def appVersion() {"3.1"}
+def appVersion() {"3.2"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -105,6 +108,13 @@ def mainPage() {
             input "myShock", "capability.shockSensor", title: "Shock Detected", required: false, multiple: true
             input "mySmoke", "capability.smokeDetector", title: "Smoke/CO Detected", required: false, multiple: true
             input "myWater", "capability.waterSensor", title: "Water Detected", required: false, multiple: true
+            input "myMode", "mode", title: "When mode changes to", required: false, multiple: true
+            input "doorKnocker", "bool", title: "When someone knocks", required: false, multiple: false, submitOnChange: true
+            if (doorKnocker) {
+                input name: "knockSensor", type: "capability.accelerationSensor", title: "When Someone Knocks Where?"
+                input name: "openSensor", type: "capability.contactSensor", title: "But not when they open this door?"
+                input name: "knockDelay", type: "number", title: "Knock Delay (defaults to 5s)?", required: false
+            }
         }
         section("Camera Trigger and/or PTZ") {
             paragraph "This will trigger camera(s) to record by default, you can also choose to move the camera(s) to a preset:"
@@ -198,6 +208,10 @@ def initialize() {
     subscribe(mySmoke, "smoke.detected", eventHandlerBinary)
     subscribe(mySmoke, "carbonMonoxide.detected", eventHandlerBinary)
     subscribe(myWater, "water.detected", eventHandlerBinary)
+    subscribe(location, "mode", modeChecker)
+    subscribe(knockSensor, "acceleration.active", knockAcceleration)
+    subscribe(openSensor, "contact.closed", doorClosed)
+    state.lastClosed = 0
     def names = []
     def presets = [] 
     def returnPresets = []  
@@ -233,29 +247,33 @@ def eventHandlerBinary(evt) {
     if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
         log.info "Event occured within the desired timing conditions, sending commands"
-        def processName = ""
-        if (usePreset && !disableRecording) {
-            processName = " Moving and Triggering "
-        } else if (usePreset && disableRecording) {
-            processName = " Moving "
-        } else if (!usePreset && disableRecording) {
-            processName = " Doing Nothing to "
-        } else if (!usePreset && !disableRecording) {
-            processName = " Triggering "
-        }
-        if (parent.loggingOn) log.debug "processName is $processName"
-        if (parent.localOnly || parent.usingBIServer) {  //The trigger runs it's own local/external code, so we need to know which BI Fusion is use (and localOnly is the same as using the server in this case)
-            if (usingCameraDTH) {		//todo - once callback works, these can be deleted (because the callback will say the camera IS triggered, etc.
-                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
-                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
-            } else {
-                if (!receiveAlerts) sendNotificationEvent("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Camera: ${biCamera}")
-                if (receiveAlerts) parent.send("${evt.displayName} is ${evt.value}, BI Fusion is" + processName + "Camera: ${biCamera}")
-            }
-            localAction()
-        } else externalAction()
+        processEvents(evt.displayName,evt.value)
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
+}   
+
+def processEvents(name,value) {
+    def processName = ""
+    if (usePreset && !disableRecording) {
+        processName = " Moving and Triggering "
+    } else if (usePreset && disableRecording) {
+        processName = " Moving "
+    } else if (!usePreset && disableRecording) {
+        processName = " Doing Nothing to "
+    } else if (!usePreset && !disableRecording) {
+        processName = " Triggering "
+    }
+    if (parent.loggingOn) log.debug "processName is $processName"
+    if (parent.localOnly || parent.usingBIServer) {  //The trigger runs it's own local/external code, so we need to know which BI Fusion is use (and localOnly is the same as using the server in this case)
+        if (usingCameraDTH) {		//todo - once callback works, these can be deleted (because the callback will say the camera IS triggered, etc.
+            if (!receiveAlerts) sendNotificationEvent("${name} is ${value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
+            if (receiveAlerts) parent.send("${name} is ${value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
+        } else {
+            if (!receiveAlerts) sendNotificationEvent("${name} is ${value}, BI Fusion is" + processName + "Camera: ${biCamera}")
+            if (receiveAlerts) parent.send("${name} is ${value}, BI Fusion is" + processName + "Camera: ${biCamera}")
         }
+        localAction()
+    } else externalAction()
+}
 
 def localAction() {
     def triggerCommand = ""
@@ -461,6 +479,36 @@ def returnPresetExternalAction(i) {
         log.error "BI Fusion Failure: $e"
         if (!receiveNotifications) sendNotificationEvent("BI Fusion Failure, turn on debugging and check logs")
         if (receiveNotifications) parent.send("BI Fusion Failure, turn on debugging and check logs")
+    }
+}
+
+def modeChecker(evt) {
+    if (evt.name != "mode") {return;}
+    def checkMode = evt.value
+    log.info "mode change detected, mode now: " + checkMode
+    if (allOk) {
+        myMode.each { eachOfMyMode ->
+            if (checkMode == eachOfMyMode) {processEvents("Mode",checkMode)}
+        }
+    }
+}
+
+def knockAcceleration(evt) {
+    def delay = knockDelay ?: 5
+    runIn(delay, "doorKnock")
+}
+
+def doorClosed(evt) {
+    state.lastClosed = now()
+}
+
+def doorKnock() {
+    if ( (openSensor.latestValue("contact") == "closed") && (now() - (60 * 1000) > state.lastClosed) && allOk) {
+        log.info "${knockSensor.label ?: knockSensor.name} detected a knock."
+        processEvents("${knockSensor.label ?: knockSensor.name}","knocking")
+    }
+    else {
+        if (parent.loggingOn) log.debug("${knockSensor.label ?: knockSensor.name} knocked, but looks like it was just someone opening the door.")
     }
 }
 
