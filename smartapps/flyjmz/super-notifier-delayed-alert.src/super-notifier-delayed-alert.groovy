@@ -24,9 +24,13 @@ Version History:
     1.6 - 1Feb2018, added timestamp to messages and debug logging option
    	1.7 - 21Feb2018, bugfix - fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
     1.8 - 5Mar2018, bugfix - fixed waitThreshold title in preferences
+    1.9 - 17Apr2018, added power meter monitoring per @ErnieG request
+
+To Do:
+-None!
 */
 
-def appVersion() {"1.8"}
+def appVersion() {"1.9"}
  
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -46,7 +50,7 @@ preferences {
 def settings() {
     dynamicPage(name: "settings", title: "", install: true, uninstall: true) {
         section("") {
-            input "monitorType", "enum", title: "Monitor what?", required: true, options: ["Contact Sensor", "Switch", "Temperature", "Lock"], submitOnChange: true
+            input "monitorType", "enum", title: "Monitor what?", required: true, options: ["Contact Sensor", "Switch", "Temperature", "Lock", "Power"], submitOnChange: true
             if (monitorType == "Contact Sensor") {
             	input "myContact", "capability.contactSensor", title: "Which contact?", required: true
             	input "openClosed", "enum", title: "When left open or closed?", required: true, options: ["Open", "Closed"]
@@ -63,6 +67,11 @@ def settings() {
             if (monitorType == "Lock") {
             	input "myLock", "capability.lock", title: "Which Lock?", required: true
                 input "lockedUnlocked", "enum", title: "When left locked or left unlocked?", required: true, options: ["Locked", "Unlocked"]
+            }
+            if (monitorType == "Power") {
+                input "myPower", "capability.powerMeter", title: "Which Power Meter?", required: true
+                input "powerTooHigh", "number", title: "Power Too High When Above:", range: "*..*", required: false
+                input "powerTooLow", "number", title: "Power Too Low When Below:", range: "*..*", required: false
             }
         }
         section("Message Details") {
@@ -159,6 +168,8 @@ def initialize () {
         subscribe(myLock, "lock.locked", okHandler)
     } else if (temp) {
     	subscribe(temp, "temperature", tempHandler)
+    } else if (myPower) {
+        subscribe(myPower, "power", powerHandler)
     } else {if (parent.loggingOn) log.debug "Not subscribing to any device events"}
     if (modeChange) subscribe(location, "mode", periodicNotifier) //checks status every time mode changes (in case it missed it)
     if (sunChange) {				//checks status every sun rises/sets (in case it missed it)
@@ -188,6 +199,29 @@ def tempHandler(evt) {
             if (parent.loggingOn) log.debug "Temp out of limits, sending to eventHandler"
             eventHandler(evt)
         } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
+    }
+}
+
+def gettooHigh() {
+    def power1 = powerTooHigh
+    if (power1 == null) power1 = -460.0
+    return power1
+}
+
+def gettooLow() {
+    def power2 = powerTooLow 
+    if (power2 == null) power2 = 3000.0
+    return power2
+}
+
+def powerHandler(evt) {
+    log.info "powerHandler has ${evt.displayName} and ${myPower?.currentState("power")}"
+    if (!atomicState.msgSent) {
+        def powerValue = power.currentValue("power")
+        if (powerValue.doubleValue > tooHigh || powerValue.doubleValue < tooLow) {
+            if (parent.loggingOn) log.debug "Power out of limits, sending to eventHandler"
+            eventHandler(evt)
+        } else {if (parent.loggingOn) log.debug "Power within limits, no action taken."}
     }
 }
 

@@ -21,9 +21,12 @@ Version History:
     1.3 - 10Oct2017, added lock locked/unlocked capability
     1.4 - 1Feb2018, added timestamp to messages and debug logging option
     1.5 - 21Feb2018, fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
+    1.6 - 17Apr2018, added door knock detection.  Added power metering per @ErnieG request
+
+To Do:
 */
 
-def appVersion() {"1.5"}
+def appVersion() {"1.6"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -57,10 +60,21 @@ def settings() {
             input "water", "capability.waterSensor", title: "Water Sensor Wet", required: false, multiple: true
             input "lockLocked", "capability.lock", title: "Lock Locked", required: false, multiple: true
             input "lockUnlocked", "capability.lock", title: "Lock Unlocked", required: false, multiple: true
-            input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, submitOnChange: true
+            input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, multiple: true, submitOnChange: true
             if (temp != null) {
                 input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
                 input "tempTooCold", "number", title: "Too Cold When Temp is Below:", range: "*..*", required: false
+            }
+            input "doorKnocker", "bool", title: "When someone knocks", required: false, multiple: false, submitOnChange: true
+            if (doorKnocker != null) {
+                input name: "knockSensor", type: "capability.accelerationSensor", title: "When Someone Knocks Where?"
+                input name: "openSensor", type: "capability.contactSensor", title: "But not when they open this door?"
+                input name: "knockDelay", type: "number", title: "Knock Delay (defaults to 5s)?", required: false
+            }
+            input "power", "capability.powerMeter", title: "Power Too High or Low", required: false, multiple: true, submitOnChange: true
+            if (power != null) {
+                input "powerTooHigh", "number", title: "Power Too High When Above:", range: "*..*", required: false
+                input "powerTooLow", "number", title: "Power Too Low When Below:", range: "*..*", required: false
             }
         }
 
@@ -119,16 +133,16 @@ def certainTime() {
 
 def installed() {
 	log.info "Installed with settings: ${settings}"
-	subscribeToEvents()
+	initialize()
 }
 
 def updated() {
 	log.info "Updated with settings: ${settings}"
 	unsubscribe()
-	subscribeToEvents()
+	initialize()
 }
 
-def subscribeToEvents() {
+def initialize() {
 	subscribe(button, "button.pushed", eventHandler)
 	subscribe(contact, "contact.open", eventHandler)
    	subscribe(contactClosed, "contact.closed", eventHandler)
@@ -145,6 +159,10 @@ def subscribeToEvents() {
     subscribe(temp, "temperature", tempHandler)
     subscribe(lockLocked,"lock.locked", eventHandler)
     subscribe(lockUnlocked,"lock.unlocked", eventHandler)
+    subscribe(knockSensor, "acceleration.active", knockAcceleration)
+    subscribe(openSensor, "contact.closed", doorClosed)
+    state.lastClosed = 0
+    subscribe(power, "power", powerHandler)
 }
 
 def gettooCold() {
@@ -166,13 +184,51 @@ def tempHandler(evt) {
     } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
 }
 
+def gettooHigh() {
+	def power1 = powerTooHigh
+    if (power1 == null) power1 = -460.0
+    return power1
+}
+
+def gettooLow() {
+	def power2 = powerTooLow 
+    if (power2 == null) power2 = 3000.0
+    return power2
+}
+
+def powerHandler(evt) {
+    def powerValue = power.currentValue("power")
+    if (powerValue.doubleValue > tooHigh || powerValue.doubleValue < tooLow) {
+    	eventHandler(evt)
+    } else {if (parent.loggingOn) log.debug "Power within limits, no action taken."}
+}
+
+def knockAcceleration(evt) {
+    def delay = knockDelay ?: 5
+    runIn(delay, "doorKnock")
+}
+
+def doorClosed(evt) {
+    state.lastClosed = now()
+}
+
+def doorKnock() {
+    if ( (openSensor.latestValue("contact") == "closed") && (now() - (60 * 1000) > state.lastClosed) && allOk) {
+        log.info "${knockSensor.label ?: knockSensor.name} detected a knock."
+        createInstantMessage("knock","knocking","${knockSensor.label ?: knockSensor.name}")
+    }
+    else {
+        if (parent.loggingOn) log.debug("${knockSensor.label ?: knockSensor.name} knocked, but looks like it was just someone opening the door.")
+    }
+}
+
 def eventHandler(evt) {
 	if (parent.loggingOn) log.debug "Notify got event ${evt} from ${evt.displayName}"
 	if (frequency) {
 		def lastTime = state[evt.deviceId]
 		if (lastTime == null || now() - lastTime >= frequency * 60000) {
         	if (parent.loggingOn) log.debug "frequency used and it is time for new message, checking if within time & date period"
-            if (allOk) createInstantMessage(evt)
+            if (allOk) createInstantMessage(evt.name,evt.value,evt.device)
             state[evt.deviceId] = now()
 		}
         else {
@@ -181,22 +237,22 @@ def eventHandler(evt) {
 	}
 	else {
     	if (parent.loggingOn) log.debug "frequency not used, checking if within time & date period"
-		if (allOk) createInstantMessage(evt)
+		if (allOk) createInstantMessage(evt.name,evt.value,evt.device)
 	}
 }
 
-def createInstantMessage(evt) {
+def createInstantMessage(name,value,device) {
 	String msg = messageText
     def messageDefault = ""
     if (!messageText) {
-		if (evt.name == 'presence') {
-			if (evt.value == 'present') {
-				messageDefault = "${evt.device} has arrived"
+		if (name == 'presence') {
+			if (value == 'present') {
+				messageDefault = "${device} has arrived"
 			} else {
-				messageDefault = "${evt.device} has left"
+				messageDefault = "${device} has left"
 			}
 		} else {
-			messageDefault = "${evt.device} is ${evt.value}"
+			messageDefault = "${device} is ${value}"
 		}
         msg = messageDefault
 	}
@@ -204,7 +260,7 @@ def createInstantMessage(evt) {
     	def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
         msg = msg + " (" + stamp + ")"
     }
-	if (parent.loggingOn) log.debug "created message to send. msg is ${msg}"
+	log.info "msg sent: ${msg}"
     sendMessage(msg)
 }
 

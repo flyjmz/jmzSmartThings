@@ -16,27 +16,29 @@ Licensed under the Apache License, Version 2.0 (the "License"); you may not use 
  
    
 Credits, based on work from:  
-	"Notify Me When" by SmartThings dated 2013-03-20
-	"Turn off after some minutes with options" by Bruce Ravenel dated 2015
-	"Left It Open" by SmartThings dated 2013-05-09
+  "Notify Me When" by SmartThings dated 2013-03-20
+  "Turn off after some minutes with options" by Bruce Ravenel dated 2015
+  "Left It Open" by SmartThings dated 2013-05-09
+  "Door Knocker" by brian@bevey.org dated 9/10/13
   
 Version History:
-	1.0 - 5Sep2016, Initial Commit
+  1.0 - 5Sep2016, Initial Commit
     1.1 - 10Oct2016, public release
     1.2 - 1Feb2018, added update notifications and debug logging option
+    1.3 - 17Apr2017, updated with Door Knocker monitoring
 
 */
 
-def appVersion() {"1.2"}
+def appVersion() {"1.3"}
  
 definition(
-	name: "Super Notifier",
-	namespace: "flyjmz",
-	author: "flyjmz230@gmail.com",
-	description: "One stop shop for alerts",
-	category: "My Apps",
-	iconUrl: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png",
-	iconX2Url: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png",
+  name: "Super Notifier",
+  namespace: "flyjmz",
+  author: "flyjmz230@gmail.com",
+  description: "One stop shop for alerts",
+  category: "My Apps",
+  iconUrl: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png",
+  iconX2Url: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png",
     singleInstance: true
 )
 
@@ -51,7 +53,7 @@ def superNotifierSetup() {
             app(name: "Delayed Alert", appName: "Super Notifier - Delayed Alert", namespace: "flyjmz", title: "Add delayed alert", description: "Add a delayed alert to notify when something has been left open/closed or on/off",multiple: true)
         }
         section("") {
-        	input "loggingOn", "bool", title: "Turn on Debug Logging?", required: false
+          input "loggingOn", "bool", title: "Turn on Debug Logging?", required: false
             input "updateAlertsOff", "bool", title: "Disable software update alerts?", required:false, submitOnChange: true
             if (!updateAlertsOff) {
                 input("recipients", "contact", title: "Send notifications to") {
@@ -135,7 +137,7 @@ def checkUpdates(name, installedVersion, website) {
         publishedVersion = "0.0"
     }
     if (loggingOn) log.debug "${name} publishedVersion from web is ${publishedVersion}, installedVersion is ${installedVersion}"
-    def instVerNum = 0			    
+    def instVerNum = 0          
     def webVerNum = 0
     if (publishedVersion && installedVersion) {  //make sure no null
         def instVerMap = installedVersion.tokenize('.')  //makes a map of each level of the version
