@@ -37,12 +37,13 @@ v1.3 5Mar18		Tried Image capture, but it gets weird because the captured image w
 				so you'd either have to go there to see it, or figure out how to send it back here...Abandoned
                 Added "Sensor" and "actuator" Capability
                 Added "moveToPreset" command so webcore (and others) can call "moveToPreset.cameraPreset(#)" to move camera to specific presets. -requested by @jrfarrar
+v1.4 17Apr18    Allows user to change the icon per @jasonrwise77 request
 
 
 ToDo:
 */
 
-def appVersion() {"1.3"}
+def appVersion() {"1.4"}
 
 metadata {
     definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -93,7 +94,7 @@ metadata {
             }
         }
 
-        standardTile("motion", "device.motion", width: 4, height: 2, canChangeIcon: false, canChangeBackground: true) {
+        standardTile("motion", "device.motion", width: 4, height: 2, canChangeIcon: true, canChangeBackground: true) {
             state "inactive", label: 'No Motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
             state "active", label: 'Motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
         }

@@ -52,6 +52,7 @@ Version History:
                     Added then removed error checking for triggering.  Worked well unless there were a lot of simultanous camera triggers, 
                         then the issues of "state" and multiple app executions end up corupting the state lists.  Todo for later.
                     NOTE: User must enter BI Fusion settings and save in order to get error checking state variables initialized.
+2.8     17Apr18     Allows user to change the icon per @jasonrwise77 request
 
 To Do:
 -Fix camera trigger error checking, search for "//for trigger error checking" and look at note in v2.7.  
@@ -66,7 +67,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.7"}
+def appVersion() {"2.8"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -118,7 +119,7 @@ metadata {
             }
         }
         */
-        valueTile("blueIrisProfile", "device.blueIrisProfile", width: 4, height: 2, canChangeIcon: false, decoration: "flat") {
+        valueTile("blueIrisProfile", "device.blueIrisProfile", width: 4, height: 2, canChangeIcon: true, decoration: "flat") {
             state("default", label: '${currentValue}'/*, icon: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo.png"*/)    //todo - can I have the icon displayed on the 'My Home' page but not on the actual device tile?
         }
         standardTile("refresh", "device.refresh", width: 2, height: 1, inactiveLabel: false, decoration: "flat") {
