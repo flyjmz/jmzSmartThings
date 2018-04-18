@@ -84,7 +84,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.2"}
+def appVersion() {"3.2.1"}
 
 mappings {
     path("/active/:camera") {
