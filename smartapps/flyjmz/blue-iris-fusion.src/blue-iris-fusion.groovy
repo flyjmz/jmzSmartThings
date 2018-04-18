@@ -69,6 +69,7 @@ Version 3.0.6 - 24Dec17		Cleaned up log.info verbage
 "							Added ability to add custom polling interval for server DTH
 Version 3.1 - 5Mar18		Added handling for "cameradevice.moveToPreset" command w/error checing	//NOTE: I need folks to test this for me!
 Version 3.2 - 17Apr18       Hopefully fixed external profile switch error
+Version 3.2.1 - 18Apr18     Cleaned up some of the logs, fixed the external command lock code (1 & 2 are opposite in external vs local commands)
 
 
 TODO:
@@ -613,18 +614,14 @@ def cameraPresetHandler(evt) {
     if (loggingOn) log.debug "cameraPresetHandler() got event ${evt.displayName} is preset ${evt.value}"
     def shortName = evt.device.name
     def preset = evt.value.toInteger()
-    if (loggingOn) log.debug "preset is $preset"
     if (usingBIServer || localOnly) {
         def localPreset = 7 + preset //1-7 are other actions, presets start at number 8.  //todo - no idea if evt.value will give the preset name...
         log.info "Moving ${shortName} to preset ${preset} via local command"
-        if (loggingOn) log.debug "localPreset is $localPreset"
         def presetCommand = "/cam/${shortName}/pos=${localPreset}&user=${username}&pw=${password}"
         localAction(presetCommand)
         runIn(waitThreshold,cameraPresetErrorChecker)
     } else {
-        log.info "Moving ${shortName} to preset ${evt.value} via external command"
         def externalPreset = preset + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
-        if (loggingOn) log.debug "externalPreset is $externalPreset"
         externalAction("preset",["shortName":shortName,"preset":externalPreset])
     }
 }
@@ -748,7 +745,6 @@ def modeChange(evt) {
     }
 
     if (checkMode != "" && settings[checkMode] != null) {
-        if (loggingOn) log.debug "BI_Found profile " + settings[checkMode]
         def profile = settings[checkMode].toInteger()
         if (usingBIServer) {
             def device = getChildDevice(state.blueIrisServerSettings.DNI)
@@ -756,7 +752,9 @@ def modeChange(evt) {
         } else {
             if(localOnly){
                 log.info "Changing Blue Iris Profile to ${profile} via local command"
-                def lock = 2  //Blue Iris Param "&lock=0/1/2" makes profile changes as: run/temp/hold, not sure what 'run' means...
+                def lock = 2  
+                //Blue Iris Param "&lock=0/1/2" makes profile changes as: run/temp/hold, not sure what 'run' means...
+                //NOTE: Local commands use this, whereas external commands have the 1 & 2 switched! CAO 18Apr2018
                 if(holdChanges) {
                     if(receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("Blue Iris Fusion hold changed Blue Iris to profile ${profile}")
                     if(receiveAlerts == "Yes") send("Blue Iris Fusion hold changed Blue Iris to profile ${profile}")
@@ -790,7 +788,7 @@ def localAction(command) {
 
 def externalAction(commandType,stringCommand) {  //can accept string of either: number for profile change or shortname for camera trigger
     def lock = 2
-    if (!holdChanges) lock = 1  //note, help file says 1 = hold, but that's not right.  1 is temp. 2 is hold
+    if (holdChanges) lock = 1  //note, help file says 1 = hold, 2 = temp, which is backwards from local commands.
     try {
         httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"login"]) { response ->
             if (loggingOn) log.debug "response 1: " + response.data
@@ -819,7 +817,7 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                             def lockStatus = response4.data.data.lock.toInteger()
                                             def profileChangedTo = response4.data.data.profile.toInteger()
                                             //////send command again to make it a hold change (this is the old method)/////
-                                            if (lock == 2) {
+                                            if (holdChanges) {
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response6 ->
                                                     if (loggingOn) log.debug "response 15: " + response6.data
                                                     lockStatus = response6.data.data.lock.toInteger()
@@ -829,20 +827,20 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                             //////////
                                             log.info ("Blue Iris is now in profile ${profileName(BIprofileNames,profile)}, and lock is ${lockStatus}!")
                                             if (profileChangedTo == profile && lockStatus == lock) {
+                                                log.info "BI Fusion synced profile successfully"
                                                 if (receiveAlerts == "No" || receiveAlerts == "Errors Only") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully")
                                                 if (receiveAlerts == "Yes") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully")
                                             } else if (profileChangedTo == profile && lockStatus != lock) {
-                                                log.error "BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${lockName(lockStatus)}'"
-                                                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${lockName(lockStatus)}.'")
-                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${lockName(lockStatus)}.'")
+                                                log.error "BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${externalLockName(lockStatus)}'"
+                                                if (receiveAlerts == "No") sendNotificationEvent("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${externalLockName(lockStatus)}.'")
+                                                if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion changed Blue Iris to profile ${profileName(BIprofileNames,profile)} successfully, but Hold/Temp type is incorrectly '${externalLockName(lockStatus)}.'")
                                             } else if (profileChangedTo != profile) {
-                                                log.error ("BI Fusion failed to change profiles, Blue Iris profile is '${profileName(BIprofileNames,response4.data.data.profile)}.'")
+                                                log.error "BI Fusion failed to change profiles, Blue Iris profile is '${profileName(BIprofileNames,response4.data.data.profile)}.'"
                                                 if (receiveAlerts == "No") sendNotificationEvent("BI Fusion failed to change profiles, Blue Iris profile is '${profileName(BIprofileNames,response4.data.data.profile)}.'")
                                                 if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion failed to change profiles, Blue Iris profile is '${profileName(BIprofileNames,response4.data.data.profile)}.'")
                                             }   
                                             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                if (loggingOn) log.debug "response 5: " + response5.data
-                                                if (loggingOn) log.debug "Logged out"
+                                                if (loggingOn) log.debug "Logged Out, response 5: " + response5.data
                                             }
                                         }
                                     } else {
@@ -861,8 +859,7 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                             if (receiveAlerts == "No") sendNotificationEvent("Blue Iris Fusion triggered camera '${shortName}'")
                                             if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("Blue Iris Fusion triggered camera '${shortName}'")
                                             httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"logout","session":session]) { response5 ->
-                                                if (loggingOn) log.debug "response 8: " + response5.data
-                                                if (loggingOn) log.debug "Logged out"
+                                                if (loggingOn) log.debug "logged out, response 8: " + response5.data
                                             }
                                         } else {
                                             log.error "BI Fusion Error: ${shortName} not triggered"
@@ -875,7 +872,7 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                 } else if (commandType == "preset") {
                                     def shortName = stringCommand.shortName
                                     def preset = stringCommand.preset.toInteger()
-                                    if (loggingOn) log.debug "Moving ${state.shortNameList} to preset ${preset}"
+                                    log.info "Moving ${state.shortNameList} to preset ${preset} via external command"
                                     def presetNumber = state.presetList[i] + 100  //Blue Iris JSON command for preset is 101...120 for preset 1...20
                                     httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"ptz","camera":shortName,"button":presetNumber, "session":session]) { response4 -> 
                                         if (parent.loggingOn) log.debug "response 10: " + response4.data
@@ -924,10 +921,10 @@ def profileName(names, num) {
         '#' + num
     }
 }
-def lockName(num) {
-    if (num == 0)  return "Schedule"
-    if (num == 1)  return "Temporary"
-    if (num == 2)  return "Hold"
+def externalLockName(num) {  //note, this only works for external commands, local commands have the 1/2 switched.
+    if (num == 0)  return "Run"
+    if (num == 1)  return "Hold"
+    if (num == 2)  return "Temporary"
 }
 
 def checkForTriggerUpdates() {
