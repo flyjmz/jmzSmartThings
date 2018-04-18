@@ -66,7 +66,7 @@ def settings() {
                 input "tempTooCold", "number", title: "Too Cold When Temp is Below:", range: "*..*", required: false
             }
             input "doorKnocker", "bool", title: "When someone knocks", required: false, multiple: false, submitOnChange: true
-            if (doorKnocker != null) {
+            if (doorKnocker) {
                 input name: "knockSensor", type: "capability.accelerationSensor", title: "When Someone Knocks Where?"
                 input name: "openSensor", type: "capability.contactSensor", title: "But not when they open this door?"
                 input name: "knockDelay", type: "number", title: "Knock Delay (defaults to 5s)?", required: false
