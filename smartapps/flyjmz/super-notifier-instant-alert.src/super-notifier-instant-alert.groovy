@@ -22,11 +22,12 @@ Version History:
     1.4 - 1Feb2018, added timestamp to messages and debug logging option
     1.5 - 21Feb2018, fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
     1.6 - 17Apr2018, added door knock detection.  Added power metering per @ErnieG request
+    1.6.1 - 20Apr2018, fixed power metering.
 
 To Do:
 */
 
-def appVersion() {"1.6"}
+def appVersion() {"1.6.1"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -60,7 +61,7 @@ def settings() {
             input "water", "capability.waterSensor", title: "Water Sensor Wet", required: false, multiple: true
             input "lockLocked", "capability.lock", title: "Lock Locked", required: false, multiple: true
             input "lockUnlocked", "capability.lock", title: "Lock Unlocked", required: false, multiple: true
-            input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, multiple: true, submitOnChange: true
+            input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, multiple: false, submitOnChange: true
             if (temp != null) {
                 input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
                 input "tempTooCold", "number", title: "Too Cold When Temp is Below:", range: "*..*", required: false
@@ -71,8 +72,8 @@ def settings() {
                 input name: "openSensor", type: "capability.contactSensor", title: "But not when they open this door?"
                 input name: "knockDelay", type: "number", title: "Knock Delay (defaults to 5s)?", required: false
             }
-            input "power", "capability.powerMeter", title: "Power Too High or Low", required: false, multiple: true, submitOnChange: true
-            if (power != null) {
+            input "powerMeters", "capability.powerMeter", title: "Power Too High or Low", required: false, multiple: false, submitOnChange: true
+            if (power != powerMeters) {
                 input "powerTooHigh", "number", title: "Power Too High When Above:", range: "*..*", required: false
                 input "powerTooLow", "number", title: "Power Too Low When Below:", range: "*..*", required: false
             }
@@ -162,7 +163,7 @@ def initialize() {
     subscribe(knockSensor, "acceleration.active", knockAcceleration)
     subscribe(openSensor, "contact.closed", doorClosed)
     state.lastClosed = 0
-    subscribe(power, "power", powerHandler)
+    subscribe(powerMeters, "power", powerHandler)
 }
 
 def gettooCold() {
@@ -186,19 +187,20 @@ def tempHandler(evt) {
 
 def gettooHigh() {
 	def power1 = powerTooHigh
-    if (power1 == null) power1 = -460.0
+    if (power1 == null) power1 = 2000.0
     return power1
 }
 
 def gettooLow() {
 	def power2 = powerTooLow 
-    if (power2 == null) power2 = 3000.0
+    if (power2 == null) power2 = -2000.0
     return power2
 }
 
 def powerHandler(evt) {
-    def powerValue = power.currentValue("power")
-    if (powerValue.doubleValue > tooHigh || powerValue.doubleValue < tooLow) {
+	if (parent.loggingOn) log.debug "Notify got event ${evt} from ${evt.displayName}"
+    def powerValue = evt.value.toDouble()
+    if (powerValue > tooHigh || powerValue < tooLow) {
     	eventHandler(evt)
     } else {if (parent.loggingOn) log.debug "Power within limits, no action taken."}
 }

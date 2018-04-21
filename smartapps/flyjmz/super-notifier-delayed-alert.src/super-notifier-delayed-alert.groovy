@@ -25,12 +25,13 @@ Version History:
    	1.7 - 21Feb2018, bugfix - fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
     1.8 - 5Mar2018, bugfix - fixed waitThreshold title in preferences
     1.9 - 17Apr2018, added power meter monitoring per @ErnieG request
+    1.9.1 - 20Apr2018, fixed power meter monitoring, added "temp now ok" message (apparently I forgot it...)
 
 To Do:
 -None!
 */
 
-def appVersion() {"1.9"}
+def appVersion() {"1.9.1"}
  
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -84,7 +85,7 @@ def settings() {
             paragraph "You'll receive an alert when it is left that way after your defined time period (above) and also onces it returns to normal.  Optionally, you can set periodic notifications for times in between as well." 
             input "periodicNotifications", "bool", title: "Receive periodic notifications?", required: false, submitOnChange: true
             if (periodicNotifications) {
-            	input "waitMinutes", "number", title: "Time between periodic notifications?", required: false
+            	input "waitMinutes", "number", title: "Time between periodic notifications? (minutes)", required: false
                 input "modeChange", "bool", title: "Notify on mode change?", required: false
                 input "sunChange", "bool", title: "Notify at sunrise/sunset?", required: false
                 paragraph "Periodic Notifications can be snoozed easily with a virtual switch device type.  This is useful when you are unable to resolve an issue and the notifications become irritable.  A 'snooze' switch in your Things is easier to hit than changeing these settings." 
@@ -192,50 +193,72 @@ def gettooHot() {
 }
 
 def tempHandler(evt) {
-	log.info "tempHandler has ${evt.displayName} and ${temp?.currentState("temperature")}"
+    def tempState1 = temp.currentState("temperature").doubleValue  //trigger is based on the event subcription, but the temp value for notifications is a direct state pull    
+    log.info "tempHandler found ${evt.displayName} is ${tempState1} ${location.temperatureScale}."
     if (!atomicState.msgSent) {  //need this check because temperatures report at intervals on a scale of values (unlike switches and contact sensors), if we didn't check this, every time it recieved a new temp that was still out of limits, it'd reset the event time and start the periodic notifcations over.
-        def tempState1 = temp.currentState("temperature")  //trigger is based on the event subcription, but the temp value for notifications is a direct state pull
-        if (tempState1.doubleValue > tooHot || tempState1.doubleValue < tooCold) {
-            if (parent.loggingOn) log.debug "Temp out of limits, sending to eventHandler"
+       if (tempState1 > tooHot || tempState1 < tooCold) {
+            if (parent.loggingOn) log.debug "Temp out of limits and haven't sent a message yet, sending to eventHandler."
             eventHandler(evt)
-        } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
+        } else {
+            if (parent.loggingOn) log.debug "Temp within limits and no messages sent, doing nothing."
+        }
+    } else {
+        if (tempState1 <= tooHot && tempState1 >= tooCold) {
+            if (parent.loggingOn) log.debug "Temp within limits and messages sent, sending to okHandler()."
+            okHandler(evt)
+        } else {
+            if (parent.loggingOn) log.debug "Temp still out of limits and messages sent, stillWrongMsger() will handle this."
+        }
     }
 }
 
 def gettooHigh() {
     def power1 = powerTooHigh
-    if (power1 == null) power1 = -460.0
+    if (power1 == null) power1 = 2000000.0
     return power1
 }
 
 def gettooLow() {
     def power2 = powerTooLow 
-    if (power2 == null) power2 = 3000.0
+    if (power2 == null) power2 = -3000000.0
     return power2
 }
 
 def powerHandler(evt) {
-    log.info "powerHandler has ${evt.displayName} and ${myPower?.currentState("power")}"
+    log.info "powerHandler found ${evt.displayName} is outputting ${evt.value} W, want it between $tooLow W & $tooHigh W"
+    def powerValue = evt.value.toDouble()
     if (!atomicState.msgSent) {
-        def powerValue = power.currentValue("power")
-        if (powerValue.doubleValue > tooHigh || powerValue.doubleValue < tooLow) {
-            if (parent.loggingOn) log.debug "Power out of limits, sending to eventHandler"
+        if (powerValue > tooHigh || powerValue < tooLow) {
+            if (parent.loggingOn) log.debug "Power out of limits and haven't sent a message yet, sending to eventHandler."
             eventHandler(evt)
-        } else {if (parent.loggingOn) log.debug "Power within limits, no action taken."}
+        } else {
+            if (parent.loggingOn) log.debug "Power within limits and no messages sent, doing nothing."
+        }
+    } else {
+    	if (powerValue <= tooHigh && powerValue >= tooLow) {
+    		if (parent.loggingOn) log.debug "Power within limits and messages sent, sending to okHandler()."
+            okHandler(evt)
+        } else {
+        	if (parent.loggingOn) log.debug "Power still out of limits and messages sent, stillWrongMsger() will handle this."
+        }
     }
 }
 
 def eventHandler(evt) {
-	log.info "eventHandler has ${evt.displayName}: ${evt.name}: ${evt.value}, scheduling stillWrong() in ${waitThreshold} minutes"
-    runIn((waitThreshold * 60), stillWrong)
+    def newWaitThreshold = (waitThreshold > 0) ? waitThreshold : 0.1
+    log.info "eventHandler has ${evt.displayName}: ${evt.name}: ${evt.value}, scheduling stillWrong() in ${newWaitThreshold} minutes"
+    runIn((newWaitThreshold * 60), stillWrong)
     atomicState.problemTime = now()
 }
 
 def stillWrong() { 
+	if (parent.loggingOn) log.debug "stillWrong() started"
 	def myContactState = myContact?.currentState("contact")
     def mySwitchState = mySwitch?.currentState("switch")
-    def tempState2 = temp?.currentState("temperature")
+    def tempState2 = temp?.currentState("temperature")?.doubleValue
     def myLockState = myLock?.currentState("lock")
+    def myPowerState = myPower?.currentState("power")?.doubleValue
+    if (parent.loggingOn) log.debug "myContactState is $myContactState, mySwitchState is $mySwitchState, tempState2 is $tempState2, myLockState is $myLockState, myPowerState is $myPowerState"
     if (openClosed) {
     	if (openClosed == "Open") {
 			if (myContactState.value == "open") {
@@ -262,45 +285,55 @@ def stillWrong() {
             } else {if (parent.loggingOn) log.debug "the switch is on and you want it that way"}
     	}
     }
-        if (lockedUnlocked) {
-    	if (lockedUnlocked == "locked") {
-			if (myLockState.value == "locked") {
-            	if (parent.loggingOn) log.debug "Lock is still locked"
-				stillWrongMsger()
+    if (lockedUnlocked) {
+        if (lockedUnlocked == "locked") {
+            if (myLockState.value == "locked") {
+                if (parent.loggingOn) log.debug "Lock is still locked"
+                stillWrongMsger()
             } else {if (parent.loggingOn) log.debug "the lock is unlocked and you want it that way"}
         } else {
-        	if (myLockState.value == "unlocked") {
-	            if (parent.loggingOn) log.debug "Lock is still unlocked"
-				stillWrongMsger()
+            if (myLockState.value == "unlocked") {
+                if (parent.loggingOn) log.debug "Lock is still unlocked"
+                stillWrongMsger()
             } else {if (parent.loggingOn) log.debug "the lock is lcoked and you want it that way"}
-    	}
+        }
     }
     if (temp) {
-        if (tempState2.doubleValue > tooHot || tempState2.doubleValue < tooCold) {
-            if (parent.loggingOn) log.debug "Temperature is still out of limits"
+        if (tempState2 > tooHot || tempState2 < tooCold) {
+            if (parent.loggingOn) log.debug "Temperature is still out of limits (${tempState2} ${location.temperatureScale})"
             stillWrongMsger()
-        } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
+        } else {if (parent.loggingOn) log.debug "Temp is within limits, no action taken."}
+    }
+    if (myPower) {
+        if (myPowerState > tooHigh || myPowerState < tooLow) {
+            if (parent.loggingOn) log.debug "Power is still out of limits (${myPowerState} W)"
+            stillWrongMsger()
+        } else {if (parent.loggingOn) log.debug "Power is within limits, no action taken."}
     }
 }
 
 def stillWrongMsger() {
+	if (parent.loggingOn) log.debug "stillWrongMsger() started"
 	def myContactState2 = myContact?.currentState("contact")
     def mySwitchState2 = mySwitch?.currentState("switch")
     def myLockState2 = myLock?.currentState("lock")
     def tempState3 = temp?.currentState("temperature")
+    def myPowerState2 = myPower?.currentState("power")
     if (allOk) {
         if (parent.loggingOn) log.debug "Event within time/day/mode constraints"
     	if (!atomicState.msgSent) {
             if (myContact) sendMessage("${myContact?.displayName} is still ${myContactState2?.value}!")
             if (mySwitch) sendMessage("${mySwitch?.displayName} is still ${mySwitchState2?.value}!")
             if (myLock) sendMessage("${myLock?.displayName} is still ${myLockState2?.value}!")
-            if (temp) sendMessage("${temp?.displayName} is still ${tempState3?.value}!")
+            if (temp) sendMessage("${temp?.displayName} is still ${tempState3?.value} ${location.temperatureScale}!")
+            if (myPower) sendMessage("${myPower?.displayName} is still ${myPowerState2?.value} W!")
             atomicState.msgSent = true
             if (parent.loggingOn) log.debug "sending first message, set atomicState.msgSent to ${atomicState.msgSent}"
        		if (periodicNotifications) {
-            	if (waitMinutes) {
-                	runIn((waitMinutes * 60), stillWrong)
-                	if (parent.loggingOn) log.debug "periodic notifications is on, scheduling stillWrong() to run again in ${waitMinutes} minutes"
+            	if (waitMinutes != null) {
+                	def newWaitMinutes = (waitMinutes > 0) ? waitMinutes : 0.1
+                	runIn((newWaitMinutes * 60), stillWrong)
+                	if (parent.loggingOn) log.debug "periodic notifications is on, scheduling stillWrong() to run again in ${newWaitMinutes} minutes"
             	}
             }
         } else if (periodicNotifications && atomicState.msgSent) {
@@ -313,30 +346,34 @@ def stillWrongMsger() {
                 if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeMsg} hours!")
             	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeMsg} hours!")
                 if (myLock) sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeMsg} hours!")
-                if (temp) sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeMsg} hours!")
+                if (temp) sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeMsg} hours! (Currently $tempState3.value ${location.temperatureScale}).")
+                if (myPower) sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeMsg} hours! (Currently $myPowerState2.value W).")
             } 
             if (!snooze && timeSince < 180) {
         		if (myContact) sendMessage("Periodic Alert: ${myContact?.displayName} has been ${myContactState2?.value} for ${timeSince} minutes!")
             	if (mySwitch) sendMessage("Periodic Alert: ${mySwitch?.displayName} has been ${mySwitchState2?.value} for ${timeSince} minutes!")
                 if (myLock) sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeSince} minutes!")
-                if (temp) sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeSince} minutes!")
+                if (temp) sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeSince} minutes! (Currently $tempState3.value ${location.temperatureScale})")
+                if (myPower) sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeSince} minutes! (Currently $myPowerState2.value W).")
             }
-            if (waitMinutes) {
-            	runIn((waitMinutes * 60), stillWrong)
-            	if (parent.loggingOn) log.debug "periodic notifications is scheduling the next stillWrong() to run in ${waitMinutes} minutes"
+            if (waitMinutes != null) {
+            	def newWaitMinutes = (waitMinutes > 0) ? waitMinutes : 0.1
+            	runIn((newWaitMinutes * 60), stillWrong)
+            	if (parent.loggingOn) log.debug "periodic notifications is scheduling the next stillWrong() to run in ${newWaitMinutes} minutes"
         	}
         } else if (!periodicNotifications && atomicState.msgSent) {
         	if (parent.loggingOn) log.debug "message already sent once, not using periodic notifcations, so not sending another message"
         }
     } else {
     	if (parent.loggingOn) log.debug "event is outside of time/day/mode conditions, no message sent, but monitoring in case it doesn't return to normal before it is within those time/day/mode conditions"
-    	runIn((waitThreshold * 60), stillWrong)
+    	def newWaitThreshold = (waitThreshold > 0) ? waitThreshold : 0.1
+        runIn((waitThreshold * 60), stillWrong)
     }
 }
 
 def okHandler(evt) {
 	if (atomicState.msgSent) {
-    	sendMessage("${evt.device.displayName} is now ${evt.value}.")
+    	sendMessage("${evt.device.displayName} is OK. Now ${evt.value}.")
         atomicState.msgSent = false
         if (parent.loggingOn)log.debug "okHandler() evoked, message sent, atomicState.msgSent is now: ${atomicState.msgSent}"
     } else {if (parent.loggingOn) log.debug "it's okay now, and never sent left open/closed/on/off message, so no need to send an 'ok' message"}
