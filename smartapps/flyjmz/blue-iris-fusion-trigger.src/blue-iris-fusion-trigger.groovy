@@ -21,7 +21,7 @@ for the specific language governing permissions and limitations under the Licens
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-///										App Info											//
+///                                     App Info                                            //
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -40,27 +40,27 @@ Version 2.1 - 17Jan2017     Added preference to turn debug logging on or off
 Version 2.2 - 22Jan2017     Added trigger notifications
 Version 2.3 - 23Jan2017     Slight tweak to notifications, now receving notifications in the app is user defined instead of always on.
 Version 2.4 - 30May2017     Added button push to trigger options
-Version 2.5 - 5Oct2017		Added Contact Closing and Switch turning off to trigger options
-Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration, and App Update Notifications
-Version 3.0.1 - 28Oct2017 	Enabled full Camera DTH support regardless of command method to Blue Iris (BI Server DTH/Local/External)
-Version 3.0.2 - 31Oct2017	Added triggers for: acceleration, presence, shock, smoke, carbonMonoxide, and water sensors.
-"   						Added ability to send preset commands to cameras when triggering.
+Version 2.5 - 5Oct2017      Added Contact Closing and Switch turning off to trigger options
+Version 3.0 - 26Oct2017     Added Blue Iris Server and Camera Device Type Integration, and App Update Notifications
+Version 3.0.1 - 28Oct2017   Enabled full Camera DTH support regardless of command method to Blue Iris (BI Server DTH/Local/External)
+Version 3.0.2 - 31Oct2017   Added triggers for: acceleration, presence, shock, smoke, carbonMonoxide, and water sensors.
+"                           Added ability to send preset commands to cameras when triggering.
 "                           Remind Users to click on each Trigger app instance to confirm settings & tap 'done' to ensure initialize() runs.
-Version 3.0.3 - 26Nov2017	Changed variable "actionName" to "processName" to fixed java error everyone had (it's a class name, can't be a variable).
+Version 3.0.3 - 26Nov2017   Changed variable "actionName" to "processName" to fixed java error everyone had (it's a class name, can't be a variable).
 "                           Cleaned up log.trace/debug/info to prevent passwords from posting all the time.
-Version 3.0.4 - 29Nov2017	Fixed typos, Fixed issue where it required a preset number during initialization.  Confirmed the external mode works as well!!
-Version 3.0.5 - 8Dec2017	Removed extra log.trace calls.
-Version 3.1 - 5Mar2018		Updates to support camera DTH changes
+Version 3.0.4 - 29Nov2017   Fixed typos, Fixed issue where it required a preset number during initialization.  Confirmed the external mode works as well!!
+Version 3.0.5 - 8Dec2017    Removed extra log.trace calls.
+Version 3.1 - 5Mar2018      Updates to support camera DTH changes
 "                           Added ability to move the camera back to it’s original preset after the triggered event. (per @jrfarrar's request)
 Version 3.2 - 17Apr2018     Added option to use mode change as a trigger option per @prjct92eh2 request 
-"                           Added knock sensing as a trigger option                       
+"                           Added knock sensing as a trigger option
+Version 3.2.1 - 22Apr2018   Fixed extraneous error messages when mode changes used for trigger (added 3sec delay to let mode change finish first)                 
 
 To Do:
--fix preset extraneous error message (local I think)
 -see todos
 */
 
-def appVersion() {"3.2"}
+def appVersion() {"3.2.1"}
 
 definition(
     name: "Blue Iris Fusion - Trigger",
@@ -86,7 +86,7 @@ def mainPage() {
         }
         if (usingCameraDTH) {
             section("Select Blue Iris Camera(s) to Trigger") {   
-                input "biCamerasSelected", "capability.videoCamera", title: "Blue Iris Cameras", required: false, multiple: true  
+                input "biCamerasSelected", "capability.videoCamera", title: "Blue Iris Cameras", required: false, multiple: true, submitOnChange: true 
                 paragraph "NOTE: Be sure to only select Blue Iris cameras."
             }
         } else {
@@ -128,7 +128,7 @@ def mainPage() {
                     biCamerasSelected.each { camera ->
                         def cameraName = camera.displayName  
                         input "preset-${cameraName}", "number", title: "Preset # for Camera: ${cameraName}", required: true
-                        if (returnPreset) input "returnPreset-${cameraName}", "number", title: "Preset # to Return to for '${cameraName}'", required: true
+                        if (returnPreset) input "switchBackPreset-${cameraName}", "number", title: "Preset # to Return to for '${cameraName}'", required: true
                     }
                 } else {
                     input "biPreset", "number", title: "Preset # for Camera: ${biCamera}", required: true
@@ -222,8 +222,8 @@ def initialize() {
                 def presetInput = "preset-${camera.displayName}"
                 presets += settings[presetInput].toInteger()
                 if (returnPreset) {
-                    def returnPresetInput = "returnPreset-${cameraName}"
-                    returnPresets += settings[returnPresetInput].toInteger()
+                    def switchBackPreset = "switchBackPreset-${cameraName}"
+                    returnPresets += settings[switchBackPreset].toInteger()  //todo - this returns an error during setup, says it can't to toInteger() on a null object, even when a number is entered in the field.  The other fields work and seem to use the same methods.
                 }
             }
         }
@@ -247,29 +247,33 @@ def eventHandlerBinary(evt) {
     if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
         log.info "Event occured within the desired timing conditions, sending commands"
-        processEvents(evt.displayName,evt.value)
+        processEvents([data: [name: "$evt.displayName", value: "$evt.value"]])
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
 }   
 
-def processEvents(name,value) {
+def processEvents(data) {
     def processName = ""
     if (usePreset && !disableRecording) {
         processName = " Moving and Triggering "
+        //todo: add a if (parent.usingBIServer) {command here}
     } else if (usePreset && disableRecording) {
         processName = " Moving "
+        //todo: add a if (parent.usingBIServer) {command here}
     } else if (!usePreset && disableRecording) {
         processName = " Doing Nothing to "
+        //todo: add a if (parent.usingBIServer) {command here}
     } else if (!usePreset && !disableRecording) {
         processName = " Triggering "
+        //todo: add a if (parent.usingBIServer) {command here}
     }
-    if (parent.loggingOn) log.debug "processName is $processName"
+    if (parent.loggingOn) log.debug "processName is $processName"  //todo- probably worth splitting out using server as above.
     if (parent.localOnly || parent.usingBIServer) {  //The trigger runs it's own local/external code, so we need to know which BI Fusion is use (and localOnly is the same as using the server in this case)
-        if (usingCameraDTH) {		//todo - once callback works, these can be deleted (because the callback will say the camera IS triggered, etc.
-            if (!receiveAlerts) sendNotificationEvent("${name} is ${value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
-            if (receiveAlerts) parent.send("${name} is ${value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
+        if (usingCameraDTH) {       //todo - once callback works, these can be deleted (because the callback will say the camera IS triggered, etc.
+            if (!receiveAlerts) sendNotificationEvent("${data.name} is ${data.value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
+            if (receiveAlerts) parent.send("${data.name} is ${data.value}, BI Fusion is" + processName + "Cameras: ${biCamerasSelected}")
         } else {
-            if (!receiveAlerts) sendNotificationEvent("${name} is ${value}, BI Fusion is" + processName + "Camera: ${biCamera}")
-            if (receiveAlerts) parent.send("${name} is ${value}, BI Fusion is" + processName + "Camera: ${biCamera}")
+            if (!receiveAlerts) sendNotificationEvent("${data.name} is ${data.value}, BI Fusion is" + processName + "Camera: ${biCamera}")
+            if (receiveAlerts) parent.send("${data.name} is ${data.value}, BI Fusion is" + processName + "Camera: ${biCamera}")
         }
         localAction()
     } else externalAction()
@@ -280,7 +284,7 @@ def localAction() {
     def presetCommand = ""
     for (int i = 0; i < state.listSize; i++) {
         if (usePreset) {
-        	log.info "Moving ${state.shortNameList[i]} to preset ${state.presetList[i]}"
+            log.info "Moving ${state.shortNameList[i]} to preset ${state.presetList[i]}"
             def presetString = 7 + state.presetList[i]  //1-7 are other actions, presets start at number 8.
             presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}"
             talkToHub(presetCommand)
@@ -340,7 +344,7 @@ def externalAction() {
 
                                 ////////////////////Trigger to Record////////////////////////////////////////////////////
                                 if (!disableRecording) {
-                                	 if (parent.loggingOn) log.debug "Triggering: ${state.shortNameList}"
+                                     if (parent.loggingOn) log.debug "Triggering: ${state.shortNameList}"
                                     for (int i = 0; i < state.listSize; i++) {
                                         def shortName = state.shortNameList[i]
                                         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"trigger","camera":shortName,"session":session]) { response4 ->
@@ -485,11 +489,22 @@ def returnPresetExternalAction(i) {
 def modeChecker(evt) {
     if (evt.name != "mode") {return;}
     def checkMode = evt.value
-    log.info "mode change detected, mode now: " + checkMode
+    def triggerFromModeChange = false
+    if (myMode != null) log.info "mode change detected, mode now: " + checkMode
     if (allOk) {
         myMode.each { eachOfMyMode ->
-            if (checkMode == eachOfMyMode) {processEvents("Mode",checkMode)}
+            if (checkMode == eachOfMyMode) {
+                triggerFromModeChange = true
+                if (parent.loggingOn) log.debug "checkMode '$checkMode' is in eachOfMyMode: '$eachOfMyMode', triggering cameras after short delay"
+            }  
+            //added delay because triggers were happening while the mode change was happening,
+            //causing error messages because it had sent the mode change, but the trigger's responses 
+            //were coming back before the error validation for profile change completed,
+            //so it thought it didn't change profiles.
         }
+    }
+    if (triggerFromModeChange) {
+        runIn(5, processEvents, [data: [name: "Mode", value: "$checkMode"]])
     }
 }
 
@@ -504,8 +519,9 @@ def doorClosed(evt) {
 
 def doorKnock() {
     if ( (openSensor.latestValue("contact") == "closed") && (now() - (60 * 1000) > state.lastClosed) && allOk) {
-        log.info "${knockSensor.label ?: knockSensor.name} detected a knock."
-        processEvents("${knockSensor.label ?: knockSensor.name}","knocking")
+        def knockSensorName = "${knockSensor.label ?: knockSensor.name}"
+        log.info "$knockSensorName detected a knock."
+        processEvents([data: [name: "$knockSensorName", value: "knocking"]])
     }
     else {
         if (parent.loggingOn) log.debug("${knockSensor.label ?: knockSensor.name} knocked, but looks like it was just someone opening the door.")

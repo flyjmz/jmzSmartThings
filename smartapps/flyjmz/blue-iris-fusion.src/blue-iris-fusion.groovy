@@ -67,7 +67,7 @@ Version 3.0.5 - 8Dec17  	Fixed Error when user ties a ST mode to BI's Inactive p
 Version 3.0.6 - 24Dec17		Cleaned up log.info verbage
 "							Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
 "							Added ability to add custom polling interval for server DTH
-Version 3.1 - 5Mar18		Added handling for "cameradevice.moveToPreset" command w/error checing	//NOTE: I need folks to test this for me!
+Version 3.1 - 5Mar18		Added handling for "cameradevice.moveToPreset" command w/error checking	//NOTE: I need folks to test this for me!
 Version 3.2 - 17Apr18       Hopefully fixed external profile switch error
 Version 3.2.1 - 18Apr18     Cleaned up some of the logs, fixed the external command lock code (1 & 2 are opposite in external vs local commands)
 
