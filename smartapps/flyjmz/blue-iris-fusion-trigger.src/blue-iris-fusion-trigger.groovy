@@ -54,7 +54,9 @@ Version 3.1 - 5Mar2018      Updates to support camera DTH changes
 "                           Added ability to move the camera back to it’s original preset after the triggered event. (per @jrfarrar's request)
 Version 3.2 - 17Apr2018     Added option to use mode change as a trigger option per @prjct92eh2 request 
 "                           Added knock sensing as a trigger option
-Version 3.2.1 - 22Apr2018   Fixed extraneous error messages when mode changes used for trigger (added 3sec delay to let mode change finish first)                 
+Version 3.2.1 - 22Apr2018   Fixed extraneous error messages when mode changes used for trigger (added 3sec delay to let mode change finish first) 
+Version 3.2.2 - beta		processEvents(data map) data map corrected from knocker and evthandler
+"							Mode based trigger delay time now user configurable
 
 To Do:
 -see todos
@@ -108,7 +110,8 @@ def mainPage() {
             input "myShock", "capability.shockSensor", title: "Shock Detected", required: false, multiple: true
             input "mySmoke", "capability.smokeDetector", title: "Smoke/CO Detected", required: false, multiple: true
             input "myWater", "capability.waterSensor", title: "Water Detected", required: false, multiple: true
-            input "myMode", "mode", title: "When mode changes to", required: false, multiple: true
+            input "myMode", "mode", title: "When mode changes to", required: false, multiple: true, submitOnChange: true
+            if (myMode) {input name: "modeDelay", type: "number", title: "Delay after mode change (>=3sec)?", required: false}
             input "doorKnocker", "bool", title: "When someone knocks", required: false, multiple: false, submitOnChange: true
             if (doorKnocker) {
                 input name: "knockSensor", type: "capability.accelerationSensor", title: "When Someone Knocks Where?"
@@ -247,7 +250,7 @@ def eventHandlerBinary(evt) {
     if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
     if (allOk) {
         log.info "Event occured within the desired timing conditions, sending commands"
-        processEvents([data: [name: "$evt.displayName", value: "$evt.value"]])
+        processEvents([name: "$evt.displayName", value: "$evt.value"])
     } else if (parent.loggingOn) log.debug "event did not occur within the desired timing conditions, not triggering"
 }   
 
@@ -497,14 +500,15 @@ def modeChecker(evt) {
                 triggerFromModeChange = true
                 if (parent.loggingOn) log.debug "checkMode '$checkMode' is in eachOfMyMode: '$eachOfMyMode', triggering cameras after short delay"
             }  
-            //added delay because triggers were happening while the mode change was happening,
-            //causing error messages because it had sent the mode change, but the trigger's responses 
-            //were coming back before the error validation for profile change completed,
-            //so it thought it didn't change profiles.
         }
     }
     if (triggerFromModeChange) {
-        runIn(5, processEvents, [data: [name: "Mode", value: "$checkMode"]])
+    	def modeDelayTime = modeDelay ?: 5
+        runIn(modeDelay, processEvents, [data: [name: "Mode", value: "$checkMode"]])
+        	//added delay because triggers were happening while the mode change was happening,
+            //causing error messages because it had sent the mode change, but the trigger's responses 
+            //were coming back before the error validation for profile change completed,
+            //so it thought it didn't change profiles.
     }
 }
 
@@ -521,7 +525,7 @@ def doorKnock() {
     if ( (openSensor.latestValue("contact") == "closed") && (now() - (60 * 1000) > state.lastClosed) && allOk) {
         def knockSensorName = "${knockSensor.label ?: knockSensor.name}"
         log.info "$knockSensorName detected a knock."
-        processEvents([data: [name: "$knockSensorName", value: "knocking"]])
+        processEvents([name: "$knockSensorName", value: "knocking"])
     }
     else {
         if (parent.loggingOn) log.debug("${knockSensor.label ?: knockSensor.name} knocked, but looks like it was just someone opening the door.")
