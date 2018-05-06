@@ -1,83 +1,83 @@
 /*
 Blue Iris Fusion  (parent app, child app is Blue Iris Camera Triggers - Trigger)
-
+ 
 Created by FLYJMZ (flyjmz230@gmail.com)
-
+ 
 Based on work by:
 Tony Gutierrez in "Blue Iris Profile Integration"
 jpark40 at https://community.smartthings.com/t/blue-iris-profile-trigger/17522/76
 luma at https://community.smartthings.com/t/blue-iris-camera-trigger-from-smart-things/25147/9
-
+ 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 in compliance with the License. You may obtain a copy of the License at:
-
+ 
 http://www.apache.org/licenses/LICENSE-2.0
-
+ 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
 on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
 for the specific language governing permissions and limitations under the License.
 */
-
-
+ 
+ 
 //////////////////////////////////////////////////////////////////////////////////////////////
-///										App Info											//
+///                                     App Info                                            //
 //////////////////////////////////////////////////////////////////////////////////////////////
 /*
 SmartThings Community Thread: 
 NEW:  https://community.smartthings.com/t/release-bi-fusion-v3-0-adds-blue-iris-device-type-handler-blue-iris-camera-dth-motion-sensing/103032
 OLD:  https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226
-
+ 
 Github Code: 
 https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src
-
+ 
 Child app can be found on Github: 
 https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src
-
+ 
 Blue Iris Server Device Type Handler on Github: 
 https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src
-
+ 
 Server DTH SmartThings Community Thread:  
 https://community.smartthings.com/t/release-blue-iris-device-handler/
-
+ 
 Blue Iris Camera Device Type Handler on Github: 
 https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-camera.src
-
+ 
 Version 1.0 - 30July2016    Initial release
 Version 1.1 - 3August2016   Cleaned up Code
 Version 2.0 - 16Oct2016     Added Profile integration.  Also set up option for local connections, but doesn't work.  Standby for updates to make it work.
 Version 2.1 - 14Dec2016     Got local connection to work!  If you have issues, try external.  External is very stable.
-Version 2.2 - 2Jan2017		Found out the local connection issue, "Local Only" setting in Blue Iris Webserver Settings cannot be checked.
+Version 2.2 - 2Jan2017      Found out the local connection issue, "Local Only" setting in Blue Iris Webserver Settings cannot be checked.
 Version 2.3 - 17Jan2017     Added preference to turn debug logging on or off.
 Version 2.4 - 22Jan2017     Fixed error in profile change notifications (they all said temporary even if it was a hold change)
 Version 2.5 - 23Jan2017     Slight tweak to notifications.
-Version 2.6 - 17Jun2017		Fixed Profile names when using in LAN (localAction was throwing NULL). Thanks Zaxxon!
-Version 3.0 - 26Oct2017		Added Blue Iris Server and Camera Device Type Integration with motion, profile integration, manual triggering and manual profile switching.
-"   						Also added App Update Notifications, cleaned up notifications, added OAuth for motion alerts
-Version 3.0.1 - 28Oct2017	Fixed bug where server device map was would fail to initialize when user wasn't using it (so now it doesn't generate unless desired) - it would make install fail even if not using the Server DTH 
-"							Fixed bug that would only only allow one camera device to install.
-"							Enabled full Camera Device DTH support even without using Server DTH.
-"							Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
-Version 3.0.2 - 1Nov2017	Code updated to allow user to change Camera Device Names after installation (can change in devices' settings, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).	                           
-Version 3.0.3 - 26Nov2017	Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
-Version 3.0.4 - 29Nov2017	Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
-"							Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
-Version 3.0.5 - 8Dec17  	Fixed Error when user ties a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
-"							Improved settings and operation when not using profile<>mode integration.
-"							Added step in DNI fix method to prevent renaming already renamed devices.
-Version 3.0.6 - 24Dec17		Cleaned up log.info verbage
-"							Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
-"							Added ability to add custom polling interval for server DTH
-Version 3.1 - 5Mar18		Added handling for "cameradevice.moveToPreset" command w/error checking	//NOTE: I need folks to test this for me!
+Version 2.6 - 17Jun2017     Fixed Profile names when using in LAN (localAction was throwing NULL). Thanks Zaxxon!
+Version 3.0 - 26Oct2017     Added Blue Iris Server and Camera Device Type Integration with motion, profile integration, manual triggering and manual profile switching.
+"                           Also added App Update Notifications, cleaned up notifications, added OAuth for motion alerts
+Version 3.0.1 - 28Oct2017   Fixed bug where server device map was would fail to initialize when user wasn't using it (so now it doesn't generate unless desired) - it would make install fail even if not using the Server DTH 
+"                           Fixed bug that would only only allow one camera device to install.
+"                           Enabled full Camera Device DTH support even without using Server DTH.
+"                           Changed Software Update input (now it asks if you want to disable vs ask if you want to enable...so it defaults to enabled).
+Version 3.0.2 - 1Nov2017    Code updated to allow user to change Camera Device Names after installation (can change in devices' settings, the change in BI Fusion preferences is irrelevant unless the shortname changes as well).                             
+Version 3.0.3 - 26Nov2017   Code cleanup; added Live Logging display of Motion URLs; updated "secure only" terminology since Blue Iris changed it.
+Version 3.0.4 - 29Nov2017   Added a method to rename camera devices to bicamera[i] without also having the shortname, which will now let people rename shortnames too.
+"                           Added an option to have it not auto-delete old camera devices, hopefully this will let people get out of the loop of changing something but not knowing how to change it back in order to continue.
+Version 3.0.5 - 8Dec17      Fixed Error when user ties a ST mode to BI's Inactive profile (the 0 was being treated as false and not switching modes for automatic mode integration)
+"                           Improved settings and operation when not using profile<>mode integration.
+"                           Added step in DNI fix method to prevent renaming already renamed devices.
+Version 3.0.6 - 24Dec17     Cleaned up log.info verbage
+"                           Fixed new install flow so that OAUTH tokens are created if they haven't already been (so you don't have to hit the switch first)
+"                           Added ability to add custom polling interval for server DTH
+Version 3.1 - 5Mar18        Added handling for "cameradevice.moveToPreset" command w/error checing  //NOTE: I need folks to test this for me!
 Version 3.2 - 17Apr18       Hopefully fixed external profile switch error
 Version 3.2.1 - 18Apr18     Cleaned up some of the logs, fixed the external command lock code (1 & 2 are opposite in external vs local commands)
-Version 3.2.2 - beta		Updated notes after comming 3.2.1 worked.
-"							todo - getting "error physicalgraph.app.exception.smartAppException: Method Not Allowed" 3-5 times in log 5-10 seconds after mode switches to away
-								>>this isn't happening in any other mode switches. ?????
-
-
+Version 3.2.2 - Beta        More Logging Cleanup
+ 
+Todo-fix the profile syncing when it comes from ST automatically (it works fine when manually done in BI Server DTH)
+ 
+ 
 TODO:
 - there is a todo for adding call back to local mode when not using bi server dth...
-
+ 
 -Add ability to enter both LAN and WAN address for: failover, camera live feed
 -Try to get motion alerts from BI to Camera Devices without using OAuth.  Some example code in here already (lanEventHandler), and look at:
 https://community.smartthings.com/t/smartthings-labs-and-lan-devices/1100/11
@@ -86,9 +86,9 @@ and maybe:
 https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi/3629/14
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
-
+ 
 def appVersion() {"3.2.1"}
-
+ 
 mappings {
     path("/active/:camera") {
         action: [GET: "cameraActiveHandler"]
@@ -97,7 +97,7 @@ mappings {
         action: [GET: "cameraInactiveHandler"]
     }
 }
-
+ 
 definition(
     name: "Blue Iris Fusion",
     namespace: "flyjmz",
@@ -108,7 +108,7 @@ definition(
     iconX2Url: "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BlueIris_logo%402x.png",
     singleInstance: true
 )
-
+ 
 preferences {
     page(name:"BIFusionSetup")
     page(name:"BIServerSetup")
@@ -117,7 +117,7 @@ preferences {
     page(name:"oauthSetup")
     page(name:"oauthView")
 }
-
+ 
 def BIFusionSetup() {
     dynamicPage(name:"BIFusionSetup", title: "BI Fusion Setup", install: true, uninstall: true, submitOnChange: true) {
         section("Blue Iris Server Settings") {
@@ -147,7 +147,7 @@ def BIFusionSetup() {
         }
     }
 }
-
+ 
 def BIServerSetup() {
     dynamicPage(name:"BIServerSetup", title: "BI Server Setup", submitOnChange: true) {
         section("Blue Iris Server Device Type") {
@@ -191,7 +191,7 @@ def BIServerSetup() {
         }
     }
 }
-
+ 
 def integrationSetup() {
     dynamicPage(name:"integrationSetup", title: "Blue Iris Profile <=> SmartThings Mode Integration", submitOnChange: true) {
         section("Blue Iris Profile/SmartThings Mode Integration") {
@@ -234,7 +234,7 @@ def integrationSetup() {
         }
     }
 }
-
+ 
 def cameraDeviceSetup() {
     dynamicPage(name:"cameraDeviceSetup", title: "Blue Iris Camera Installation", submitOnChange: true) {
         section("Blue Iris Camera Device Creation") {
@@ -254,7 +254,7 @@ def cameraDeviceSetup() {
                 paragraph "If you're having trouble changing settings, you can turn off auto-deletion for old camera devices. ADVANCED USERS ONLY"
                 input "skipDeletion", "bool", title: "Do not delete old camera devices?", required: false
             }
-
+ 
         }
         if (installCamaraDevices) {
             section ("Blue Iris Motion Alert Setup") {
@@ -277,7 +277,7 @@ def cameraDeviceSetup() {
         }
     }
 }
-
+ 
 def oauthSetup() {
     dynamicPage(name:"oauthSetup", title: "CHANGED Blue Iris Alert URLs") {
         createBIFusionToken()
@@ -295,7 +295,7 @@ def oauthSetup() {
         }
     }
 }
-
+ 
 def oauthView() {
     dynamicPage(name:"oauthView", title: "CURRENT Blue Iris Alert URLs") {
         if (state.accessToken == null) createBIFusionToken()
@@ -312,29 +312,29 @@ def oauthView() {
         }
     }
 }
-
+ 
 def installed() {
     initialize()
 }
-
+ 
 def updated() {
     unsubscribe()
     unschedule()
     initialize()
 }
-
+ 
 def uninstalled() {
     removeChildDevices(getChildDevices(true))
     unschedule()
     revokeAccessToken()
 }
-
+ 
 private removeChildDevices(delete) {
     delete.each {
         deleteChildDevice(it.deviceNetworkId)
     }
 }
-
+ 
 def initialize() {
     log.info "initialized"
     createInfoMaps()
@@ -354,9 +354,9 @@ def initialize() {
     schedule(now(), checkForUpdates)
     checkForUpdates()
 }
-
+ 
 ///////////////////////////////////////////////////////////////////////////
-//					BI FUSION 3.X Code (Uses Device Type Handlers)		///
+//                  BI FUSION 3.X Code (Uses Device Type Handlers)      ///
 ///////////////////////////////////////////////////////////////////////////
 def createInfoMaps() {
     //First create Profile:
@@ -378,17 +378,17 @@ def createInfoMaps() {
     if (profile6 != null) state.profileModeMap[6].modeName = profile6
     if (profile7 != null) state.profileModeMap[7].modeName = profile7
     if (autoModeProfileSync) {
-        location.modes.each { mode ->								//todo- this section prevents users from using the same BI profile number for multiple ST Modes (ie home and night are both profile 2).  
+        location.modes.each { mode ->                                //todo- this section prevents users from using the same BI profile number for multiple ST Modes (ie home and night are both profile 2).  
             //Probably need to run a script to see if multiple modes have the same number and combine the name, eg "Home/Night".  Then in this and in the server DTH,
             //instead of comparing the actual ST mode to the result of getProfileName(), have it compare the number from BI's return to getProfileNumber()
             def checkMode = "mode-${mode.id.toString()}"
             if (settings[checkMode] != null) {
-                state.profileModeMap[settings[checkMode].toInteger()].modeName = "${mode.name}"	//For each ST mode, it determines if the user made profile number for it in settings, then uses that profile number as the map value number and fills the name.
+                state.profileModeMap[settings[checkMode].toInteger()].modeName = "${mode.name}" //For each ST mode, it determines if the user made profile number for it in settings, then uses that profile number as the map value number and fills the name.
             }
         }
     }
     if (loggingOn) log.debug "state.profileModeMap map: ${state.profileModeMap}"
-
+ 
     //Second create BI Server Settings Map:
     state.blueIrisServerSettings = [:]
     if (usingBIServer) { 
@@ -408,9 +408,9 @@ def createInfoMaps() {
         state.blueIrisServerSettings.loggingOn = loggingOn
         if (loggingOn) log.debug "state.blueIrisServerSettings map: ${state.blueIrisServerSettings}"
     }
-
+ 
     //Third create the Camera Devices Map:
-
+ 
     //Fix for having DNI tied to shortname:////  todo - only need this for a while to make sure everyone had updated names, then can delete.
     if (installCamaraDevices) {
         def previousChildDevices = getChildDevices(true)
@@ -432,7 +432,7 @@ def createInfoMaps() {
         }
     }
     ///////////////////////////////////////////
-
+ 
     state.cameradeviceDNI = []
     state.camerashortName = []
     state.cameradisplayName = []
@@ -453,11 +453,11 @@ def createInfoMaps() {
     state.cameraSettings.username = username
     state.cameraSettings.password = password
     state.cameraSettings.shortName = ""
-
+ 
     //Finally, go make the devices:
     makeDevices()
 }
-
+ 
 def makeDevices() {
     //First, delete any old devices not in the settings any more:
     def installedChildDevices = getChildDevices(true)
@@ -489,11 +489,11 @@ def makeDevices() {
     if (usingBIServer) createBlueIrisServerDevice()
     if (installCamaraDevices) createCameraDevice()   
 }
-
-
-//////////////////////   	Server Device Creation 		////////////////////////////////
+ 
+ 
+//////////////////////      Server Device Creation      ////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
-
+ 
 def createBlueIrisServerDevice() {
     def serverDevice = getChildDevice(state.blueIrisServerSettings.DNI)       
     try {
@@ -506,7 +506,7 @@ def createBlueIrisServerDevice() {
     } catch (e) {
         log.error "Error creating Blue Iris Server device: ${e}"
     }
-
+ 
     //Update the Server Settings regardless of whether it was just created or not, and subscribe to it's events:
     serverDevice.initializeServer(state.blueIrisServerSettings)
     subscribe(serverDevice, "cameraPresetOk", cameraPresetOkHandler)
@@ -519,28 +519,28 @@ def createBlueIrisServerDevice() {
     } else if (receiveAlerts == "No") {
         //no server events to subscribe to, because we don't receive any that are just for messaging
     }
-
+ 
     //Code for motion active/inactive from BI Server Device.  OAuth setup overrode this, but I'd like to go back (todo):
-    //subscribe(serverDevice, "cameraMotionActive", cameraActiveHandler)	
+    //subscribe(serverDevice, "cameraMotionActive", cameraActiveHandler)    
     //subscribe(serverDevice, "cameraMotionInactive", cameraInactiveHandler)
-}					
-
+}                   
+ 
 def serverDeviceProfileHandler(evt) {
     if (loggingOn) log.debug "serverDeviceProfileHandler() received {$evt}"
     send("Blue Iris Profile set to ${evt.value}")
 }
-
+ 
 def serverDeviceStopLightHandler(evt) {
     if (loggingOn) log.debug "serverDeviceStopLightHandler() received {$evt}"
     send("Blue Iris Stoplight set to ${evt.value}")
 }
-
+ 
 def serverDeviceErrorMessageHandler(evt) {
-    log.error "serverDeviceErrorMessageHandler() received {$evt}"
+    log.error "serverDeviceErrorMessageHandler() received {$evt.descriptionText}"
     send("${evt.descriptionText}")
 }
-
-/*		//Code for motion active/inactive from BI Server Device.  OAuth setup overrode this, but I'd like to go back (todo).
+ 
+/*      //Code for motion active/inactive from BI Server Device.  OAuth setup overrode this, but I'd like to go back (todo).
 def cameraActiveHandler(evt) {  //receives triggered status from BI through BI Server Device, and sends it to the Camera device
 if (loggingOn) log.debug "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."
 log.trace "cameraActiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is active."
@@ -554,7 +554,7 @@ log.trace "cameraDNI is $cameraDNI"
 def cameraDevice = getChildDevice(cameraDNI)
 cameraDevice.active()
 }
-
+ 
 def cameraInactiveHandler(evt) {  //receives triggered status from BI through BI Server Device, and sends it to the Camera device
 if (loggingOn) log.debug "cameraInactiveHandler() got event: '${evt.displayName}'. Camera '${evt.value}' is inactive."
 def shortName = evt.device.name
@@ -568,13 +568,13 @@ def cameraDevice = getChildDevice(cameraDNI)
 cameraDevice.inactive()
 }
 */
-
-//////////////////////   	Camera Device Creation 		////////////////////////////////
+ 
+//////////////////////      Camera Device Creation      ////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 def createCameraDevice() {
     for (int i = 0; i < howManyCameras; i++) {  
         def cameraDevice = getChildDevice(state.cameradeviceDNI[i])
-        if (!cameraDevice) {	//double check that it isn't already installed
+        if (!cameraDevice) {    //double check that it isn't already installed
             try {
                 cameraDevice = addChildDevice("flyjmz", "Blue Iris Camera", state.cameradeviceDNI[i], location.hubs[0].id, [name: "${state.camerashortName[i]}", label: "${state.cameradisplayName[i]}", completedSetup: true])
                 if (loggingOn) log.debug "'${state.cameradisplayName[i]}' Device Created"
@@ -594,7 +594,7 @@ def createCameraDevice() {
         }
     }
 }
-
+ 
 def cameraTriggerHandler(evt) {  //sends command to camera to start recording whenever the camera device is 'turned on' (which is done by the Camera DTH and/or other apps controlling the Camera DTH).
     //WARNING - you don't want to have a camera triggered event also run this, because you'll end up in a loop.
     if (loggingOn) log.debug "cameraTriggerHandler() got event ${evt.displayName} is ${evt.value}"
@@ -602,17 +602,17 @@ def cameraTriggerHandler(evt) {  //sends command to camera to start recording wh
     def cameraMapSize = state.cameradeviceDNI.size()
     if (usingBIServer) {
         def serverDevice = getChildDevice(state.blueIrisServerSettings.DNI)
-        serverDevice.triggerCamera(shortName)		//sends command through the BI Server Device
+        serverDevice.triggerCamera(shortName)       //sends command through the BI Server Device
     } else {
         if(localOnly) {
             def triggerCameraCommand = "/admin?camera=${shortName}&trigger&user=${username}&pw=${password}"
             localAction(triggerCameraCommand)      //sends command through local action if not using the BI Server Device
         } else {
-            externalAction("trigger",shortName)		//sends command through external action if not using the BI Server Device
+            externalAction("trigger",shortName)     //sends command through external action if not using the BI Server Device
         }
     }
 }
-
+ 
 def cameraPresetHandler(evt) {
     if (loggingOn) log.debug "cameraPresetHandler() got event ${evt.displayName} is preset ${evt.value}"
     def shortName = evt.device.name
@@ -628,11 +628,11 @@ def cameraPresetHandler(evt) {
         externalAction("preset",["shortName":shortName,"preset":externalPreset])
     }
 }
-
+ 
 def cameraPresetOkHandler(evt) {
     state.cameraPresetOk = true
 }
-
+ 
 def cameraPresetErrorChecker() {
     if (!state.cameraPresetOk && (receiveAlerts == "Errors Only" || receiveAlerts == "Yes")) {
         log.error "BI Camera did not move to commanded preset"
@@ -640,11 +640,11 @@ def cameraPresetErrorChecker() {
     }
     state.cameraPresetOk = false
 }
-
-
-/////   				Camera Motion Code (Using OAuth) 						   /////
+ 
+ 
+/////                   Camera Motion Code (Using OAuth)                           /////
 ////////////////////////////////////////////////////////////////////////////////////////
-
+ 
 def createBIFusionToken() {
     try {
         if (state.accessToken) revokeAccessToken()
@@ -656,17 +656,17 @@ def createBIFusionToken() {
         return
     }
 }
-
+ 
 /*
 def lanEventHandler(evt) {  //todo -- see if i can make this work
 def msg = parseLanMessage(evt.value)
 def body = msg.body
 log.debug "lanEventHandler() got msg $msg and body $body"
-//def headerString = new String(parsedEvent.headers.decodeBase64())		
+//def headerString = new String(parsedEvent.headers.decodeBase64())     
 //def bodyString = new String(parsedEvent.body.decodeBase64())
 }
 */
-
+ 
 def cameraActiveHandler() {
     def cameraShortName = params.camera
     log.info "'$cameraShortName' is active."
@@ -687,7 +687,7 @@ def cameraActiveHandler() {
         sendEvent(name: "errorMessage", value: "Active Camera Motion Received but failed to send motion to ST device, check settings", descriptionText: "Active Camera Motion Received but failed to send motion to ST device, check settings", displayed: true)
     }
 }
-
+ 
 def cameraInactiveHandler() {
     def cameraShortName = params.camera
     log.info "'$cameraShortName' is inactive."
@@ -708,7 +708,7 @@ def cameraInactiveHandler() {
         sendEvent(name: "errorMessage", value: "Camera Motion Stopped but failed to update ST device, check settings", descriptionText: "Camera Motion Stopped but failed to update ST device, check settings", displayed: true)
     }
 }
-
+ 
 private String convertIPtoHex(ipAddress) {
     try {
         String hex = ipAddress.tokenize('.').collect {String.format('%02x', it.toInteger())}.join()
@@ -718,7 +718,7 @@ private String convertIPtoHex(ipAddress) {
         sendEvent(name: "errorMessage", value: "Invalid IP Address $ipAddress, check settings", descriptionText: "Invalid Blue Iris Server IP Address $ipAddress, check settings", displayed: true)
     }
 }
-
+ 
 private String convertPortToHex(port) {
     if (!port || (port == 0)) {
         log.error "error 13: Invalid port $port, check settings."
@@ -730,23 +730,23 @@ private String convertPortToHex(port) {
         log.error "error 14: Invalid port $port, check settings. Error: $e"
     }
 }
-
-
+ 
+ 
 ///////////////////////////////////////////////////////////////////////////
-//					BI FUSION 2.X Code (No devices required)
+//                  BI FUSION 2.X Code (No devices required)
 ///////////////////////////////////////////////////////////////////////////
 def modeChange(evt) {
     if (evt.name != "mode") {return;}
     log.info "mode change detected, mode now: " + evt.value
     def checkMode = ""
-
+ 
     location.modes.each { mode ->
         if (mode.name == evt.value){
             checkMode = "mode-" + mode.id
             if (loggingOn) log.debug "BI_modeChange matched to " + mode.name
         }
     }
-
+ 
     if (checkMode != "" && settings[checkMode] != null) {
         def profile = settings[checkMode].toInteger()
         if (usingBIServer) {
@@ -755,7 +755,7 @@ def modeChange(evt) {
         } else {
             if(localOnly){
                 log.info "Changing Blue Iris Profile to ${profile} via local command"
-                def lock = 2  
+                def lock = 2 
                 //Blue Iris Param "&lock=0/1/2" makes profile changes as: run/temp/hold, not sure what 'run' means...
                 //NOTE: Local commands use this, whereas external commands have the 1 & 2 switched! CAO 18Apr2018
                 if(holdChanges) {
@@ -767,12 +767,12 @@ def modeChange(evt) {
                     if(receiveAlerts == "Yes") send("Temporarily changed Blue Iris to profile ${profile}")
                 }
                 def profileChangeCommand = "/admin?profile=${profile}&lock=${lock}&user=${username}&pw=${password}"
-                localAction(profileChangeCommand)	//sends profile change through local lan (like device) except through the app
+                localAction(profileChangeCommand)   //sends profile change through local lan (like device) except through the app
             } else externalAction("profile",profile)  //sends profile change from SmartThings cloud to BI server
         }  
     }
 }
-
+ 
 def localAction(command) {
     def biHost = "${host}:${port}"
     def httpMethod = "GET"
@@ -788,7 +788,7 @@ def localAction(command) {
     sendHubCommand(hubAction)  //todo - add callback function for error checking
     if (loggingOn) log.debug hubAction
 }
-
+ 
 def externalAction(commandType,stringCommand) {  //can accept string of either: number for profile change or shortname for camera trigger
     def lock = 2
     if (holdChanges) lock = 1  //note, help file says 1 = hold, 2 = temp, which is backwards from local commands.
@@ -815,11 +815,11 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                     def newProfile = null
                                     log.info "Changing Blue Iris Profile to ${profile} via external command"
                                     if (response3.data.data.profile != profile) {        
-                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response4 -> //note: cannot set "lock" in JSON command, the only way to do a hold is to send the "profile" command twice
+                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response4 -> //""lock":lock", cut out to see if that was causing the extraneous error message
                                             if (loggingOn) log.debug "response 4: " + response4.data
                                             def lockStatus = response4.data.data.lock.toInteger()
                                             def profileChangedTo = response4.data.data.profile.toInteger()
-                                            //////send command again to make it a hold change (because you can't send "lock" in a JSON command)/////
+                                            //////send command again to make it a hold change (this is the old method)/////
                                             if (holdChanges) {
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response6 ->
                                                     if (loggingOn) log.debug "response 15: " + response6.data
@@ -916,7 +916,7 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
         if (receiveAlerts == "Yes" || receiveAlerts == "Errors Only") send("BI Fusion Error: External Connection to Blue Iris Failed. Error: $e")
     }
 }
-
+ 
 def profileName(names, num) {
     if (names[num.toInteger()]) {
         names[num.toInteger()] + " (#${num})"
@@ -929,7 +929,7 @@ def externalLockName(num) {  //note, this only works for external commands, loca
     if (num == 1)  return "Hold"
     if (num == 2)  return "Temporary"
 }
-
+ 
 def checkForTriggerUpdates() {
     log.info "Checking for Trigger app updates"
     def childApps = getChildApps()
@@ -944,7 +944,7 @@ def checkForTriggerUpdates() {
     def website = "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/blue-iris-fusion-trigger.src/version.txt"
     if (installed) checkUpdates(name, installedVersion, website)
 }
-
+ 
 def checkForFusionUpdates() {
     log.info "Checking for BI Fusion app updates"
     def installedVersion = appVersion()
@@ -952,7 +952,7 @@ def checkForFusionUpdates() {
     def website = "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/blue-iris-fusion.src/version.txt"
     checkUpdates(name, installedVersion, website)
 }
-
+ 
 def checkForCameraUpdates() {
     log.info "Checking for Camera device code updates"
     def name = "Blue Iris Camera Device Type Handler"
@@ -960,7 +960,7 @@ def checkForCameraUpdates() {
     def installedVersion = getChildDevice(state.cameradeviceDNI[0]).appVersion()
     if (installed) checkUpdates(name, installedVersion, website)
 }
-
+ 
 def checkForServerUpdates() {
     log.info "Checking for Server device code updates"
     def name = "Blue Iris Server Device Type Handler"
@@ -968,14 +968,14 @@ def checkForServerUpdates() {
     def installedVersion = getChildDevice(state.blueIrisServerSettings.DNI).appVersion()
     if (installedVersion) checkUpdates(name, installedVersion, website)
 }
-
+ 
 def checkForUpdates() {
     checkForFusionUpdates()
     checkForTriggerUpdates()
     if (installCamaraDevices) checkForCameraUpdates()
     if (usingBIServer) checkForServerUpdates()
 }
-
+ 
 def checkUpdates(name, installedVersion, website) {
     if (loggingOn) log.debug "${name} running checkForUpdates() with an installedVersion of $installedVersion, at website $website"
     def publishedVersion = "0.0"
@@ -993,7 +993,7 @@ def checkUpdates(name, installedVersion, website) {
         publishedVersion = "0.0"
     }
     if (loggingOn) log.debug "${name} publishedVersion from web is ${publishedVersion}, installedVersion is ${installedVersion}"
-    def instVerNum = 0			    
+    def instVerNum = 0             
     def webVerNum = 0
     if (publishedVersion && installedVersion) {  //make sure no null
         def instVerMap = installedVersion.tokenize('.')  //makes a map of each level of the version
@@ -1034,7 +1034,7 @@ def checkUpdates(name, installedVersion, website) {
         }
     } else if (!publishedVersion) {log.error "Cannot get published app version for ${name} from the web."}
 }
-
+ 
 private send(msg) {  
     if (location.contactBookEnabled) {
         if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
