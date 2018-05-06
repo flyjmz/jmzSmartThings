@@ -70,6 +70,9 @@ Version 3.0.6 - 24Dec17		Cleaned up log.info verbage
 Version 3.1 - 5Mar18		Added handling for "cameradevice.moveToPreset" command w/error checking	//NOTE: I need folks to test this for me!
 Version 3.2 - 17Apr18       Hopefully fixed external profile switch error
 Version 3.2.1 - 18Apr18     Cleaned up some of the logs, fixed the external command lock code (1 & 2 are opposite in external vs local commands)
+Version 3.2.2 - beta		Updated notes after comming 3.2.1 worked.
+"							todo - getting "error physicalgraph.app.exception.smartAppException: Method Not Allowed" 3-5 times in log 5-10 seconds after mode switches to away
+								>>this isn't happening in any other mode switches. ?????
 
 
 TODO:
@@ -812,11 +815,11 @@ def externalAction(commandType,stringCommand) {  //can accept string of either: 
                                     def newProfile = null
                                     log.info "Changing Blue Iris Profile to ${profile} via external command"
                                     if (response3.data.data.profile != profile) {        
-                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response4 -> //""lock":lock", cut out to see if that was causing the extraneous error message
+                                        httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response4 -> //note: cannot set "lock" in JSON command, the only way to do a hold is to send the "profile" command twice
                                             if (loggingOn) log.debug "response 4: " + response4.data
                                             def lockStatus = response4.data.data.lock.toInteger()
                                             def profileChangedTo = response4.data.data.profile.toInteger()
-                                            //////send command again to make it a hold change (this is the old method)/////
+                                            //////send command again to make it a hold change (because you can't send "lock" in a JSON command)/////
                                             if (holdChanges) {
                                                 httpPostJson(uri: host + ':' + port, path: '/json',  body: ["cmd":"status","profile":profile, "session":session]) { response6 ->
                                                     if (loggingOn) log.debug "response 15: " + response6.data
