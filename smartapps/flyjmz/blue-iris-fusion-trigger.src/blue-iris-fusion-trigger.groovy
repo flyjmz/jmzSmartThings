@@ -57,8 +57,9 @@ Version 3.2 - 17Apr2018     Added option to use mode change as a trigger option 
 Version 3.2.1 - 22Apr2018   Fixed extraneous error messages when mode changes used for trigger (added 3sec delay to let mode change finish first) 
 Version 3.2.2 - beta		processEvents(data map) data map corrected from knocker and evthandler
 "							Mode based trigger delay time now user configurable
-"							Fixed "return to preset" actions, it was wasn't overwriting runin calls, but should be (if the same thing keeps triggering the camera to move, it needs to just stay there)
-"							Fixed Trigger creation when using presets and list of cameras.  The ".toInteger()" attached to the preset inputs to ensure the input was a number just doesn't work for some reason; removed.
+"							Fixed "return to preset" actions, it was wasn't overwriting runin calls, but should be (if the same thing keeps triggering the camera and the camera moved to the preset, it needs to just stay there)
+"							Fixed Trigger creation when using presets and list of cameras.  The ".toInteger()" attached to the preset inputs to ensure the input was a number just doesn't work for some reason. Removed.
+"							Continued to fix presets, the runIn() methods improperly passed data.  Corrected minor typos, cleaned up logs.
 
 To Do:
 -see todos
@@ -225,20 +226,19 @@ def initialize() {
             names += camera.name
             if (usePreset) {
                 def presetInput = "preset-${camera.displayName}"
-                log.trace "presetInput is ${presetInput} and settings[presetInput] is ${settings[presetInput]}"
                 presets += settings[presetInput]   
                 if (returnPreset) {
                     def switchBackPreset = "switchBackPreset-${cameraName}"
-                    returnPresets += settings[switchBackPreset]  //todo - this returns an error during setup, says it can't to toInteger() on a null object, even when a number is entered in the field.  The other fields work and seem to use the same methods.
+                    returnPresets += settings[switchBackPreset]
                 }
             }
         }
     } else {
         names += biCamera
         if (usePreset) {
-            presets += biPreset.toInteger()
+            presets += biPreset
             if (returnPreset) {
-                returnPresets += returnBiPreset.toInteger()
+                returnPresets += returnBiPreset
             }
         }
     }
@@ -250,7 +250,7 @@ def initialize() {
 }
 
 def eventHandlerBinary(evt) {
-    if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value} and data ${evt.data}"
+    if (parent.loggingOn) log.debug "processed event ${evt.name} from device ${evt.displayName} with value ${evt.value}"
     if (allOk) {
         log.info "Event occured within the desired timing conditions, sending commands"
         processEvents([name: "$evt.displayName", value: "$evt.value"])
@@ -294,7 +294,7 @@ def localAction() {
             def presetString = 7 + state.presetList[i]  //1-7 are other actions, presets start at number 8.
             presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}"
             talkToHub(presetCommand)
-            if (returnPreset) runIn(returnPresetWaitTime, returnPresetLocalAction(i), [overwrite: true])
+            if (returnPreset) runIn(returnPresetWaitTime, returnPresetLocalAction, [data: [listNumber: "$i"]])
         }
         if (!disableRecording) {
             log.info "Triggering: ${state.shortNameList[i]}"
@@ -304,9 +304,10 @@ def localAction() {
     }
 }
 
-def returnPresetLocalAction(i) {
+def returnPresetLocalAction(data) {
+    def i = data.listNumber
     def presetCommand = ""
-    log.info "Moving ${state.shortNameList[i]} to back to preset ${state.returnPresetList[i]}"
+    log.info "Moving ${state.shortNameList[i]} back to preset ${state.returnPresetList[i]}"
     def presetString = 7 + state.returnPresetList[i]  //1-7 are other actions, presets start at number 8.
     presetCommand = "/cam/${state.shortNameList[i]}/pos=${presetString}&user=${parent.username}&pw=${parent.password}"
     talkToHub(presetCommand)
@@ -377,7 +378,7 @@ def externalAction() {
                                             if (parent.loggingOn) log.debug response4.data
                                             if (response4.data.result == "success") {
                                                 log.info "BI Fusion moved $shortName to preset '${state.presetList[i]}'"
-                                                if (returnPreset) runIn(returnPresetWaitTime, returnPresetExternalAction(i), [overwrite: true])
+                                                if (returnPreset) runIn(returnPresetWaitTime, returnPresetExternalAction, [data: [listNumber: "$i"]])
                                             } else {
                                                 log.error "BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName"
                                                 if (parent.loggingOn) log.debug(response4.data.data.reason)
@@ -422,7 +423,8 @@ def externalAction() {
     }
 }
 
-def returnPresetExternalAction(i) {
+def returnPresetExternalAction(data) {
+	def i = data.listNumber
     log.info "Running externalAction"
     try {
         httpPostJson(uri: parent.host + ':' + parent.port, path: '/json',  body: ["cmd":"login"]) { response ->
@@ -450,7 +452,7 @@ def returnPresetExternalAction(i) {
                                     if (parent.loggingOn) log.debug response4.data
                                     if (response4.data.result == "success") {
                                         log.info "BI Fusion moved $shortName to preset '${state.presetList[i]}'"
-                                        if (returnPreset) runIn(returnPresetWaitTime, returnPresetExternalAction(i), [overwrite: true])
+                                        if (returnPreset) runIn(returnPresetWaitTime, returnPresetExternalAction, [data: [listNumber: "$i"]])
                                     } else {
                                         log.error "BI Fusion Failure: preset '${state.presetList[i]}' not sent to $shortName"
                                         if (parent.loggingOn) log.debug(response4.data.data.reason)
