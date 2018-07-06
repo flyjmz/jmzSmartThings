@@ -53,8 +53,10 @@ Version History:
                         then the issues of "state" and multiple app executions end up corupting the state lists.  Todo for later.
                     NOTE: User must enter BI Fusion settings and save in order to get error checking state variables initialized.
 2.8     17Apr18     Allows user to change the icon per @jasonrwise77 request
+2.9   	6Jul18      Updated some debug logging.  Made custom polling code more robust.  Added Periodic notifications for server offline.
 
 To Do:
+-The polling doesn't confirm that the profile matches the mode...
 -Fix camera trigger error checking, search for "//for trigger error checking" and look at note in v2.7.  
     --http://docs.smartthings.com/en/latest/smartapp-developers-guide/state.html#state-and-potential-race-conditions
 -Finish attempted multiAttributeTile
@@ -67,7 +69,7 @@ Wish List:
 --The 'on' status for each tile lets me have the background change but then the label says on instead of the profile's name
 */
 
-def appVersion() {"2.8"}
+def appVersion() {"2.9"}
 
 metadata {
     definition (name: "Blue Iris Server", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -207,8 +209,10 @@ metadata {
         }
         section("Blue Iris Server Health Monitor"){
             double waitThreshold = 5
-            input "waitThreshold", "number", title: "Enter how many seconds to wait after the server request is made before deaming it offline:", description: "Default: 5 sec", required:false, displayDuringSetup: true 
-            input "pollingInterval", "number", title: "You can set a custom polling interval as well", description: "Default: 15 minutes", required: false, displayDuringSetup: true 
+            input "waitThreshold", "number", title: "Custom Server Health Monitor, max server response time: (sec)", description: "Default: 5 sec", required:false, displayDuringSetup: true 
+            input "pollingInterval", "enum", title: "Custom polling interval? (min)", description: "Default: 15 minutes", options: ["1", "5", "10", "15", "30", "60"], required: false, displayDuringSetup: true
+            input "periodicNotifications", "bool", title: "Receive Periodic Notifications?", required: false, displayDuringSetup: true
+            input "periodicNotificationsTiming", "number", title: "Periodic Notification Interval (minutes between messages):", description: "Defaults to 15 min", required: false, displayDuringSetup: true
         }
         section("Debug"){
             def loggingOn = false
@@ -242,7 +246,7 @@ def initialize() {
         unschedule()
         state.debugLogging = (loggingOn != null) ? loggingOn : false
         state.serverResponseThreshold = (waitThreshold != null) ? waitThreshold : 5
-        state.pollingInterval = (pollingInterval != null) ? pollingInterval : 15
+        state.pollingInterval = (pollingInterval != null) ? pollingInterval : "15"
         log.info "initialize() called, debug logging is ${state.debugLogging}, serverResponseThreshold is ${state.serverResponseThreshold}"
 
         //initialize variables and set the profile names to the tiles
@@ -257,6 +261,9 @@ def initialize() {
         state.hubCommandReceivedTime = now()
         state.hubCommandSentTime = now()
         state.hubOnline = true
+        state.periodicNotifications = periodicNotifications
+        state.periodicNotificationsTiming = (periodicNotificationsTiming != null) ? periodicNotificationsTiming : 15
+        state.periodicNotificationTime = now()
         state.sync = autoModeProfileSync
         if (state.sync) {
             sendEvent(name: "sync", value: "default", displayed: false)
@@ -286,7 +293,7 @@ def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but 
     state.debugLogging = (state.blueIrisServerSettings.loggingOn != null) ? state.blueIrisServerSettings.loggingOn : false 
     if(state.debugLogging) log.debug "initializeServer() received these settings from BI Fusion: ${state.blueIrisServerSettings}"
     state.serverResponseThreshold = (state.blueIrisServerSettings.waitThreshold != null) ? state.blueIrisServerSettings.waitThreshold : 5
-    state.pollingInterval = (state.blueIrisServerSettings.pollingInterval != null) ? state.blueIrisServerSettings.pollingInterval : 15
+    state.pollingInterval = (state.blueIrisServerSettings.pollingInterval != null) ? state.blueIrisServerSettings.pollingInterval : "15"
     state.holdChange = state.blueIrisServerSettings.holdTemp
     if (state.holdChange == null) {
         state.holdChange = true
@@ -317,6 +324,9 @@ def initializeServer(blueIrisServerSettings) {  //The same as initialize(), but 
     setTileProfileModesToName()
     if(state.debugLogging) log.debug "profile0mode is ${state.profile0mode}, profile1mode is ${state.profile1mode}, profile2mode is ${state.profile2mode}, profile3mode is ${state.profile3mode}, profile4mode is ${state.profile4mode}, profile5mode is ${state.profile5mode}, profile6mode is ${state.profile6mode}, profile7mode is ${state.profile7mode}"
     customPolling()
+    state.periodicNotifications = state.blueIrisServerSettings.periodicNotifications
+    state.periodicNotificationsTiming = state.blueIrisServerSettings.periodicNotificationsTiming
+    state.periodicNotificationTime = now()
     //state.triggeredCameraHistory = []  //for trigger error checking
     //state.cameraTriggeredSuccessfulHistory = []  //for trigger error checking
 }
@@ -424,7 +434,7 @@ def parseBody(body) {
         }
 
         //Finally, notify if there are errors
-        if (state.debugLogging) log.debug "Profile Error Check: want '${state?.desiredNewProfile}' == '${newProfileName}' or '${state?.desiredNewProfile}' == false."
+        if (state.debugLogging) log.debug "Profile Error Check: wants profile '${state?.desiredNewProfile}', has profile '${newProfileName}'. Or want '${state?.desiredNewProfile}' == false."
         if (state?.desiredNewProfile && state?.desiredNewProfile != newProfileName) {
             log.error "error 1: ${state.desiredNewProfile} != ${newProfileName}"
             sendEvent(name: "errorMessage", value: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", descriptionText: "Error! Blue Iris Profile failed to change to ${state.desiredNewProfile}; it is ${newProfileName}", displayed: true)
@@ -496,12 +506,38 @@ def changeHoldTemp() {
 }
 
 def customPolling() {
-    double timesSinceContact = (now() - state.hubCommandReceivedTime).abs() / 60000  //time since last contact from server in minutes
-    if (timesSinceContact > state.pollingInterval) {
+    double timesSinceContact = (now() - state.hubCommandReceivedTime).abs() / 60000 
+    //time since last contact from server in minutes
+    log.info "Polling. Time since last contact is $timesSinceContact minutes"
+    def minimumCheckInterval
+    if (state.pollingInterval == "1") {
+        runEvery1Minute(customPolling)
+        minimumCheckInterval = 1
+    } else if (state.pollingInterval == "5") {
+        runEvery5Minutes(customPolling)
+        minimumCheckInterval = 5
+    } else if (state.pollingInterval == "10") {
+        runEvery10Minutes(customPolling)
+        minimumCheckInterval = 10
+    } else if (state.pollingInterval == "15") {
+        runEvery15Minutes(customPolling)
+        minimumCheckInterval = 15
+    } else if (state.pollingInterval == "30") {
+        runEvery30Minutes(customPolling)
+        minimumCheckInterval = 30
+    } else if (state.pollingInterval == "60") {
+        runEvery1Hour(customPolling)
+        minimumCheckInterval = 60
+    } else {
+        log.error "Error 23: Blue Iris Server Custom Polling interval is invalid.  Check settings. (This setting was changed from a number input to a selection in version 2.8.1)"
+        sendEvent(name: "errorMessage", value: "Error! Blue Iris Server Custom Polling interval is invalid.  Check settings.", descriptionText: "Error! Blue Iris Server Custom Polling interval is invalid.  Check settings.", displayed: true)
+        minimumCheckInterval = 15
+    }
+
+    if ((timesSinceContact + 1) >= minimumCheckInterval) {  //added '+1' because if it is preventing it from polling when it's been less than the polling inveral since last update, but it requires a full polling interval to actually poll, it'll never do it.
         retrieveCurrentStatus()     //Only does a check ('poll') if we haven't heard from the server in more than the polling interval.
-    }    
-    runIn(state.pollingInterval*60, customPolling)
-}
+    }
+ }
 
 def retrieveCurrentStatus() {
     state.desiredNewProfile = false
@@ -657,28 +693,47 @@ def cameraTriggerErrorChecker() {
 def serverOfflineChecker() {
     if (state.debugLogging) log.debug "serverOfflineChecker() has state.hubCommandReceivedTime at ${state.hubCommandReceivedTime} and state.hubCommandSentTime at ${state?.hubCommandSentTime}"
     if (state.hubCommandReceivedTime && state.hubCommandSentTime) {
-        double responseTime = (state.hubCommandReceivedTime - state.hubCommandSentTime).abs() / 1000  //response time in seconds
-        if (state.debugLogging) log.debug "serverOfflineChecker() found server response time was ${responseTime}"
-        if (responseTime > state.serverResponseThreshold) {
-            log.error "error 9: Server Response time was ${responseTime} seconds, the server is offline."
+        double responseTime = (state.hubCommandReceivedTime - state.hubCommandSentTime).abs() / 1000  
+        //response time in seconds
+        if (state.debugLogging) log.debug "serverOfflineChecker() found server response time was ${responseTime} seconds"
+        if (responseTime > state.serverResponseThreshold && state.hubOnline) {
+            log.error "error 9: BI Server Response time was ${responseTime} seconds. The server is offline."
             sendEvent(name: "errorMessage", value: "Error! Blue Iris Server is offline!", descriptionText: "Error! Blue Iris Server is offline!", displayed: true)  //It has to be the BI server or the SmartThing hub's connection to the BI Server (because otherwise you're hub would be offline too and the SmartThings app would tell you.)
             sendEvent(name: "blueIrisProfile", value: "${getprofileName(8)}", descriptionText: "Blue Iris Profile is ${getprofileName(8)}", displayed: true)
             setTileProfileModesToName()
             state.hubOnline = false
-        } else state.hubOnline = true       
+        } else if (responseTime > state.serverResponseThreshold && !state.hubOnline && state.periodicNotifications) {
+            offlinePeriodicNotifier(responseTime)
+            log.info "BI Server is still offline, checking if it's time to send another periodic notification"
+        } else if (responseTime < state.serverResponseThreshold) {
+            state.hubOnline = true
+            //The it's now ok message is already sent up in parseBody()
+        }    
     }
     if (!state.hubCommandReceivedTime) {  //shouldn't ever have a null received time because it is a state value setup in initialize()
-        log.error "error 9.1: Server doesn't have a received time, so it is offline. (doesn't have one because it's the first health check and it is offline)"
+        log.error "error 9.1: BI Server doesn't have a received time, so it is offline. (doesn't have one because it's the first health check and it is offline)"
         sendEvent(name: "errorMessage", value: "Error! Blue Iris Server is offline!", descriptionText: "Error! Blue Iris Server is offline!", displayed: true)  //It has to be the BI server or the SmartThing hub's connection to the BI Server (because otherwise you're hub would be offline too and the SmartThings app would tell you.)
         sendEvent(name: "blueIrisProfile", value: "${getprofileName(8)}", descriptionText: "Blue Iris Profile is ${getprofileName(8)}", displayed: true)
         state.hubOnline = false
     }
     if (!state.hubCommandSentTime || ((state.hubCommandSentTime - now()).abs() / 1000) > (state.serverResponseThreshold + 10)) {  
         //checks to make sure the hubCommandSetTime is from the actual command we intend to compare against (it will always have a value, but if it didn't run correctly the value will be from a previous execution)
-        log.error "error 9.2: Server doesn't have a sent time, SmartThings never sent a command, check settings and hub."
+        log.error "error 9.2: BI Server doesn't have a sent time, SmartThings never sent a command, check settings and hub."
         sendEvent(name: "errorMessage", value: "Error! Either SmartThings Hub or Blue Iris Server is offline!", descriptionText: "Either SmartThings Hub or Blue Iris Server is offline!", displayed: true)  //It has to be the BI server or the SmartThing hub's connection to the BI Server (because otherwise you're hub would be offline too and the SmartThings app would tell you.)
         state.hubOnline = false
     }
+}
+
+def offlinePeriodicNotifier(responseTime) {  //pulling periodic notifications out of the polling schedule so they can be different (e.g. poll every minute but notify every hour)
+    double timesSincePeriodicNotification = (state.periodicNotificationTime - now()).abs() / 60000 
+    //time since last periodic notification in minutes
+    if (state.debugLogging) log.debug "timesSincePeriodicNotification is $timesSincePeriodicNotification, state.periodicNotificationsTiming is $state.periodicNotificationsTiming, state.periodicNotificationTime is $state.periodicNotificationTime, and now is ${now()}"
+    if ((timesSincePeriodicNotification + 0.5) > state.periodicNotificationsTiming) {
+        log.error "error 9.3: BI Server is still offline.  Sending periodic notification."
+        def responseTimeMinutes = Math.round(responseTime / 60)
+        sendEvent(name: "errorMessage", value: "Error! Blue Iris Server has been offline for $responseTimeMinutes minutes!", descriptionText: "Error! Blue Iris Server has been offline for $responseTimeMinutes minutes!", displayed: true)
+        state.periodicNotificationTime = now()
+    }   
 }
 
 def getprofileName(number) {
