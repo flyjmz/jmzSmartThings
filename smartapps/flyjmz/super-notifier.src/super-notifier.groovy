@@ -22,14 +22,15 @@ Credits, based on work from:
   "Door Knocker" by brian@bevey.org dated 9/10/13
   
 Version History:
-  1.0 - 5Sep2016, Initial Commit
+  	1.0 - 5Sep2016, Initial Commit
     1.1 - 10Oct2016, public release
     1.2 - 1Feb2018, added update notifications and debug logging option
     1.3 - 17Apr2017, updated with Door Knocker monitoring
+    1.4 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
 
 */
 
-def appVersion() {"1.3"}
+def appVersion() {"1.4"}
  
 definition(
   name: "Super Notifier",
@@ -46,20 +47,41 @@ preferences {
     page(name:"superNotifierSetup")
 }
 
+
 def superNotifierSetup() {
     dynamicPage(name: "superNotifierSetup", title: "Super Notifier", install: true, uninstall: true, submitOnChange: true) {
-        section("") {
+        section("Alerts") {
             app(name: "Instant Alert", appName: "Super Notifier - Instant Alert", namespace: "flyjmz", title: "Add instant alert", description: "Add an instant alert to notify as soon as something happens", multiple: true)
             app(name: "Delayed Alert", appName: "Super Notifier - Delayed Alert", namespace: "flyjmz", title: "Add delayed alert", description: "Add a delayed alert to notify when something has been left open/closed or on/off",multiple: true)
         }
-        section("") {
-          input "loggingOn", "bool", title: "Turn on Debug Logging?", required: false
-            input "updateAlertsOff", "bool", title: "Disable software update alerts?", required:false, submitOnChange: true
-            if (!updateAlertsOff) {
-                input("recipients", "contact", title: "Send notifications to") {
-                    input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]      
-                    input "phone", "phone", title: "Phone Number (only for SMS)", required: false
-                    paragraph "If outside the US please make sure to enter the proper country code"
+
+        section("Notifications", hidden: false, hideable: true) {
+            def SMSContactsSplit
+            if (!location.contactBookEnabled) {
+                paragraph "Contact Book Workaround:  Enter phone numbers if you are using SMS notifications. (Push notifications are selected elsewhere and effect all users of this Location)"
+                input "SMSContacts", "string", title: "Enter up to 10 Phone Numbers: (include country code) Separate entries with a semi-colon (;). Do not use spaces or special characters.", required: false, submitOnChange: true
+                if (SMSContacts != null) {
+                    paragraph "Name each contact:"
+                    SMSContactsSplit = SMSContacts.split(";")
+                    for (int i = 0; i < SMSContactsSplit.size(); i++) {
+                        input "contact-${i}", "string", title: "Contact-${i} '${SMSContactsSplit[i]}' Name:", required: true
+                    }
+                    paragraph "NOTE: If you add/remove/reorder users, you'll need to update the Notification Settings in each instant/delayed alert app. You do not need to do anything if you only change the phone number and don't want to change anything else." 
+                }
+            }
+        }
+
+        section("Advanced", hidden: true, hideable: true){
+            paragraph "You can turn on debug logging, viewed in Live Logging on the API website."
+            def loggingOn = false
+            input "loggingOn", "bool", title: "Debug Logging On?"
+            paragraph "New software version notifications are sent automatically, but can be disabled."
+            input "updateAlertsOff", "bool", title: "Disable software update alerts?", required:false
+            if (updateAlertsOff) {
+                input("recipients", "contact", title: "Send update notifications to") {
+                    input "wantsPush", "bool", title: "Send update Push Notification? (pushes to all this location's users)", required: false
+                    paragraph "If you want SMS Notifications, enter phone numbers including the country code (1 for USA), otherwise leave blank. Separate multiple numbers with a semi-colon (;). Only enter the numbers, no spaces or special characters."
+                    input "phoneNumbers", "string", title: "Enter Phone Numbers for SMS Notifications:", required: false
                 }
             }
         }
@@ -67,14 +89,19 @@ def superNotifierSetup() {
 }
 
 def installed() {
-    schedule(now(), checkForUpdates)
-    checkForUpdates()
+	log.info "installed with settings: ${settings}"
+	initialize()
 }
 
 def updated() {
-    unsubscribe()
+	log.info "updated with settings: ${settings}"
+    unschedule()
+	initialize()
+}
+
+def initialize() {
     schedule(now(), checkForUpdates)
-    checkForUpdates()
+   	checkForUpdates()
 }
 
 def checkForUpdates() {
@@ -180,20 +207,31 @@ def checkUpdates(name, installedVersion, website) {
 }
 
 private send(msg) {  
+	//First try to use Contact Book (Depricated 30July2018)
     if (location.contactBookEnabled) {
-        if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
+        if (loggingOn) log.debug("sending '$msg' notification to: ${recipients?.size()}")
         sendNotificationToContacts(msg, recipients)
     }
+    //Otherwise use old school Push/SMS notifcations
     else {
-        Map options = [:]
-        if (phone) {
-            options.phone = phone
-            if (loggingOn) log.debug 'sending SMS'
-        } else if (pushAndPhone == 'Yes') {
-            options.method = 'both'
-            options.phone = phone
-        } else options.method = 'push'
-        sendNotification(msg, options)
+        if (loggingOn) log.debug("sending message to app notications tab: '$msg'")
+        sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
+        if (wantsPush) {
+            sendPushMessage(msg)  //Second, send the push notification if user wanted it
+            if (loggingOn) log.debug("sending push message")
+        }
+
+        if (phoneNumbers) {	//Third, send SMS messages if desired
+            if (phoneNumbers.indexOf(";") > 1) {	//Code block for multiple phone numbers
+                def phones = phoneNumbers.split(";")
+                for (int i = 0; i < phones.size(); i++) {
+                    if (loggingOn) log.debug("sending SMS to ${phones[i]}")
+                    sendSmsMessage(phones[i], msg)
+                }
+            } else {	//Code block for single phone number
+                if (loggingOn) log.debug("sending SMS to ${phoneNumbers}")
+                sendSmsMessage(phoneNumbers, msg)
+            }
+        }
     }
-    if (loggingOn) log.debug msg
 }

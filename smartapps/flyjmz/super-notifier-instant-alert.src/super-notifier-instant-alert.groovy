@@ -23,11 +23,12 @@ Version History:
     1.5 - 21Feb2018, fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
     1.6 - 17Apr2018, added door knock detection.  Added power metering per @ErnieG request
     1.6.1 - 20Apr2018, fixed power metering.
+    1.6.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
 
 To Do:
 */
 
-def appVersion() {"1.6.1"}
+def appVersion() {"1.6.2"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -83,13 +84,28 @@ def settings() {
             input "messageText", "text", title: "Message Text", required: false
         }
 
-        section("Notification Type"){
-            input("recipients", "contact", title: "Send notifications to") {
-                input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]		
-                input "phone", "phone", title: "Phone Number (only for SMS)", required: false
-                paragraph "If outside the US please make sure to enter the proper country code"
+        section("Notifications", hidden: false, hideable: true) {
+            def SMSContactsSendSMS = []
+
+            if (location.contactBookEnabled ==  true) {
+                input("recipients", "contact", title: "Send notifications to")
+            } 
+            else { 
+                input "wantsPush", "bool", title: "Send Push Notification? (pushes to all this location's users)", required: false
+                paragraph "Select Contacts to send SMS Notifications:"
+
+                def mapSize = parent.settings["SMSContacts"].split(';').size()
+                for (int i = 0; i < mapSize; i++) {
+                    def contactInput = "contact-" + "${i}"
+                    def contactName = parent.settings[contactInput]                   
+                    input "phone-${i}", "bool", title: "${contactName}", required: false, submitOnChange: true
+                    def contactValue = "phone-" + "${i}"
+                    SMSContactsSendSMS += settings[contactValue]         
+                }
+                state.SMSContactsMap = SMSContactsSendSMS
             }
-    	}
+        }
+
 
         section("Message Details") {
             paragraph "Minimum time between messages (optional, defaults to every message)"
@@ -338,18 +354,30 @@ private timeIntervalLabel() {
 	else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
 }
 
-private sendMessage(msg) {
-	if (location.contactBookEnabled) {
-		sendNotificationToContacts(msg, recipients)
-	} else {
-		Map options = [:]
-        if (phone) {
-			options.phone = phone
-			if (parent.loggingOn) log.debug 'sending SMS'
-		} else if (pushAndPhone == 'Yes') {
-        	options.method = 'both'
-            options.phone = phone
-        } else options.method = 'push'
-		sendNotification(msg, options)
-	}
+private sendMessage(msg) {   
+    //First try to use Contact Book (Depricated 30July2018)
+    if (location.contactBookEnabled) {
+        if (loggingOn) log.debug("sending '$msg' notification to: ${recipients?.size()}")
+        sendNotificationToContacts(msg, recipients)
+    }
+
+    //Otherwise use old school Push/SMS notifcations
+    else {
+        if (loggingOn) log.debug("sending message to app notifications tab: '$msg'")
+        sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
+        if (wantsPush) {
+            sendPushMessage(msg)  //Second, send the push notification if user wanted it
+            if (loggingOn) log.debug("sending push message")
+        }
+
+        if (state.SMSContactsMap != null) {  //Third, send SMS messages if desired
+            def SMSContactsSplit = parent.settings["SMSContacts"].split(';')
+            for (int i = 0; i < state.SMSContactsMap.size(); i++) {
+                if (state.SMSContactsMap[i]) {
+                    if (parent.loggingOn) log.debug "Sending SMS to ${SMSContactsSplit[i]}"
+                    sendSmsMessage(SMSContactsSplit[i], msg)
+                }
+            }
+        }
+    }
 }

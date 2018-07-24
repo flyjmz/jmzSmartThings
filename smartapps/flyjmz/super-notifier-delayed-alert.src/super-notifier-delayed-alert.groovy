@@ -26,12 +26,13 @@ Version History:
     1.8 - 5Mar2018, bugfix - fixed waitThreshold title in preferences
     1.9 - 17Apr2018, added power meter monitoring per @ErnieG request
     1.9.1 - 20Apr2018, fixed power meter monitoring, added "temp now ok" message (apparently I forgot it...)
+    1.9.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
 
 To Do:
 -None!
 */
 
-def appVersion() {"1.9.1"}
+def appVersion() {"1.9.2"}
  
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -92,15 +93,29 @@ def settings() {
                 input "snoozeSwitch", "capability.switch", title: "Which switch controls snoozing periodic notifications?", required: false
         	}      
         }
-
-        section("Notification Type"){
-            input("recipients", "contact", title: "Send notifications to") {
-                input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]		
-                input "phone", "phone", title: "Phone Number (only for SMS)", required: false
-                paragraph "If outside the US please make sure to enter the proper country code"
-            }
-    	}
         
+        section("Notifications", hidden: false, hideable: true) {
+            def SMSContactsSendSMS = []
+
+            if (location.contactBookEnabled ==  true) {
+                input("recipients", "contact", title: "Send notifications to")
+            } 
+            else {
+                input "wantsPush", "bool", title: "Send Push Notification? (pushes to all this location's users)", required: false
+                paragraph "Select Contacts to send SMS Notifications:"
+
+                def mapSize = parent.settings["SMSContacts"].split(';').size()
+                for (int i = 0; i < mapSize; i++) {
+                    def contactInput = "contact-" + "${i}"
+                    def contactName = parent.settings[contactInput]                   
+                    input "phone-${i}", "bool", title: "${contactName}", required: false, submitOnChange: true
+                    def contactValue = "phone-" + "${i}"
+                    SMSContactsSendSMS += settings[contactValue]         
+                }
+                state.SMSContactsMap = SMSContactsSendSMS
+            }
+        } 
+
         section() {
             label title: "Assign a name", required: true
         }
@@ -449,35 +464,47 @@ private offset(value) {
 }
 
 private timeIntervalLabel() {
-	def result = ""
-	if (startingX == "Sunrise" && endingX == "Sunrise") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
-	else if (startingX == "Sunrise" && endingX == "Sunset") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-	else if (startingX == "Sunset" && endingX == "Sunrise") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
-	else if (startingX == "Sunset" && endingX == "Sunset") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-	else if (startingX == "Sunrise" && ending) result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")
-	else if (startingX == "Sunset" && ending) result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")
-	else if (starting && endingX == "Sunrise") result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)
-	else if (starting && endingX == "Sunset") result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)
-	else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
+    def result = ""
+    if (startingX == "Sunrise" && endingX == "Sunrise") {result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunrise" + offset(endSunriseOffset)}
+    else if (startingX == "Sunrise" && endingX == "Sunset") {result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunset" + offset(endSunsetOffset)}
+    else if (startingX == "Sunset" && endingX == "Sunrise") {result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)}
+    else if (startingX == "Sunset" && endingX == "Sunset") {result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)}
+    else if (startingX == "Sunrise" && ending) {result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")}
+    else if (startingX == "Sunset" && ending) {result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")}
+    else if (starting && endingX == "Sunrise") {result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)}
+    else if (starting && endingX == "Sunset") {result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)}
+    else if (starting && ending) {result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")}
 }
 
 private sendMessage(msg) {
     if (useTimeStamp) {
-    	def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
+        def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
         msg = msg + " (" + stamp + ")"
     }
+
+    //First try to use Contact Book (Depricated 30July2018)
     if (location.contactBookEnabled) {
-		sendNotificationToContacts(msg, recipients)
-	} else {
-		Map options = [:]
-        if (phone) {
-			options.phone = phone
-			log.debug 'sending SMS'
-		} else if (pushAndPhone == 'Yes') {
-        	options.method = 'both'
-            options.phone = phone
-        } else options.method = 'push'
-		sendNotification(msg, options)
-	}
-    if (parent.loggingOn) log.debug "sent message: ${msg}"
+        if (loggingOn) log.debug("sending '$msg' notification to: ${recipients?.size()}")
+        sendNotificationToContacts(msg, recipients)
+    }
+
+    //Otherwise use old school Push/SMS notifcations
+    else {
+        if (loggingOn) log.debug("sending message to app notifications tab: '$msg'")
+        sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
+        if (wantsPush) {
+            sendPushMessage(msg)  //Second, send the push notification if user wanted it
+            if (loggingOn) log.debug("sending push message")
+        }
+
+        if (state.SMSContactsMap != null) {  //Third, send SMS messages if desired
+            def SMSContactsSplit = parent.settings["SMSContacts"].split(';')
+            for (int i = 0; i < state.SMSContactsMap.size(); i++) {
+                if (state.SMSContactsMap[i]) {
+                    if (parent.loggingOn) log.debug "Sending SMS to ${SMSContactsSplit[i]}"
+                    sendSmsMessage(SMSContactsSplit[i], msg)
+                }
+            }
+        }
+    }
 }
