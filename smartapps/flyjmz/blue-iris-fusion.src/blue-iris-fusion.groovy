@@ -71,6 +71,7 @@ Version 3.1 - 5Mar18        Added handling for "cameradevice.moveToPreset" comma
 Version 3.2 - 17Apr18       Hopefully fixed external profile switch error
 Version 3.2.1 - 18Apr18     Cleaned up some of the logs, fixed the external command lock code (1 & 2 are opposite in external vs local commands)
 Version 3.2.2 - 6Jul2018    Updated notes after comfirming v3.2.1's fixes worked & did some logging cleanup. Updated language in preferences.  Custom polling code redone to be more robust. Added Periodic notifications for server offline.
+Version 3.2.3 - 23Jul2018  	Updated Nofications to support SmartThings' depricating the Contact Book feature (which was a dumb move on their part).
 
 TODO:
 - getting "error physicalgraph.app.exception.smartAppException: Method Not Allowed" 3-5 times in log 5-10 seconds after mode switches to away
@@ -87,7 +88,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.2.2"}
+def appVersion() {"3.2.3"}
 
 mappings {
     path("/active/:camera") {
@@ -134,16 +135,17 @@ def BIFusionSetup() {
         }
         section("Notification Delivery Settings", hidden: false, hideable: true) {
             input("recipients", "contact", title: "Send notifications to") {
-                input "pushAndPhone", "enum", title: "Also send SMS? (optional, it will always send push)", required: false, options: ["Yes", "No"]      
-                input "phone", "phone", title: "Phone Number (only for SMS)", required: false
-                paragraph "If outside the US please make sure to enter the proper country code"
+                input "wantsPush", "bool", title: "Send Push Notification? (pushes to all this location's users)", required: false
+                paragraph "If you want SMS Notifications, enter phone numbers including the country code (1 for USA), otherwise leave blank. Separate multiple numbers with a semi-colon (;). Only enter the numbers, no spaces or special characters."
+                input "phoneNumbers", "string", title: "Enter Phone Numbers for SMS Notifications:", required: false
             }
-            input "updateAlertsOff", "bool", title: "Disable software update alerts?", required:false
         }
-        section("Debug", hidden: true, hideable: true){
+        section("Advanced", hidden: true, hideable: true){
             paragraph "You can turn on debug logging, viewed in Live Logging on the API website."
             def loggingOn = false
             input "loggingOn", "bool", title: "Debug Logging On?"
+            paragraph "New software version notifications are sent automatically, but can be disabled."
+            input "updateAlertsOff", "bool", title: "Disable software update alerts?", required:false
         }
     }
 }
@@ -1043,20 +1045,31 @@ def checkUpdates(name, installedVersion, website) {
 }
 
 private send(msg) {  
+	//First try to use Contact Book (Depricated 30July2018)
     if (location.contactBookEnabled) {
-        if (loggingOn) log.debug("sending notifications to: ${recipients?.size()}")
+        if (loggingOn) log.debug("sending '$msg' notification to: ${recipients?.size()}")
         sendNotificationToContacts(msg, recipients)
     }
+    //Otherwise use old school Push/SMS notifcations
     else {
-        Map options = [:]
-        if (phone) {
-            options.phone = phone
-            if (loggingOn) log.debug 'sending SMS'
-        } else if (pushAndPhone == 'Yes') {
-            options.method = 'both'
-            options.phone = phone
-        } else options.method = 'push'
-        sendNotification(msg, options)
+        if (loggingOn) log.debug("sending message to app notications tab: '$msg'")
+        sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
+        if (wantsPush) {
+            sendPushMessage(msg)  //Second, send the push notification if user wanted it
+            if (loggingOn) log.debug("sending push message")
+        }
+
+        if (phoneNumbers) {	//Third, send SMS messages if desired
+            if (phoneNumbers.indexOf(";") > 1) {	//Code block for multiple phone numbers
+                def phones = phoneNumbers.split(";")
+                for (int i = 0; i < phones.size(); i++) {
+                    if (loggingOn) log.debug("sending SMS to ${phones[i]}")
+                    sendSmsMessage(phones[i], msg)
+                }
+            } else {	//Code block for single phone number
+                if (loggingOn) log.debug("sending SMS to ${phoneNumbers}")
+                sendSmsMessage(phoneNumbers, msg)
+            }
+        }
     }
-    if (loggingOn) log.debug msg
 }
