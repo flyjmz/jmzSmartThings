@@ -24,11 +24,12 @@ Version History:
     1.6 - 17Apr2018, added door knock detection.  Added power metering per @ErnieG request
     1.6.1 - 20Apr2018, fixed power metering.
     1.6.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
+    1.6.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
 
 To Do:
 */
 
-def appVersion() {"1.6.2"}
+def appVersion() {"1.6.3"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -92,17 +93,19 @@ def settings() {
             } 
             else { 
                 input "wantsPush", "bool", title: "Send Push Notification? (pushes to all this location's users)", required: false
-                paragraph "Select Contacts to send SMS Notifications:"
+                if (parent.settings["SMSContacts"] != null) {
+                    paragraph "Select Contacts to send SMS Notifications:"
 
-                def mapSize = parent.settings["SMSContacts"].split(';').size()
-                for (int i = 0; i < mapSize; i++) {
-                    def contactInput = "contact-" + "${i}"
-                    def contactName = parent.settings[contactInput]                   
-                    input "phone-${i}", "bool", title: "${contactName}", required: false, submitOnChange: true
-                    def contactValue = "phone-" + "${i}"
-                    SMSContactsSendSMS += settings[contactValue]         
+                    def mapSize = parent.settings["SMSContacts"].split(';').size()
+                    for (int i = 0; i < mapSize; i++) {
+                        def contactInput = "contact-" + "${i}"
+                        def contactName = parent.settings[contactInput]                   
+                        input "phone-${i}", "bool", title: "${contactName}", required: false, submitOnChange: true
+                        def contactValue = "phone-" + "${i}"
+                        SMSContactsSendSMS += settings[contactValue]         
+                    }
+                    state.SMSContactsMap = SMSContactsSendSMS
                 }
-                state.SMSContactsMap = SMSContactsSendSMS
             }
         }
 
