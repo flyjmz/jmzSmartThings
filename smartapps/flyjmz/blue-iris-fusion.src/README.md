@@ -39,10 +39,10 @@ Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) 
     * Name: jmzSmartThings
     * Branch: master
 2.	You need to add two smartapps and two Device Type Handlers (DTH): 
-    1. [BI Fusion SmartApp](https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src)  *(Publish this one)*
-    2. [BI Fusion – Trigger SmartApp] (https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src) *(Do not publish this one, it only needs to be installed in the IDE)*
-    3. [Blue Iris Server DTH](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src) *(Publish this one)*
-    4. [Blue Iris Camera DTH](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-camera.src) *(Publish this one)*
+    1. [BI Fusion SmartApp](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/blue-iris-fusion.src/blue-iris-fusion.groovy)  *(Publish this one)*
+    2. [BI Fusion – Trigger SmartApp](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/blue-iris-fusion-trigger.src/blue-iris-fusion-trigger.groovy) *(Do not publish this one, it only needs to be installed in the IDE)*
+    3. [Blue Iris Server DTH](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/devicetypes/flyjmz/blue-iris-server.src/blue-iris-server.groovy) *(Publish this one)*
+    4. [Blue Iris Camera DTH](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/devicetypes/flyjmz/blue-iris-camera.src/blue-iris-camera.groovy) *(Publish this one)*
 
 **Make sure you enable OAuth for the "BI Fusion" smartapp** (Once you've created the new app in your API, find it in the Smart Apps list and click "Edit Properties." Then scroll down to OAuth and enable it.)
 
@@ -58,21 +58,19 @@ Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) 
 
 ***NOTE*** 
 *While this is a reduced security setting in Blue Iris, it is only being used when using a local only connection (i.e. computer and hub are on the same network that is secured from intrusion).  So as long as you've taken reasonable steps to secure your home network, this is not reducing security.  If you are using the external options for setup (i.e. the computer and hub are not on the same network), then you don't need to do this step and can leave it with the higher security setting.  (Local and external use different protocols to communicate between computer and hub, and require different settings to work).*
-
-* If you want to use the BI Fusion Triggers to have ST trigger BI camera recording, and use the Blue Iris Camera DTH (which I recommend), you need to complete the initial setup through BI Fusion settings once first.  Click 'done' through the pages, then reenter BI Fusion settings and set up the Triggers (because that first iteration of settings creates the devices, so if you didn't close out once first, they wouldn't be created and available for selection).
+    * If you want to use the BI Fusion Triggers to have ST trigger BI camera recording, and use the Blue Iris Camera DTH (which I recommend), you need to complete the initial setup through BI Fusion settings once first.  Click 'done' through the pages, then reenter BI Fusion settings and set up the Triggers (because that first iteration of settings creates the devices, so if you didn't close out once first, they wouldn't be created and available for selection).
 5.	If you’re installing camera devices and want motion triggers, you’ll have to use the access token found during setup and enter it in Blue Iris for each camera.  I’m trying to make this better, but for now we have to use OAuth.  One improvement I made is the ability to “View Only” the access token URLs, so that they don’t change every time you open BI Fusion’s settings.  You can also choose to have the URLs displayed in the API's Live Logging tab so you can copy & paste into Blue Iris too!
-* From the BI Fusion Settings, first generate new tokens and continue with the other settings.  We’ll set up Blue Iris in bit.
+    * From the BI Fusion Settings, first generate new tokens and continue with the other settings.  We’ll set up Blue Iris in bit.
 6.	Once done entering settings, click “done” until exited out of settings, go to the Blue Iris Server device on your phone, and tap the refresh button to have it do it’s first update.
-
 7.	Now we can set up Motion Alerts in Blue Iris.
-* Go to Blue Iris and open Camera Properties for your first camera.
-* Follow the directions in these screenshots and enter the URLs from the BI Fusion Setting Screenshot you took or from the debug logs earlier:
+    * Go to Blue Iris and open Camera Properties for your first camera.
+    * Follow the directions in these screenshots and enter the URLs from the BI Fusion Setting Screenshot you took or from the debug logs earlier:
 ![Blue Iris Alert Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/bialertsettings.jpg)
 
 ![Blue Iris Alert Settings Detail](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIalertsettingsdetail.jpg)
-* Make sure you enter the URL correctly, not including the “https://” but selecting it from the dropdown menu.
-* Replace “cameraShortNameHere” with your camera’s short name
-* The only difference between the active and inactive URLs is the “in” for “inactive,” so once you type the URL in for the first camera, you can just copy and paste for the rest of the cameras, ensuring the short name is correct for each camera and you use active and inactive for “when triggered” and “Request again when trigger is reset”
+    * Make sure you enter the URL correctly, not including the “https://” but selecting it from the dropdown menu.
+    * Replace “cameraShortNameHere” with your camera’s short name
+    * The only difference between the active and inactive URLs is the “in” for “inactive,” so once you type the URL in for the first camera, you can just copy and paste for the rest of the cameras, ensuring the short name is correct for each camera and you use active and inactive for “when triggered” and “Request again when trigger is reset”
 8.	You’re set!  Just remember, **don’t change any settings from within the device settings themselves**, make required updates within BI Fusion’s settings.
 
 **If you want to learn more:**
@@ -81,8 +79,7 @@ These are old threads if you want to see the comments, but all the funcitonality
 
 [The v1.0 beta of the Blue Iris Device Handler Thread is here.](https://community.smartthings.com/t/release-blue-iris-device-handler/101765)
 
-**FAQ:**
--
+## FAQ
 **What settings are important in Blue Iris?**
 Go to Blue Iris Options, the Web server tab, click Advanced, and make sure "Use Secure Session Keys and Login Page" is unchecked. This enables the login to work, but also uses a less secure method of login. If you are using it LAN only and do not port-forward or otherwise expose your Blue Iris server to the Internet, then there is no need to worry. If you do have it set up for external logins (i.e. to log into the BI server when you’re away), then please make sure you have secured that connection in another way. I recommend two different options:
 1.	VPN. You can set up a VPN server on your computer, a network device like a Synology server, or on your router using [DD-WRT firmware](http://www.dd-wrt.com/) (which is a relatively simple and doesn’t cost anything if you have a good router already). The VPN will take care of all the security, it’s as if you don’t expose it to the internet but you can still reach the server! I have a not-yet-ready-for-publishing How-To.
@@ -95,19 +92,11 @@ With BI Fusion v3.0+, using the Blue Iris Server DTH is the best option, but if 
 
 I can think of few situations that WAN would be a better fit, primarily if you have your SmartThings hub on a different network than your Blue Iris computer. I would imagine most people would use LAN.
 
-**Updates are made regularly and uploaded to Github!**
-
-Current Versions:
-* Blue Iris Fusion v3.2.2
-* Blue Iris Fusion - Trigger v3.2.2
-* Blue Iris Sever DTH v2.9
-* Blue Iris Camera DTH v1.4
-
-Current Version Changes:
+## Current Version Changes:
 * Custom Polling improved
 * Added ability for triggers to move PTZ cameras to a preset, and then move them back (if desired)
                             
-History:
+Older Major Changes:
 * Added triggers for door knocking and mode changes
 * Added ability to set your own icon for the Server and Camera Devices
 * Expanded error checking to lock status (hold/temporary profile change mode)
