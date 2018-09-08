@@ -34,19 +34,17 @@ Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) 
     * Example: Front door contact opening triggers the Porch Camera Device's switch 'on' to ensure the event is recorded.  Separately, you can have SHM monitor the Porch Camera DTH's motion and alert you when it is active.
 
 ## Install Instructions
--
 1.	In the SmartThings API, Create a new Smartapp. Either from code and copy the code from the links below, or add my Github repository to your Github Integration settings:
-Owner: flyjmz
-Name: jmzSmartThings
-Branch: master
-
+* Owner: flyjmz
+* Name: jmzSmartThings
+* Branch: master
 2.	You need to add two smartapps and two device type handlers: 
 * SmartApps:
-BI Fusion: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src  *(Publish this one)*
-BI Fusion – Trigger: https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src *(Do not publish this one, it only needs to be installed in the IDE)*
+[BI Fusion](https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src)  *(Publish this one)*
+[BI Fusion – Trigger] (https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src) *(Do not publish this one, it only needs to be installed in the IDE)*
 * Device Type Handlers:
-Blue Iris Server: https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src *(Publish this one)*
-Blue Iris Camera: https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-camera.src *(Publish this one)*
+[Blue Iris Server](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src) *(Publish this one)*
+[Blue Iris Camera](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-camera.src) *(Publish this one)*
 
 * **Make sure you enable OAuth for the "BI Fusion" smartapp** (Once you've created the new app in your API, find it in the Smart Apps list and click "Edit Properties." Then scroll down to OAuth and enable it.)
 3.	One you’ve added them in the API, open the SmartThings app on your phone, add an automation, and add the “Blue Iris Fusion” app under the “My Apps” category. Only install the “Blue Iris Fusion” app, do not install the “Blue Iris Fusion - Trigger” app (it will install itself).
