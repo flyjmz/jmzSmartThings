@@ -6,7 +6,7 @@
 
 ## BI Fusion
 * SmartThings Community Thread
-* [HTTPS/SSL/STUNNEL How-To for securing Blue Iris external (WAN) connections] (https://github.com/flyjmz/jmzSmartThings/blob/master/smartapps/flyjmz/blue-iris-fusion.src/HTTPS:SSL:STUNNEL%20How-To.md)
+* [HTTPS/SSL/STUNNEL How-To for securing Blue Iris external (WAN) connections](https://github.com/flyjmz/jmzSmartThings/blob/master/smartapps/flyjmz/blue-iris-fusion.src/HTTPS:SSL:STUNNEL%20How-To.md)
 * (upcoming) VPN How-To for securing Home Network & Blue Iris external (WAN) connections
 
 ## Super Notifier
