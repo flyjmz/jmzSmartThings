@@ -8,19 +8,15 @@
 **SSL Certificate Generation**
 
 1. Setup your host on [no-ip.com](http://no-ip.com/). (Or other services)
-1. Create an account, and sign up for the "No-IP Plus" service level (enhanced might work), no need for registering a domain name unless you want your own, just use one of their included domains (e.g. [mydomain.ddns.net](http://mydomain.ddns.net/)).
-2. Set up your hostname: Host Type - "DNS Host (A)", IP address will auto populate, Assign Group – No Group, Enable Wildcard off.
+  1. Create an account, and sign up for the "No-IP Plus" service level (enhanced might work), no need for registering a domain name unless you want your own, just use one of their included domains (e.g. [mydomain.ddns.net](http://mydomain.ddns.net/)).
+  2. Set up your hostname: Host Type - "DNS Host (A)", IP address will auto populate, Assign Group – No Group, Enable Wildcard off.
 2. Go to:[zerossl.com ](http://zerossl.com/) > click on Online Tools > Click on Start for the Free SSL Certificate Wizard
 3. Enter Email Address, check DNS Verification box, check both terms of service boxes to agree
 4. For New setups:
-
-a) In "Domains...", type in your domain name (e.g. [mydomain.com](http://mydomain.com/) or [mydomain.ddns.net](http://mydomain.ddns.net/)).
-
-b) Leave the "Paste your Let's Encrypt Key..." and "Paste your CSR..." fields blank.
-
-c) It'll ask if you want to include the www version (if yes, you'll get it for [www.mydomain.ddns.net](http://www.mydomain.ddns.net/) as well). Click next.
-
-d) It'll generate the domain-csr.txt file, then generate the Key (account-key.txt). Be sure to save both files and put in a secure location.
+  a) In "Domains...", type in your domain name (e.g. [mydomain.com](http://mydomain.com/) or [mydomain.ddns.net](http://mydomain.ddns.net/)).
+  b) Leave the "Paste your Let's Encrypt Key..." and "Paste your CSR..." fields blank.
+  c) It'll ask if you want to include the www version (if yes, you'll get it for [www.mydomain.ddns.net](http://www.mydomain.ddns.net/) as well). Click next.
+  d) It'll generate the domain-csr.txt file, then generate the Key (account-key.txt). Be sure to save both files and put in a secure location.
 
 e) Then it'll take to you the verification step, use the DNS verification (not http, which has you put specific stuff on your server, which you can't do in blue iris).
 
@@ -50,11 +46,11 @@ e) As long as it wasn't expired (so create a reminder somewhere to renew this be
 
 a) Edit the stunnel.conf file to read:
 
-'[Blue-Iris]'
-'accept = xxx.xxx.xxx.xxx:xxxx'
-'connect = xxx.xxx.xxx.xxx:xxxx'
-'cert = blueiris.pem'
-'TIMEOUTclose = 0'
+'[Blue-Iris]
+accept = xxx.xxx.xxx.xxx:xxxx
+connect = xxx.xxx.xxx.xxx:xxxx
+cert = blueiris.pem
+TIMEOUTclose = 0'
 
 b) Save stunnel.conf and close it. Save a backup copy to a safe place.
 
