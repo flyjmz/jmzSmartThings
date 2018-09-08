@@ -28,29 +28,28 @@
     3. In "Paste your CSR...", copy in your "domain-csr.txt" file contents you created the first time you set it up.
     4. Click Next.
     5. As long as it wasn't expired (so create a reminder somewhere to renew this before it expires each time), it'll take you straight to a new certificate (domain-crt.txt). Download, save a copy in a safe place.
-6. Configure Stunnel, first stop the stunnel service and make sure the GUI is closed.
-7. For new setups:
-    1. Edit the stunnel.conf file to read:
+
+**Configure Stunnel**
+(Stop the stunnel service and make sure the GUI is closed before making changes.)
+*For new setups:*
+1. Edit the stunnel.conf file to read:
 ```
 [Blue-Iris]
-
 accept = xxx.xxx.xxx.xxx:xxxx
-
 connect = xxx.xxx.xxx.xxx:xxxx
-
 cert = blueiris.pem
-
 TIMEOUTclose = 0
 ```
-    2. Save stunnel.conf and close it. Save a backup copy to a safe place.
-    3. Create a new .txt file and call it "blueiris.pem" this is your new certificate file to replace the default stunnel.pem.
-    4. Open the blueiris.pem file you just created and paste the contents of domain-key.txt into it. After the domain-key.txt contents, paste the contents of domain-crt.txt and save the file. Save a backup copy to a safe place.
-8. For Renewals:
-    1. Open the blueiris.pem file and delete the old certificate (so everything after "-----END PRIVATE KEY-----")
-    2. Paste the new certificate to the end (all of the new domain-crt.txt you just downloaded)
-    3. Save the file and close it. Save a backup copy to a safe place.
-9. Start the Stunnel service, then open the Stunnel GUI and reload configuration. Test it out!
-    1. There are several stunnel links in start menu, if you choose to run as a service it'll just open a service and not have a GUI or anything running.  You can go to Windows Processes and find the stunnel service and make it auto-start on computer boot so that even after restarts you don't ever have to start stunnel again.
+2. Save stunnel.conf and close it. Save a backup copy to a safe place.
+3. Create a new .txt file and call it "blueiris.pem" this is your new certificate file to replace the default stunnel.pem.
+4. Open the blueiris.pem file you just created and paste the contents of domain-key.txt into it. After the domain-key.txt contents, paste the contents of domain-crt.txt and save the file. Save a backup copy to a safe place.
+
+*For Renewals:*
+1. Open the blueiris.pem file and delete the old certificate (so everything after "-----END PRIVATE KEY-----")
+2. Paste the new certificate to the end (all of the new domain-crt.txt you just downloaded)
+3. Save the file and close it. Save a backup copy to a safe place.
+4. Start the Stunnel service, then open the Stunnel GUI and reload configuration. Test it out!
+    - There are several stunnel links in start menu, if you choose to run as a service it'll just open a service and not have a GUI or anything running.  You can go to Windows Processes and find the stunnel service and make it auto-start on computer boot so that even after restarts you don't ever have to start stunnel again.
 
 **Blue Iris HTTPS Setup**
 
