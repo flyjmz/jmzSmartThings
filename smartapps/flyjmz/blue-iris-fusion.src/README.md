@@ -5,15 +5,6 @@
 * [HTTPS/SSL/STUNNEL How-To for securing Blue Iris external (WAN) connections](https://github.com/flyjmz/jmzSmartThings/blob/master/smartapps/flyjmz/blue-iris-fusion.src/HTTPS:SSL:STUNNEL%20How-To.md)
 * (upcoming) VPN How-To for securing Home Network & Blue Iris external (WAN) connections
 
-
-**Blue Iris Users, this is what we’ve wanted!  BI Fusion now includes:**
-* Simplified setup – Only enter your password, IP, etc. ONCE!  OAuth tokens only change when you want them too, and they can be found in multiple places to enable copy & paste!
-* All the smartapp functions in one smartapp: SmartThings events trigger Blue Iris recording, SmartThings modes control Blue Iris profiles, PTZ to presets (and back) based on SmartThings events.
-* Blue Iris Server Device – You can manually control Blue Iris mode’s and traffic light from SmartThings, monitor online/offline status, get alerts.
-* Local LAN connection status updates and error notifications – no more need to use port forwarding, etc.  But still works with external connections as before.
-* Blue Iris Camera Devices – Act like switches so other automations can manually trigger recording, and like motion sensors so other automations (like SHM or [Super Notifier](https://community.smartthings.com/t/release-super-notifier-all-your-alerts-in-one-place/59707)) can react and alert you to motion sensed by your BI cameras.  Plus you can manually trigger recording from the device’s page in the app.
-* Works with webCoRE so you can create your own automations
-
 **Blue Iris Server Device Type:**
 
 ![Blue Iris Server Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIServerDevice.png)
@@ -22,6 +13,13 @@
 
 ![Blue Iris Camera Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BICameraDevice.jpeg)
 
+## BI Fusion Features
+* Simplified setup – Only enter your password, IP, etc. ONCE!  OAuth tokens only change when you want them too, and they can be found in multiple places to enable copy & paste!
+* All the smartapp functions in one smartapp: SmartThings events trigger Blue Iris recording, SmartThings modes control Blue Iris profiles, PTZ to presets (and back) based on SmartThings events.
+* Blue Iris Server Device – You can manually control Blue Iris mode’s and traffic light from SmartThings, monitor online/offline status, get alerts.
+* Local LAN connection status updates and error notifications – no more need to use port forwarding, etc.  But still works with external connections as before.
+* Blue Iris Camera Devices – Act like switches so other automations can manually trigger recording, and like motion sensors so other automations (like SHM or [Super Notifier](https://community.smartthings.com/t/release-super-notifier-all-your-alerts-in-one-place/59707)) can react and alert you to motion sensed by your BI cameras.  Plus you can manually trigger recording from the device’s page in the app.
+* Works with webCoRE so you can create your own automations
 * Limited live stream capability - only work when your phone is on the same LAN as your Blue Iris computer, and is limited by SmartThings' live stream capabilities.  No image capture due to the way BI Fusion builds all the capabilities into one set of smartapps and DTHs.  I strongly encourage you to use the [Blue Iris Mobile apps](http://blueirissoftware.com/mobile/) for video and image viewing. It has all the capabilities now and works better than non-SmartThings-branded video will ever work within SmartThings.
 
 **Plus BI Fusion still does (and now does better):**
@@ -29,23 +27,16 @@
 * BI Triggers – Triggers BI camera’s to record based on motion/contact sensors/etc.  This can now be done from other smartapps as well through the Blue Iris Camera DTH.
 * WAN/External connection control if you need it.
 
-**This is a major update, hence the new thread.  v3.0 will install non-destructively over your existing BI Fusion smartapp with 2 caveats:**
-1)	The notifications for BI Triggers changes, so please review your settings
-2)	If you installed the Blue Iris Server DTH v1.0, you’ll need to manually uninstall it before installing this version of BI Fusion. I tried to prevent this, and you may get away with not needing to, but you could end up with 2 Server Devices fighting each other if not.  Don’t worry though, BI Fusion will install a new one and you won’t have to repeat your settings if you had a previous BI Fusion install.
-
 **If you’re unfamiliar with Blue Iris (BI):**
 Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) program that works with virtually every IP camera out there, creating a web server that manages them all and monitors them for motion, triggering recording. [http://blueirissoftware.com/](http://blueirissoftware.com/) Big shout out to Ken, the program is great and his support is outstanding.
-
-**Updates for the future:**
-* Motion alerts via LAN instead of using OAuth – This will make the setup simpler and you won’t have to worry about expired tokens.  Next on my list.
 
 **Clarification of the Camera DTH's Intent & Purpose:**
 * The Camera Device can be selected as a switch to turn 'on' from other smartapps, this triggers the Blue Iris Camera to start recording for the preset length you setup in Blue Iris.
 * The Camera Device can also be selected as a Motion Sensor, which becomes active/inactive based on the Blue Iris motion sensing settings you set up in Blue Iris.
 * You don't want to have your Camera Device's motion sensing trigger the Camera Device's switch to enable recording, because you'll create an endless loop of recording...  Treat the two function separately.  
-  * Example: Front door contact opening triggers the Porch Camera Device's switch 'on' to ensure the event is recorded.  Separately, you can have SHM monitor the Porch Camera DTH's motion and alert you when it is active.
+    * Example: Front door contact opening triggers the Porch Camera Device's switch 'on' to ensure the event is recorded.  Separately, you can have SHM monitor the Porch Camera DTH's motion and alert you when it is active.
 
-**How to Install:**
+## Install Instructions
 -
 1.	In the SmartThings API, Create a new Smartapp. Either from code and copy the code from the links below, or add my Github repository to your Github Integration settings:
 Owner: flyjmz
