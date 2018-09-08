@@ -1,14 +1,12 @@
-# BI Fusion README
+# BI Fusion Features & Installation Instructions
 [![Donate Button](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/donateButton.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6T44ZPUKCMYL6&lc=US&item_name=FLYJMZ%20Custom%20SmartApps&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted)
+
+![Blue Iris Server Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIServerDevice.png)
+![Blue Iris Camera Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BICameraDevice.jpeg)
 
 * [SmartThings Community Thread](https://community.smartthings.com/t/release-bi-fusion-v3-0-adds-blue-iris-device-type-handler-blue-iris-camera-dth-motion-sensing/103032)
 * [HTTPS/SSL/STUNNEL How-To for securing Blue Iris external (WAN) connections](https://github.com/flyjmz/jmzSmartThings/blob/master/smartapps/flyjmz/blue-iris-fusion.src/HTTPS:SSL:STUNNEL%20How-To.md)
 * (upcoming) VPN How-To for securing Home Network & Blue Iris external (WAN) connections
-
-**Server & Camera Device Pages**
-
-![Blue Iris Server Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIServerDevice.png)
-![Blue Iris Camera Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BICameraDevice.jpeg)
 
 ## BI Fusion Features
 * Simplified setup – Only enter your password, IP, etc. ONCE!  OAuth tokens only change when you want them too, and they can be found in multiple places to enable copy & paste!
@@ -77,6 +75,7 @@ Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) 
 
 **If you want to learn more:**
 These are old threads if you want to see the comments, but all the funcitonality has been incorporated and improved in this new app.
+
 [The old BI Fusion Thread is here if you want to look over other’s comments](https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226).
 
 [The v1.0 beta of the Blue Iris Device Handler Thread is here.](https://community.smartthings.com/t/release-blue-iris-device-handler/101765)
