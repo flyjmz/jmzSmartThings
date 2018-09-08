@@ -65,14 +65,14 @@ Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) 
 6.	Once done entering settings, click “done” until exited out of settings, go to the Blue Iris Server device on your phone, and tap the refresh button to have it do it’s first update.
 7.	Now we can set up Motion Alerts in Blue Iris.
     * Go to Blue Iris and open Camera Properties for your first camera.
-    * Follow the directions in these screenshots and enter the URLs from the BI Fusion Setting Screenshot you took or from the debug logs earlier:
-![Blue Iris Alert Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/bialertsettings.jpg)
-
-![Blue Iris Alert Settings Detail](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIalertsettingsdetail.jpg)
-*
+    * Follow the directions in these screenshots below and enter the URLs from the BI Fusion Setting Screenshot you took or from the debug logs earlier
     * Make sure you enter the URL correctly, not including the “https://” but selecting it from the dropdown menu.
     * Replace “cameraShortNameHere” with your camera’s short name
     * The only difference between the active and inactive URLs is the “in” for “inactive,” so once you type the URL in for the first camera, you can just copy and paste for the rest of the cameras, ensuring the short name is correct for each camera and you use active and inactive for “when triggered” and “Request again when trigger is reset”
+![Blue Iris Alert Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/bialertsettings.jpg)
+
+![Blue Iris Alert Settings Detail](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIalertsettingsdetail.jpg)
+
 8.	You’re set!  Just remember, **don’t change any settings from within the device settings themselves**, make required updates within BI Fusion’s settings.
 
 **If you want to learn more:**
@@ -94,11 +94,13 @@ With BI Fusion v3.0+, using the Blue Iris Server DTH is the best option, but if 
 
 I can think of few situations that WAN would be a better fit, primarily if you have your SmartThings hub on a different network than your Blue Iris computer. I would imagine most people would use LAN.
 
-## Current Version Changes:
-* Custom Polling improved
-* Added ability for triggers to move PTZ cameras to a preset, and then move them back (if desired)
+## Version Changes:
+Current Versions Changes:
+* Expanded Push and SMS notifications after SmartThings' contact book feature removal
+* Added ability to add multiple phone numbers for SMS messages (just separate numbers with a semicolon ';')
                             
 Older Major Changes:
+* Added ability for triggers to move PTZ cameras to a preset, and then move them back (if desired)
 * Added triggers for door knocking and mode changes
 * Added ability to set your own icon for the Server and Camera Devices
 * Expanded error checking to lock status (hold/temporary profile change mode)
