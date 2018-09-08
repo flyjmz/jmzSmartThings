@@ -8,8 +8,8 @@
 **SSL Certificate Generation**
 
 1. Setup your host on [no-ip.com](http://no-ip.com/). (Or other services)
-  1. Create an account, and sign up for the "No-IP Plus" service level (enhanced might work), no need for registering a domain name unless you want your own, just use one of their included domains (e.g. [mydomain.ddns.net](http://mydomain.ddns.net/)).
-  2. Set up your hostname: Host Type - "DNS Host (A)", IP address will auto populate, Assign Group – No Group, Enable Wildcard off.
+   1. Create an account, and sign up for the "No-IP Plus" service level (enhanced might work), no need for registering a domain name unless you want your own, just use one of their included domains (e.g. [mydomain.ddns.net](http://mydomain.ddns.net/)).
+   2. Set up your hostname: Host Type - "DNS Host (A)", IP address will auto populate, Assign Group – No Group, Enable Wildcard off.
 2. Go to:[zerossl.com ](http://zerossl.com/) > click on Online Tools > Click on Start for the Free SSL Certificate Wizard
 3. Enter Email Address, check DNS Verification box, check both terms of service boxes to agree
 4. For New setups:
