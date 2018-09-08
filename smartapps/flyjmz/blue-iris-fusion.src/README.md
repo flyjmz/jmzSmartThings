@@ -5,7 +5,8 @@
 * [HTTPS/SSL/STUNNEL How-To for securing Blue Iris external (WAN) connections](https://github.com/flyjmz/jmzSmartThings/blob/master/smartapps/flyjmz/blue-iris-fusion.src/HTTPS:SSL:STUNNEL%20How-To.md)
 * (upcoming) VPN How-To for securing Home Network & Blue Iris external (WAN) connections
 
-**Blue Iris Server Device Type:** **Blue Iris Camera Device Type:**
+**Server & Camera Device Pages**
+
 ![Blue Iris Server Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIServerDevice.png)
 ![Blue Iris Camera Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BICameraDevice.jpeg)
 
