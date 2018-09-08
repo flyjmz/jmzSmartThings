@@ -1,4 +1,5 @@
-# **HTTPS/SSL/STUNNEL How-To**
+# HTTPS/SSL/STUNNEL How-To
+*Current As of 8 Sep 2018*
 
 ### Port Forwarding & DDNS
 1. Set up Port Forwarding on you router's settings.  Refer to your router's manual, and use the IP address of your Blue Iris Server Computer and choose a port (not on of the common ones though, 4 digit ports can help keep you safe from picking a common one).  You'll likely want to set up a IP Reservation for your computer's IP on your server so that when the computer or router restarts it doesn't change the IP.  You could also use a static IP.
@@ -8,7 +9,7 @@
    3. Set up their DDNS program on your router or computer running Blue Iris (this program checks for IP address changes and then updates the DDNS service so it knows your new IP address.  Easiest to just run the DDNS' program on your Blue Iris computer, but most routers can do this too.
 
 ### Stunnel Setup
-*Stunnel is is a program that secures the WAN (internet) side of the connection, and connects it to the LAN (local) side.  You port forward one port, but have Blue Iris on another.  So you are port forwarding Stunnel, which then connects to Blue Iris). For example, you could have Blue Iris’s web server port set to 4000, but for your router’s port forwarding you'd use a different port, like 4002. Stunnel accepts the 4002 from the router and connects you to the 4000 port, which is your BI Server.  So locally you’d connect to 192.168.0.15:4000, but externally it’d be mydomain.ddns.org:4002.
+*Stunnel is is a program that secures the WAN (internet) side of the connection, and connects it to the LAN (local) side.  You port forward one port, but have Blue Iris on another.  So you are port forwarding Stunnel, which then connects to Blue Iris). For example, you could have Blue Iris’s web server port set to 4000, but for your router’s port forwarding you'd use a different port, like 4002. Stunnel accepts the 4002 from the router and connects you to the 4000 port, which is your BI Server.*
 
 1. Download and install [stunnel](https://www.stunnel.org/index.html)
 2. Edit the stunnel.conf file to read:
@@ -21,8 +22,8 @@ TIMEOUTclose = 0
 ```
 2. The 'accept' IP:PORT address is the IP address of the computer running Stunnel (likely the same computer as the one running Blue Iris), and the Port is the one forwarded in your router settings that yoru DDNS service connects through. For example: 192.168.0.15:4002
 3. The 'connect' IP:PORT address is the IP address of the computer running Blue Iris (again, the IP for both may be the same if it's the same computer), and the Port is a different one that you'll set up in Blue Iris. For example: 192.168.0.15:4000
-3. Save stunnel.conf and close it. Save a backup copy to a safe place.
-4. Stunnel can/will create a self-signed certificate for you.  You can use this and skip the SSL Certificate Generation section if you don't plan to use the external mode in BI Fusion.
+3. The 'cert' part is the certificate file used to encrypt your connection.  Stunnel can/will create a self-signed certificate for you and put it in a file called 'stunnel.pem'. You can use this and skip the SSL Certificate Generation section if you don't plan to use the external mode in BI Fusion.  If you do that, then leave the .conf file as is, with 'cert = stunnel.pem' otherwise change it to "cert = blueiris.pem" and complete the SSL Certificate Generation steps below before running stunnel.
+4. Save stunnel.conf and close it. Save a backup copy to a safe place. 
 
 ### Blue Iris HTTPS Setup
 
@@ -47,23 +48,27 @@ TIMEOUTclose = 0
 7. Wait 15-30 minutes (per directions), and click verify. When it's good, it'll take you to your last step.
 8. Download the domain-crt.txt and domain-key.txt files, and save your account ID. Keep all the files in a safe place!
 9. Delete the TXT records from your hostnames on your [no-IP.com](http://no-ip.com/) account.
+10. Create a new .txt file and call it "blueiris.pem" (.pem is the file extension, delete the txt part) this is your new certificate file to replace the default stunnel.pem.
+11. Open the blueiris.pem file you just created and paste the contents of domain-key.txt into it. After the domain-key.txt contents, paste the contents of domain-crt.txt and save the file. Save a backup copy to a safe place.
+12. Put your new blueiris.pem file into the same folder as stunnel.pem, and delete stunnel.pem.
+13. Start the Stunnel service, then open the Stunnel GUI and reload configuration. Test it out!
+    - There are several stunnel links in start menu, if you choose to run as a service it'll just open a service and not have a GUI or anything running.  You can go to Windows Processes and find the stunnel service and make it auto-start on computer boot so that even after restarts you don't ever have to start stunnel again.
 ###### Renewals:
 1. Leave "Domains..." blank
 2. In "Paste your Let's Encrypt Key...", copy the "account-key.txt" file contents so you can skip verification.
 3. In "Paste your CSR...", copy in your "domain-csr.txt" file contents you created the first time you set it up.
 4. Click Next.
 5. As long as it wasn't expired (so create a reminder somewhere to renew this before it expires each time), it'll take you straight to a new certificate (domain-crt.txt). Download, save a copy in a safe place.
-
-### Configure Stunnel
-**(Stop the stunnel service and make sure the GUI is closed before making changes.)**
-###### Initial Setup:
-
-3. Create a new .txt file and call it "blueiris.pem" this is your new certificate file to replace the default stunnel.pem.
-4. Open the blueiris.pem file you just created and paste the contents of domain-key.txt into it. After the domain-key.txt contents, paste the contents of domain-crt.txt and save the file. Save a backup copy to a safe place.
-
-###### Renewals:
-1. Open the blueiris.pem file and delete the old certificate (so everything after "-----END PRIVATE KEY-----")
-2. Paste the new certificate to the end (all of the new domain-crt.txt you just downloaded)
-3. Save the file and close it. Save a backup copy to a safe place.
-4. Start the Stunnel service, then open the Stunnel GUI and reload configuration. Test it out!
+6. Open the blueiris.pem file and delete the old certificate (so everything after "-----END PRIVATE KEY-----")
+7. Paste the new certificate to the end (all of the new domain-crt.txt you just downloaded)
+8. Save the file and close it. Save a backup copy to a safe place.
+9. Start the Stunnel service, then open the Stunnel GUI and reload configuration. Test it out!
     - There are several stunnel links in start menu, if you choose to run as a service it'll just open a service and not have a GUI or anything running.  You can go to Windows Processes and find the stunnel service and make it auto-start on computer boot so that even after restarts you don't ever have to start stunnel again.
+    
+### Computer Interface, Mobile Blue Iris app, and SmartThings Considerations
+* Depending on your connection, either local or external to your home network, you'll use a different address to connect to Blue Iris:
+    * Locally it'd be 192.168.0.15:4000
+    * Externally it’d be mydomain.ddns.org:4002
+* Remember you'll have to include the port in the address as shown above, :80 is assumed if you don't type a port, and it won't work
+* For the iOS/Android app, you'll have to edit the connection, ensuring you have the LAN and WAN addresses entered as shown above with the different ports and addresses.  Also, don't forget to use the dropdown and set http/https as required (https for WAN, for LAN it'd most likely be http unless you set up Blue Iris to use the secure HTTPs for LAN as well, which means you'd also need to use the stunnel port, 4002 in this example, for both).
+* For SmartThings, none of this matters if you use the local connection in BI Fusion (either with or without the server device) and the the computer and your SmartThings hub are on the same network.  You'd just use the local IP and Port.  If they aren't on the same network, or you choose to use the external connection method for some other reason, then you'd use the external address and port, and also must use a real CA SSL certificate. 
