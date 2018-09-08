@@ -15,10 +15,12 @@
 * Works with webCoRE so you can create your own automations
 
 **Blue Iris Server Device Type:**
-[![Blue Iris Server Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIServerDevice.png)]
+
+![Blue Iris Server Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIServerDevice.png)
      
 **Blue Iris Camera Device Type:**
-[![Blue Iris Camera Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BICameraDevice.jpeg)]
+
+![Blue Iris Camera Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BICameraDevice.jpeg)
 
 * Limited live stream capability - only work when your phone is on the same LAN as your Blue Iris computer, and is limited by SmartThings' live stream capabilities.  No image capture due to the way BI Fusion builds all the capabilities into one set of smartapps and DTHs.  I strongly encourage you to use the [Blue Iris Mobile apps](http://blueirissoftware.com/mobile/) for video and image viewing. It has all the capabilities now and works better than non-SmartThings-branded video will ever work within SmartThings.
 
@@ -68,7 +70,7 @@ Blue Iris Camera: https://github.com/flyjmz/jmzSmartThings/tree/master/devicetyp
 * Make sure there are no spaces or special characters in the username, password, and camera short name (I can’t guarantee it’ll work if there are).
 * The username for Blue Iris login needs to be an Admin username to make profile changing work.  For security reasons, I recommend creating a new username just for this integration, so you can look at the logs and tell when it was you or the app that was logging into Blue Iris.
 * In Blue Iris’s Advanced Webserver settings, “Use Secure Session Keys and Login Page” must NOT be checked:
-[![Blue Iris Web Server Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/biwebserversettings.jpg)]
+![Blue Iris Web Server Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/biwebserversettings.jpg)
 ***NOTE*** *While this is a reduced security setting in Blue Iris, it is only being used when using a local only connection (i.e. computer and hub are on the same network that is secured from intrusion).  So as long as you've taken reasonable steps to secure your home network, this is not reducing security.  If you are using the external options for setup (i.e. the computer and hub are not on the same network), then you don't need to do this step and can leave it with the higher security setting.  (Local and external use different protocols to communicate between computer and hub, and require different settings to work).*
 
 * If you want to use the BI Fusion Triggers to have ST trigger BI camera recording, and use the Blue Iris Camera DTH (which I recommend), you need to complete the initial setup through BI Fusion settings once first.  Click 'done' through the pages, then reenter BI Fusion settings and set up the Triggers (because that first iteration of settings creates the devices, so if you didn't close out once first, they wouldn't be created and available for selection).
@@ -79,9 +81,9 @@ Blue Iris Camera: https://github.com/flyjmz/jmzSmartThings/tree/master/devicetyp
 7.	Now we can set up Motion Alerts in Blue Iris.
 * Go to Blue Iris and open Camera Properties for your first camera.
 * Follow the directions in these screenshots and enter the URLs from the BI Fusion Setting Screenshot you took or from the debug logs earlier:
-[![Blue Iris Alert Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/bialertsettings.jpg)]
+![Blue Iris Alert Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/bialertsettings.jpg)
 
-[![Blue Iris Alert Settings Detail](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIalertsettingsdetail.jpg)]
+![Blue Iris Alert Settings Detail](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIalertsettingsdetail.jpg)
 * Make sure you enter the URL correctly, not including the “https://” but selecting it from the dropdown menu.
 * Replace “cameraShortNameHere” with your camera’s short name
 * The only difference between the active and inactive URLs is the “in” for “inactive,” so once you type the URL in for the first camera, you can just copy and paste for the rest of the cameras, ensuring the short name is correct for each camera and you use active and inactive for “when triggered” and “Request again when trigger is reset”
