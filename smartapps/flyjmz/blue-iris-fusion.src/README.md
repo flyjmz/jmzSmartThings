@@ -35,29 +35,29 @@ Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) 
 
 ## Install Instructions
 1.	In the SmartThings API, Create a new Smartapp. Either from code and copy the code from the links below, or add my Github repository to your Github Integration settings:
-* Owner: flyjmz
-* Name: jmzSmartThings
-* Branch: master
-2.	You need to add two smartapps and two device type handlers: 
-* SmartApps:
-[BI Fusion](https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src)  *(Publish this one)*
-[BI Fusion – Trigger] (https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src) *(Do not publish this one, it only needs to be installed in the IDE)*
-* Device Type Handlers:
-[Blue Iris Server](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src) *(Publish this one)*
-[Blue Iris Camera](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-camera.src) *(Publish this one)*
+    * Owner: flyjmz
+    * Name: jmzSmartThings
+    * Branch: master
+2.	You need to add two smartapps and two Device Type Handlers (DTH): 
+    1. [BI Fusion SmartApp](https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion.src)  *(Publish this one)*
+    2. [BI Fusion – Trigger SmartApp] (https://github.com/flyjmz/jmzSmartThings/tree/master/smartapps/flyjmz/blue-iris-fusion-trigger.src) *(Do not publish this one, it only needs to be installed in the IDE)*
+    3. [Blue Iris Server DTH](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-server.src) *(Publish this one)*
+    4. [Blue Iris Camera DTH](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/blue-iris-camera.src) *(Publish this one)*
 
-* **Make sure you enable OAuth for the "BI Fusion" smartapp** (Once you've created the new app in your API, find it in the Smart Apps list and click "Edit Properties." Then scroll down to OAuth and enable it.)
+**Make sure you enable OAuth for the "BI Fusion" smartapp** (Once you've created the new app in your API, find it in the Smart Apps list and click "Edit Properties." Then scroll down to OAuth and enable it.)
+
 3.	One you’ve added them in the API, open the SmartThings app on your phone, add an automation, and add the “Blue Iris Fusion” app under the “My Apps” category. Only install the “Blue Iris Fusion” app, do not install the “Blue Iris Fusion - Trigger” app (it will install itself).
-
 4.	Go through and enter your settings.  Some gotchas:
-* For the Server Device, the ST Hub and BI Computer need to be on the “same” network with either static IP’s or DHCP with address reservations so that the IP isn’t changing.
-* If using the Server Device or a local/LAN connection, only enter the IP address, nothing extra
-* The Camera Short Name is the “Short Name” set in Blue Iris Camera Properties.  
-* Make sure there are no spaces or special characters in the username, password, and camera short name (I can’t guarantee it’ll work if there are).
-* The username for Blue Iris login needs to be an Admin username to make profile changing work.  For security reasons, I recommend creating a new username just for this integration, so you can look at the logs and tell when it was you or the app that was logging into Blue Iris.
-* In Blue Iris’s Advanced Webserver settings, “Use Secure Session Keys and Login Page” must NOT be checked:
+    * For the Server Device, the ST Hub and BI Computer need to be on the “same” network with either static IP’s or DHCP with address reservations so that the IP isn’t changing.
+    * If using the Server Device or a local/LAN connection, only enter the IP address, nothing extra
+    * The Camera Short Name is the “Short Name” set in Blue Iris Camera Properties.  
+    * Make sure there are no spaces or special characters in the username, password, and camera short name (I can’t guarantee it’ll work if there are).
+    * The username for Blue Iris login needs to be an Admin username to make profile changing work.  For security reasons, I recommend creating a new username just for this integration, so you can look at the logs and tell when it was you or the app that was logging into Blue Iris.
+    * In Blue Iris’s Advanced Webserver settings, “Use Secure Session Keys and Login Page” must NOT be checked:
 ![Blue Iris Web Server Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/biwebserversettings.jpg)
-***NOTE*** *While this is a reduced security setting in Blue Iris, it is only being used when using a local only connection (i.e. computer and hub are on the same network that is secured from intrusion).  So as long as you've taken reasonable steps to secure your home network, this is not reducing security.  If you are using the external options for setup (i.e. the computer and hub are not on the same network), then you don't need to do this step and can leave it with the higher security setting.  (Local and external use different protocols to communicate between computer and hub, and require different settings to work).*
+
+***NOTE*** 
+*While this is a reduced security setting in Blue Iris, it is only being used when using a local only connection (i.e. computer and hub are on the same network that is secured from intrusion).  So as long as you've taken reasonable steps to secure your home network, this is not reducing security.  If you are using the external options for setup (i.e. the computer and hub are not on the same network), then you don't need to do this step and can leave it with the higher security setting.  (Local and external use different protocols to communicate between computer and hub, and require different settings to work).*
 
 * If you want to use the BI Fusion Triggers to have ST trigger BI camera recording, and use the Blue Iris Camera DTH (which I recommend), you need to complete the initial setup through BI Fusion settings once first.  Click 'done' through the pages, then reenter BI Fusion settings and set up the Triggers (because that first iteration of settings creates the devices, so if you didn't close out once first, they wouldn't be created and available for selection).
 5.	If you’re installing camera devices and want motion triggers, you’ll have to use the access token found during setup and enter it in Blue Iris for each camera.  I’m trying to make this better, but for now we have to use OAuth.  One improvement I made is the ability to “View Only” the access token URLs, so that they don’t change every time you open BI Fusion’s settings.  You can also choose to have the URLs displayed in the API's Live Logging tab so you can copy & paste into Blue Iris too!
