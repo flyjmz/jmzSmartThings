@@ -15,10 +15,10 @@
 * Works with webCoRE so you can create your own automations
 
 **Blue Iris Server Device Type:**
-![IMG_4072|281x499](upload://c6ceS9KpCN1olTP7dePb7EjunwM.PNG)
+[![Blue Iris Server Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIServerDevice.png)]
      
 **Blue Iris Camera Device Type:**
-![IMG_C242DECA5D81-1|230x500](upload://nLOqCR1s6e8Wkau1k1jyV8XmuOl.jpeg)
+[![Blue Iris Camera Device Type](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BICameraDevice.jpeg)]
 
 * Limited live stream capability - only work when your phone is on the same LAN as your Blue Iris computer, and is limited by SmartThings' live stream capabilities.  No image capture due to the way BI Fusion builds all the capabilities into one set of smartapps and DTHs.  I strongly encourage you to use the [Blue Iris Mobile apps](http://blueirissoftware.com/mobile/) for video and image viewing. It has all the capabilities now and works better than non-SmartThings-branded video will ever work within SmartThings.
 
@@ -68,7 +68,7 @@ Blue Iris Camera: https://github.com/flyjmz/jmzSmartThings/tree/master/devicetyp
 * Make sure there are no spaces or special characters in the username, password, and camera short name (I can’t guarantee it’ll work if there are).
 * The username for Blue Iris login needs to be an Admin username to make profile changing work.  For security reasons, I recommend creating a new username just for this integration, so you can look at the logs and tell when it was you or the app that was logging into Blue Iris.
 * In Blue Iris’s Advanced Webserver settings, “Use Secure Session Keys and Login Page” must NOT be checked:
-![new secure only|528x500](upload://x6Y2r9rjRBIP8KYXpYFlkhK1a20.jpg)
+[![Blue Iris Web Server Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/biwebserversettings.jpg)]
 ***NOTE*** *While this is a reduced security setting in Blue Iris, it is only being used when using a local only connection (i.e. computer and hub are on the same network that is secured from intrusion).  So as long as you've taken reasonable steps to secure your home network, this is not reducing security.  If you are using the external options for setup (i.e. the computer and hub are not on the same network), then you don't need to do this step and can leave it with the higher security setting.  (Local and external use different protocols to communicate between computer and hub, and require different settings to work).*
 
 * If you want to use the BI Fusion Triggers to have ST trigger BI camera recording, and use the Blue Iris Camera DTH (which I recommend), you need to complete the initial setup through BI Fusion settings once first.  Click 'done' through the pages, then reenter BI Fusion settings and set up the Triggers (because that first iteration of settings creates the devices, so if you didn't close out once first, they wouldn't be created and available for selection).
@@ -79,9 +79,9 @@ Blue Iris Camera: https://github.com/flyjmz/jmzSmartThings/tree/master/devicetyp
 7.	Now we can set up Motion Alerts in Blue Iris.
 * Go to Blue Iris and open Camera Properties for your first camera.
 * Follow the directions in these screenshots and enter the URLs from the BI Fusion Setting Screenshot you took or from the debug logs earlier:
-![Pic 1|660x499](upload://5cOWl2SRt4HUdwiqW52jIQUHrZS.jpg)
+[![Blue Iris Alert Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/bialertsettings.jpg)]
 
-![Pic 2|630x500](upload://sV9XHD4CAAifka6b6fsEHDIz8oB.jpg)
+[![Blue Iris Alert Settings Detail](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIalertsettingsdetail.jpg)]
 * Make sure you enter the URL correctly, not including the “https://” but selecting it from the dropdown menu.
 * Replace “cameraShortNameHere” with your camera’s short name
 * The only difference between the active and inactive URLs is the “in” for “inactive,” so once you type the URL in for the first camera, you can just copy and paste for the rest of the cameras, ensuring the short name is correct for each camera and you use active and inactive for “when triggered” and “Request again when trigger is reset”
@@ -97,8 +97,8 @@ These are old threads if you want to see the comments, but all the funcitonality
 -
 **What settings are important in Blue Iris?**
 Go to Blue Iris Options, the Web server tab, click Advanced, and make sure "Use Secure Session Keys and Login Page" is unchecked. This enables the login to work, but also uses a less secure method of login. If you are using it LAN only and do not port-forward or otherwise expose your Blue Iris server to the Internet, then there is no need to worry. If you do have it set up for external logins (i.e. to log into the BI server when you’re away), then please make sure you have secured that connection in another way. I recommend two different options:
-1.	VPN. You can set up a VPN server on your computer, a network device like a Synology server, or on your router using [DD-WRT firmware](http://www.dd-wrt.com/) (which is a relatively simple and doesn’t cost anything if you have a good router already). The VPN will take care of all the security, it’s as if you don’t expose it to the internet but you can still reach the server! I have a not-yet-ready-for-publishing How-To, PM me if you want to know more.
-2.	HTTPS. Blue Iris has [stunnel](https://www.stunnel.org/index.html) integration. It’s not to difficult to set this up either. You port forward the BI server but secure the connection so your login and viewing are all encrypted. I have an extensive how-to in the[ initial post in the old BI Fusion Thread](https://community.smartthings.com/t/release-blue-iris-fusion-integrate-smartthings-and-blue-iris/54226).  You can also PM me.
+1.	VPN. You can set up a VPN server on your computer, a network device like a Synology server, or on your router using [DD-WRT firmware](http://www.dd-wrt.com/) (which is a relatively simple and doesn’t cost anything if you have a good router already). The VPN will take care of all the security, it’s as if you don’t expose it to the internet but you can still reach the server! I have a not-yet-ready-for-publishing How-To.
+2.	HTTPS. Blue Iris has [stunnel](https://www.stunnel.org/index.html) integration. It’s not to difficult to set this up either. You port forward the BI server but secure the connection so your login and viewing are all encrypted. I have an extensive how-to here: [HTTPS/SSL/STUNNEL How-To](https://github.com/flyjmz/jmzSmartThings/blob/master/smartapps/flyjmz/blue-iris-fusion.src/HTTPS:SSL:STUNNEL%20How-To.md).
 
 **What is the difference between WAN and LAN?**
 LAN = Local area network, WAN = Wide area network. For BI Fusion setup, LAN specifically means all traffic will stay on your home network, nothing out to the cloud (the SmartThings hub sends commands directly to the computer running Blue Iris). The WAN setup differs by having the SmartThings cloud send the commands to your Blue Iris computer.
