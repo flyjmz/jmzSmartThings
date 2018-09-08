@@ -31,7 +31,7 @@
 6. Configure Stunnel, first stop the stunnel service and make sure the GUI is closed.
 7. For new setups:
     1. Edit the stunnel.conf file to read:
-`
+```
 [Blue-Iris]
 
 accept = xxx.xxx.xxx.xxx:xxxx
@@ -41,7 +41,7 @@ connect = xxx.xxx.xxx.xxx:xxxx
 cert = blueiris.pem
 
 TIMEOUTclose = 0
-`
+```
     2. Save stunnel.conf and close it. Save a backup copy to a safe place.
     3. Create a new .txt file and call it "blueiris.pem" this is your new certificate file to replace the default stunnel.pem.
     4. Open the blueiris.pem file you just created and paste the contents of domain-key.txt into it. After the domain-key.txt contents, paste the contents of domain-crt.txt and save the file. Save a backup copy to a safe place.
