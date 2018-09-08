@@ -1,5 +1,10 @@
 # HTTPS/SSL/STUNNEL How-To
 *Current As of 8 Sep 2018*
+* This how-to explains a method to increase security for Blue Iris connections.  
+* Normal port-forwarding without setting up any extra layers of security isn't necessarily bad, as long as the Blue Iris Web Server settings are set to require authentication and the "Use Secure Session Keys and login page" box is checked, however that is not compatible with BI Fusion.  You can use these instructions regardless of SmartThings, because they add security for Blue Iris itself.
+* If you are using BI Fusion in SmartThings, then definitely follow these steps or set up a VPN in order to secure your Blue Iris server from the outside internet while still allowing BI Fusion access.
+* Locally connecting BI Fusion requires that "Use Secure Session Keys and login page" box to be unchecked, slightly weakening Blue Iris' external security, but does not impose any risks locally as long as you secure your home network with a good password and encryption level.  Setting up this HTTPS connection or using a VPN will ensure all other (external) connections remain secure, so you can use your phone app to view video, etc.  
+* I have rough draft VPN setup instructions available too, will post and link sometime in the future.
 
 ### Port Forwarding & DDNS
 1. Set up Port Forwarding on you router's settings.  Refer to your router's manual, and use the IP address of your Blue Iris Server Computer and choose a port (not on of the common ones though, 4 digit ports can help keep you safe from picking a common one).  You'll likely want to set up a IP Reservation for your computer's IP on your server so that when the computer or router restarts it doesn't change the IP.  You could also use a static IP.
@@ -9,7 +14,7 @@
    3. Set up their DDNS program on your router or computer running Blue Iris (this program checks for IP address changes and then updates the DDNS service so it knows your new IP address.  Easiest to just run the DDNS' program on your Blue Iris computer, but most routers can do this too.
 
 ### Stunnel Setup
-*Stunnel is is a program that secures the WAN (internet) side of the connection, and connects it to the LAN (local) side.  You port forward one port, but have Blue Iris on another.  So you are port forwarding Stunnel, which then connects to Blue Iris). For example, you could have Blue Iris’s web server port set to 4000, but for your router’s port forwarding you'd use a different port, like 4002. Stunnel accepts the 4002 from the router and connects you to the 4000 port, which is your BI Server.*
+*Stunnel is a program that secures the WAN (internet) side of the connection, and connects it to the LAN (local) side.  You port forward one port, but have Blue Iris on another.  So you are port forwarding Stunnel, which then connects to Blue Iris). For example, you could have Blue Iris’s web server port set to 4000, but for your router’s port forwarding you'd use a different port, like 4002. Stunnel accepts the 4002 from the router and connects you to the 4000 port, which is your BI Server.*
 
 1. Download and install [stunnel](https://www.stunnel.org/index.html)
 2. Edit the stunnel.conf file to read:
@@ -20,7 +25,7 @@ connect = xxx.xxx.xxx.xxx:xxxx
 cert = blueiris.pem
 TIMEOUTclose = 0
 ```
-2. The 'accept' IP:PORT address is the IP address of the computer running Stunnel (likely the same computer as the one running Blue Iris), and the Port is the one forwarded in your router settings that yoru DDNS service connects through. For example: 192.168.0.15:4002
+2. The 'accept' IP:PORT address is the IP address of the computer running Stunnel (likely the same computer as the one running Blue Iris), and the Port is the one forwarded in your router settings that your DDNS service connects through. For example: 192.168.0.15:4002
 3. The 'connect' IP:PORT address is the IP address of the computer running Blue Iris (again, the IP for both may be the same if it's the same computer), and the Port is a different one that you'll set up in Blue Iris. For example: 192.168.0.15:4000
 3. The 'cert' part is the certificate file used to encrypt your connection.  Stunnel can/will create a self-signed certificate for you and put it in a file called 'stunnel.pem'. You can use this and skip the SSL Certificate Generation section if you don't plan to use the external mode in BI Fusion.  If you do that, then leave the .conf file as is, with 'cert = stunnel.pem' otherwise change it to "cert = blueiris.pem" and complete the SSL Certificate Generation steps below before running stunnel.
 4. Save stunnel.conf and close it. Save a backup copy to a safe place. 
@@ -33,7 +38,7 @@ TIMEOUTclose = 0
 ### SSL Certificate Generation
 **This is to create a real HTTPS certificate from a Certificate Authority (CA), as opposed to a self-signed one.  SmartThings needs a real one from a CA in order to use the external mode of BI Fusion.**
 
-*NOTE: This step may be ommitted if you you are going to use BI Fusion in local mode, and are only setting this up for external access to Blue Iris for viewing videos, etc.  But if you are using BI Fusion in external mode, you must follow these steps*
+*NOTE: This step may be omitted if you are going to use BI Fusion in local mode, and are only setting this up for external access to Blue Iris for viewing videos, etc.  But if you are using BI Fusion in external mode, you must follow these steps*
 
 1. Go to: [zerossl.com ](http://zerossl.com/) > click on Online Tools > Click on Start for the Free SSL Certificate Wizard
 2. Enter Email Address, check DNS Verification box, check both terms of service boxes to agree
@@ -71,4 +76,4 @@ TIMEOUTclose = 0
     * Externally it’d be mydomain.ddns.org:4002
 * Remember you'll have to include the port in the address as shown above, :80 is assumed if you don't type a port, and it won't work
 * For the iOS/Android app, you'll have to edit the connection, ensuring you have the LAN and WAN addresses entered as shown above with the different ports and addresses.  Also, don't forget to use the dropdown and set http/https as required (https for WAN, for LAN it'd most likely be http unless you set up Blue Iris to use the secure HTTPs for LAN as well, which means you'd also need to use the stunnel port, 4002 in this example, for both).
-* For SmartThings, none of this matters if you use the local connection in BI Fusion (either with or without the server device) and the the computer and your SmartThings hub are on the same network.  You'd just use the local IP and Port.  If they aren't on the same network, or you choose to use the external connection method for some other reason, then you'd use the external address and port, and also must use a real CA SSL certificate. 
+* For SmartThings, none of this matters if you use the local connection in BI Fusion (either with or without the server device) and the computer and your SmartThings hub are on the same network.  You'd just use the local IP and Port.  If they aren't on the same network, or you choose to use the external connection method for some other reason, then you'd use the external address and port, and also must use a real CA SSL certificate.
