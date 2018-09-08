@@ -1,7 +1,7 @@
 # HTTPS/SSL/STUNNEL How-To
 *Current As of 8 Sep 2018*
 
-[![Donate Button](https://www.paypal.com/en_US/i/btn/btn_donate_SM.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6T44ZPUKCMYL6&lc=US&item_name=FLYJMZ%20Custom%20SmartApps&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted)
+[![Donate Button](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/donateButton.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6T44ZPUKCMYL6&lc=US&item_name=FLYJMZ%20Custom%20SmartApps&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted)
 
 * This how-to explains a method to increase security for Blue Iris connections.  
 * Normal port-forwarding without setting up any extra layers of security isn't necessarily bad, as long as the Blue Iris Web Server settings are set to require authentication and the "Use Secure Session Keys and login page" box is checked, however that is not compatible with BI Fusion.  You can use these instructions regardless of SmartThings, because they add security for Blue Iris itself.
