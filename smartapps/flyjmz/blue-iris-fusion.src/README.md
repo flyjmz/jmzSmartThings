@@ -69,7 +69,7 @@ Blue Iris is an outstanding Video Security/Capture NVR (Network Video Recorder) 
 ![Blue Iris Alert Settings](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/bialertsettings.jpg)
 
 ![Blue Iris Alert Settings Detail](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/BIalertsettingsdetail.jpg)
-
+*
     * Make sure you enter the URL correctly, not including the “https://” but selecting it from the dropdown menu.
     * Replace “cameraShortNameHere” with your camera’s short name
     * The only difference between the active and inactive URLs is the “in” for “inactive,” so once you type the URL in for the first camera, you can just copy and paste for the rest of the cameras, ensuring the short name is correct for each camera and you use active and inactive for “when triggered” and “Request again when trigger is reset”
