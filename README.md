@@ -16,7 +16,7 @@
 
 ### Power is Out
 * [SmartThings Community Thread](https://community.smartthings.com/t/this-is-awesome-power-is-out-based-on-state-of-v1-motion-sensor/3757)
-* [Custom SmartThings SmartSense Motion v1 DTH] (https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/smartsense-motion-v1.src)
+* [Custom SmartThings SmartSense Motion v1 DTH](https://github.com/flyjmz/jmzSmartThings/tree/master/devicetypes/flyjmz/smartsense-motion-v1.src)
 
 ## Custom Device Types 
 *Other than those required for the above SmartApps*
