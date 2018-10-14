@@ -17,6 +17,10 @@
  *  for the specific language governing permissions and limitations under the License.
  * 
  *	2 August 2016 - flyjmz changed name to SmartSense Motion v1, added Power Source capability, and added power source to device page in app.
+ *  12 October 2018 - flyjmz changed it so the power source changes would show up in the logs.
+ 
+ todo:
+ - getting this in logs:  warn Device: 8c3af7d1-ad46-41a1-b6e4-dd0e18c1ed1d, Hub: e10fde6b-1f2c-4395-9933-de0b45f1ecc6, is using deprecated isZoneType19 call
  *
  */
 metadata {
@@ -205,7 +209,7 @@ private getPowerSourceResult(part, description) {
 		descriptionText: descriptionText,
 		handlerName: name,
 		isStateChange: isStateChange,
-		displayed: false  //mod'd flyjmz, but returned.  Had it "displayed: displayed(description)" for a bit.
+		displayed: true  //flyjmz changed from false to true
 	]
 }
 
