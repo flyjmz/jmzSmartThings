@@ -28,12 +28,13 @@ Version History:
     1.9.1 - 20Apr2018, fixed power meter monitoring, added "temp now ok" message (apparently I forgot it...)
     1.9.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
     1.9.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
+    1.9.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings, user can now set if the snooze switch snoozes when it is on or off.
 
 To Do:
 -None!
 */
 
-def appVersion() {"1.9.3"}
+def appVersion() {"1.9.4"}
  
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -90,12 +91,13 @@ def settings() {
             	input "waitMinutes", "number", title: "Time between periodic notifications? (minutes)", required: false
                 input "modeChange", "bool", title: "Notify on mode change?", required: false
                 input "sunChange", "bool", title: "Notify at sunrise/sunset?", required: false
-                paragraph "Periodic Notifications can be snoozed easily with a virtual switch device type.  This is useful when you are unable to resolve an issue and the notifications become irritable.  A 'snooze' switch in your Things is easier to hit than changeing these settings." 
-                input "snoozeSwitch", "capability.switch", title: "Which switch controls snoozing periodic notifications?", required: false
+                paragraph "Periodic Notifications can be snoozed easily with a virtual switch device type.  This is useful when you are unable to resolve an issue and the notifications become irritable.  A 'snooze' switch in your Things is easier to hit than changing settings." 
+                input "snoozeSwitch", "capability.switch", title: "Snooze periodic notifications when this switch is...?", required: false, submitOnChange: true
+				if (snoozeSwitch) input "snoozeSwitchOnOrOff","enum", title: "...On or Off?", multiple: false, required: true, options: ["On", "Off"]
         	}      
         }
         
-        section("Notifications", hidden: false, hideable: true) {
+        section("Text/Push Notifications", hidden: false, hideable: true) {
             def SMSContactsSendSMS = []
 
             if (location.contactBookEnabled ==  true) {
@@ -118,16 +120,26 @@ def settings() {
                 }
             }
         } 
+        
+        section("Audio Notifications", hidden: false, hideable: true) {
+        	paragraph "Can choose to have the message spoken using a speech synthesis device (e.g. LANnouncer)"
+            input "speakNotifications", "bool", title: "Use Audio Notifications?", required: false, submitOnChange: true
+            if (speakNotifications) {
+                input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers?", required: true, multiple: true
+            }
+        }
 
         section() {
             label title: "Assign a name", required: true
         }
 
-        section(title: "More options", hidden: hideOptionsSection(), hideable: true) {
+        section(title: "Execution Restrictions", hidden: false, hideable: true) {
             def timeLabel = timeIntervalLabel()
             href "certainTime", title: "Only during a certain time", description: timeLabel ?: "Tap to set", state: timeLabel ? "complete" : null
             input "days", "enum", title: "Only on certain days of the week", multiple: true, required: false, options: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
             input "modes", "mode", title: "Only when mode is", multiple: true, required: false
+            input "controlSwitch", "capability.switch", title: "Only when this switch is...?", required: false, submitOnChange: true
+            if (controlSwitch) input "controlSwitchOnOrOff","enum", title: "...On or Off?", multiple: false, required: true, options: ["On", "Off"]
         }
 	}
 }
@@ -271,20 +283,20 @@ def eventHandler(evt) {
 
 def stillWrong() { 
 	if (parent.loggingOn) log.debug "stillWrong() started"
-	def myContactState = myContact?.currentState("contact")
-    def mySwitchState = mySwitch?.currentState("switch")
+	def myContactState = myContact?.currentState("contact")?.value
+    def mySwitchState = mySwitch?.currentState("switch")?.value
     def tempState2 = temp?.currentState("temperature")?.doubleValue
-    def myLockState = myLock?.currentState("lock")
+    def myLockState = myLock?.currentState("lock")?.value
     def myPowerState = myPower?.currentState("power")?.doubleValue
     if (parent.loggingOn) log.debug "myContactState is $myContactState, mySwitchState is $mySwitchState, tempState2 is $tempState2, myLockState is $myLockState, myPowerState is $myPowerState"
     if (openClosed) {
     	if (openClosed == "Open") {
-			if (myContactState.value == "open") {
+			if (myContactState == "open") {
             	if (parent.loggingOn) log.debug "Contact is still open"
                 stillWrongMsger()
             } else log.debug "the contact is closed and you want it that way"  //okHandler will send the it's ok messages for all these cases
         } else {
-        	if (myContactState.value == "closed") {
+        	if (myContactState == "closed") {
             	if (parent.loggingOn) log.debug "Contact is still closed"
                 stillWrongMsger()
             } else {if (parent.loggingOn) log.debug "the contact is open and you want it that way"}
@@ -292,12 +304,12 @@ def stillWrong() {
     }
     if (onOff) {
     	if (onOff == "On") {
-			if (mySwitchState.value == "on") {
+			if (mySwitchState == "on") {
             	if (parent.loggingOn) log.debug "Switch is still on"
 				stillWrongMsger()
             } else log.debug "the switch is off and you want it that way"
         } else {
-        	if (mySwitchState.value == "off") {
+        	if (mySwitchState == "off") {
 	            if (parent.loggingOn) log.debug "Switch is still off"
 				stillWrongMsger()
             } else {if (parent.loggingOn) log.debug "the switch is on and you want it that way"}
@@ -305,12 +317,12 @@ def stillWrong() {
     }
     if (lockedUnlocked) {
         if (lockedUnlocked == "locked") {
-            if (myLockState.value == "locked") {
+            if (myLockState == "locked") {
                 if (parent.loggingOn) log.debug "Lock is still locked"
                 stillWrongMsger()
             } else {if (parent.loggingOn) log.debug "the lock is unlocked and you want it that way"}
         } else {
-            if (myLockState.value == "unlocked") {
+            if (myLockState == "unlocked") {
                 if (parent.loggingOn) log.debug "Lock is still unlocked"
                 stillWrongMsger()
             } else {if (parent.loggingOn) log.debug "the lock is lcoked and you want it that way"}
@@ -338,7 +350,7 @@ def stillWrongMsger() {
     def tempState3 = temp?.currentState("temperature")
     def myPowerState2 = myPower?.currentState("power")
     if (allOk) {
-        if (parent.loggingOn) log.debug "Event within time/day/mode constraints"
+        if (parent.loggingOn) log.debug "Event within time/day/mode/switch constraints"
     	if (!atomicState.msgSent) {
             if (myContact) sendMessage("${myContact?.displayName} is still ${myContactState2?.value}!")
             if (mySwitch) sendMessage("${mySwitch?.displayName} is still ${mySwitchState2?.value}!")
@@ -346,17 +358,30 @@ def stillWrongMsger() {
             if (temp) sendMessage("${temp?.displayName} is still ${tempState3?.value} ${location.temperatureScale}!")
             if (myPower) sendMessage("${myPower?.displayName} is still ${myPowerState2?.value} W!")
             atomicState.msgSent = true
-            if (parent.loggingOn) log.debug "sending first message, set atomicState.msgSent to ${atomicState.msgSent}"
+            if (parent.loggingOn) log.debug "sent first message, set atomicState.msgSent to ${atomicState.msgSent}"
        		if (periodicNotifications) {
             	if (waitMinutes != null) {
-                	def newWaitMinutes = (waitMinutes > 0) ? waitMinutes : 0.1
+                	def newWaitMinutes = (waitMinutes > 0) ? waitMinutes : 0.1 //if user entered '0' then it'd break, so adjusting it for them
                 	runIn((newWaitMinutes * 60), stillWrong)
-                	if (parent.loggingOn) log.debug "periodic notifications is on, scheduling stillWrong() to run again in ${newWaitMinutes} minutes"
+                	if (parent.loggingOn) log.debug "periodic notifications is on, scheduled stillWrong() to run again in ${newWaitMinutes} minutes"
             	}
             }
         } else if (periodicNotifications && atomicState.msgSent) {
-        	def snooze = false
-        	if (snoozeSwitch?.currentState("switch")?.value == "on") snooze = true
+            def snooze = false
+            if (snoozeSwitch && snoozeSwitchOnOrOff) {
+                if (snoozeSwitchOnOrOff == "On" && snoozeSwitch?.currentState("switch")?.value == "on") {
+                    snooze = true
+                    if (parent.loggingOn) log.debug "snoozing"
+                } else if (snoozeSwitchOnOrOff == "Off" && snoozeSwitch?.currentState("switch")?.value == "off") {
+                    snooze = true
+                    if (parent.loggingOn) log.debug "snoozing"
+                } else {
+                    if (parent.loggingOn) log.debug "Snooze switch is not on/off for snoozing, not snoozing."
+                }
+            } else if (snoozeSwitch && snoozeSwitchOnOrOff == null) {
+            	log.error "You have a snooze switch selected but haven't updated your settings for whether want to snooze when it is on or off. Assuming you want to snooze when the switch is on. Please update your settings."
+            	snooze = true
+            }
             if (!snooze) log.debug "sending periodic notification"
             int timeSince = ((now() - atomicState.problemTime) / 60000) //time since issue occured in whole minutes
             if (!snooze && timeSince > 180) {  //determines whether to report in hours or minutes (longer than 180 minutes is reported in hours), and ensures alerts aren't snoozed.
@@ -383,7 +408,7 @@ def stillWrongMsger() {
         	if (parent.loggingOn) log.debug "message already sent once, not using periodic notifcations, so not sending another message"
         }
     } else {
-    	if (parent.loggingOn) log.debug "event is outside of time/day/mode conditions, no message sent, but monitoring in case it doesn't return to normal before it is within those time/day/mode conditions"
+    	if (parent.loggingOn) log.debug "event is outside of time/day/mode/switch conditions, no message sent, but monitoring in case it doesn't return to normal before it is within those time/day/mode/switch conditions"
     	def newWaitThreshold = (waitThreshold > 0) ? waitThreshold : 0.1
         runIn((waitThreshold * 60), stillWrong)
     }
@@ -403,7 +428,20 @@ def periodicNotifier(evt) {
 }
 
 private getAllOk() {
-	modeOk && daysOk && timeOk
+	modeOk && daysOk && timeOk && switchOk
+}
+
+private getSwitchOk() {
+    def result = true
+    if (controlSwitch) {
+		if (controlSwitchOnOrOff == "On" && controlSwitch?.currentState("switch")?.value != "on") {
+        result = false
+        } else if (controlSwitchOnOrOff == "Off" && controlSwitch?.currentState("switch")?.value != "off") {
+        result = false
+        } else log.error "You're using a switch to control when this app will run, except the setting for when that switch is 'On' or 'Off' isn't set. Ignoring and allowing app to run regardless. Check your settings."
+    }
+    if (parent.loggingOn) log.debug "switchOk = $result"
+    return result
 }
 
 private getDaysOk() {
@@ -448,6 +486,7 @@ private getTimeOk() {
 
 private getModeOk() {
 	def result = !modes || modes.contains(location.mode)
+    if (parent.loggingOn) log.debug "modeOk = $result"
     return result
 }
 
@@ -480,6 +519,15 @@ private timeIntervalLabel() {
 }
 
 private sendMessage(msg) {
+    //Speak Message
+    if (speakNotifications) {
+        speechDevices.each() {
+    		it.speak(msg)
+            log.info "Spoke '" + msg + "' with " + it.device.displayName
+    	}
+    }
+    
+    //Add time stamps for text/push messages (not for audio)
     if (useTimeStamp) {
         def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
         msg = msg + " (" + stamp + ")"
@@ -487,7 +535,7 @@ private sendMessage(msg) {
 
     //First try to use Contact Book (Depricated 30July2018)
     if (location.contactBookEnabled) {
-        if (loggingOn) log.debug("sending '$msg' notification to: ${recipients?.size()}")
+        log.info "sent '$msg' notification to: ${recipients?.size()}"
         sendNotificationToContacts(msg, recipients)
     }
 
@@ -497,14 +545,14 @@ private sendMessage(msg) {
         sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
         if (wantsPush) {
             sendPushMessage(msg)  //Second, send the push notification if user wanted it
-            if (loggingOn) log.debug("sending push message")
+            log.info "sent '$msg' via push"
         }
 
         if (state.SMSContactsMap != null) {  //Third, send SMS messages if desired
             def SMSContactsSplit = parent.settings["SMSContacts"].split(';')
             for (int i = 0; i < state.SMSContactsMap.size(); i++) {
                 if (state.SMSContactsMap[i]) {
-                    if (parent.loggingOn) log.debug "Sending SMS to ${SMSContactsSplit[i]}"
+                    log.info "sent '$msg' via SMS to ${SMSContactsSplit[i]}"
                     sendSmsMessage(SMSContactsSplit[i], msg)
                 }
             }

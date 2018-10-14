@@ -25,11 +25,11 @@ Version History:
     1.6.1 - 20Apr2018, fixed power metering.
     1.6.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
     1.6.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
-
+	1.6.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings,
 To Do:
 */
 
-def appVersion() {"1.6.3"}
+def appVersion() {"1.6.4"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -85,7 +85,7 @@ def settings() {
             input "messageText", "text", title: "Message Text", required: false
         }
 
-        section("Notifications", hidden: false, hideable: true) {
+        section("Text/Push Notifications", hidden: false, hideable: true) {
             def SMSContactsSendSMS = []
 
             if (location.contactBookEnabled ==  true) {
@@ -108,7 +108,14 @@ def settings() {
                 }
             }
         }
-
+ 
+ 		section("Audio Notifications", hidden: false, hideable: true) {
+        	paragraph "Can choose to have the message spoken using a speech synthesis device (e.g. LANnouncer)"
+			input "speakNotifications", "bool", title: "Use Audio Notifications?", required: false, submitOnChange: true
+            if (speakNotifications) {
+                input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g. LANnouncer)?", required: true, multiple: true
+            }
+        }
 
         section("Message Details") {
             paragraph "Minimum time between messages (optional, defaults to every message)"
@@ -120,11 +127,13 @@ def settings() {
                 label title: "Assign a name", required: true
         }
 
-        section(title: "More options", hidden: hideOptionsSection(), hideable: true) {
-                def timeLabel = timeIntervalLabel()
-                href "certainTime", title: "Only during a certain time", description: timeLabel ?: "Tap to set", state: timeLabel ? "complete" : null
-                input "days", "enum", title: "Only on certain days of the week", multiple: true, required: false, options: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-                mode(title: "Only during specific mode(s)")
+        section(title: "Execution Restrictions", hidden: hideOptionsSection(), hideable: true) {
+            def timeLabel = timeIntervalLabel()
+            href "certainTime", title: "Only during a certain time", description: timeLabel ?: "Tap to set", state: timeLabel ? "complete" : null
+            input "days", "enum", title: "Only on certain days of the week", multiple: true, required: false, options: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            input "controlSwitch", "capability.switch", title: "Only when this switch is...?", required: false, submitOnChange: true
+            if (controlSwitch) input "controlSwitchOnOrOff","enum", title: "...On or Off?", multiple: false, required: true, options: ["On", "Off"]
+            mode(title: "Only during specific mode(s)")
         }
      }
  }
@@ -248,7 +257,7 @@ def eventHandler(evt) {
 	if (frequency) {
 		def lastTime = state[evt.deviceId]
 		if (lastTime == null || now() - lastTime >= frequency * 60000) {
-        	if (parent.loggingOn) log.debug "frequency used and it is time for new message, checking if within time & date period"
+        	if (parent.loggingOn) log.debug "frequency used and it is time for new message, checking if within time/day/mode/switch parameters"
             if (allOk) createInstantMessage(evt.name,evt.value,evt.device)
             state[evt.deviceId] = now()
 		}
@@ -257,7 +266,7 @@ def eventHandler(evt) {
         }
 	}
 	else {
-    	if (parent.loggingOn) log.debug "frequency not used, checking if within time & date period"
+    	if (parent.loggingOn) log.debug "frequency not used, checking if within time/day/mode/switch parameters"
 		if (allOk) createInstantMessage(evt.name,evt.value,evt.device)
 	}
 }
@@ -277,16 +286,24 @@ def createInstantMessage(name,value,device) {
 		}
         msg = messageDefault
 	}
-    if (useTimeStamp) {
-    	def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
-        msg = msg + " (" + stamp + ")"
-    }
-	log.info "msg sent: ${msg}"
     sendMessage(msg)
 }
 
 private getAllOk() {
-	daysOk && timeOk
+	daysOk && timeOk && switchOk
+}
+
+private getSwitchOk() {
+    def result = true
+    if (controlSwitch) {
+		if (controlSwitchOnOrOff == "On" && controlSwitch.currentState("switch")?.value != "on") {
+        result = false
+        } else if (controlSwitchOnOrOff == "Off" && controlSwitch.currentState("switch")?.value != "off") {
+        result = false
+        } else log.error "You're using a switch to control when this app will run, except the setting for when that switch is 'On' or 'Off' isn't set. Ignoring and allowing app to run regardless. Check your settings."
+    }
+    if (parent.loggingOn) log.debug "switchOk = $result"
+    return result
 }
 
 private getDaysOk() {
@@ -337,7 +354,7 @@ private hhmm(time, fmt = "h:mm a") {
 }
 
 private hideOptionsSection() {
-	(starting || ending || days || modes || startingX || endingX) ? false : true
+	(starting || ending || days || modes || startingX || endingX || controlSwitch) ? false : true
 }
 
 private offset(value) {
@@ -357,10 +374,24 @@ private timeIntervalLabel() {
 	else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
 }
 
-private sendMessage(msg) {   
+private sendMessage(msg) {  
+	//Speak Message
+    if (speakNotifications) {
+        speechDevices.each() {
+    		it.speak(msg)
+            log.info "Spoke '" + msg + "' with " + it.device.displayName
+    	}
+    }
+    
+    //Add time stamps for text/push messages (not for audio)
+    if (useTimeStamp) {
+        def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
+        msg = msg + " (" + stamp + ")"
+    }
+    
     //First try to use Contact Book (Depricated 30July2018)
     if (location.contactBookEnabled) {
-        if (loggingOn) log.debug("sending '$msg' notification to: ${recipients?.size()}")
+        log.info "sent '$msg' notification to: ${recipients?.size()}"
         sendNotificationToContacts(msg, recipients)
     }
 
@@ -370,15 +401,15 @@ private sendMessage(msg) {
         sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
         if (wantsPush) {
             sendPushMessage(msg)  //Second, send the push notification if user wanted it
-            if (loggingOn) log.debug("sending push message")
+            log.info "sent '$msg' via push"
         }
 
         if (state.SMSContactsMap != null) {  //Third, send SMS messages if desired
             def SMSContactsSplit = parent.settings["SMSContacts"].split(';')
             for (int i = 0; i < state.SMSContactsMap.size(); i++) {
                 if (state.SMSContactsMap[i]) {
-                    if (parent.loggingOn) log.debug "Sending SMS to ${SMSContactsSplit[i]}"
                     sendSmsMessage(SMSContactsSplit[i], msg)
+                    log.info "sent '$msg' via SMS to ${SMSContactsSplit[i]}"
                 }
             }
         }
