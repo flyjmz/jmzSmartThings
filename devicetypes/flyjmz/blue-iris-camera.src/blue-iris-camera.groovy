@@ -38,12 +38,14 @@ v1.3 5Mar18		Tried Image capture, but it gets weird because the captured image w
                 Added "Sensor" and "actuator" Capability
                 Added "moveToPreset" command so webcore (and others) can call "moveToPreset.cameraPreset(#)" to move camera to specific presets. -requested by @jrfarrar
 v1.4 17Apr18    Allows user to change the icon per @jasonrwise77 request
+v1.5 5Feb19		Added Camera name to notifications. Added some todos.
 
 
 ToDo:
+- add code for new smartthings app to work (mnmn: “SmartThings”, vid: “generic-motion-3”) from post, but whole thread on all of them.
 */
 
-def appVersion() {"1.4"}
+def appVersion() {"1.5"}
 
 metadata {
     definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -51,7 +53,7 @@ metadata {
         capability "Switch"  //To trigger camera recording for other smartapps that may not accept momentary
         capability "Momentary" //To trigger camera recording w/momentary on
         capability "Video Camera"
-		capability "Refresh"
+		capability "Refresh" //todo - if you pull down for a refresh it looks for the command for this, except it isn't defined below!
         capability "Sensor"
         capability "Actuator"
         attribute "cameraShortName", "string"
@@ -112,7 +114,7 @@ metadata {
 
 def initializeCamera(cameraSettings) {
 	state.cameraSettings = cameraSettings
-    sendEvent(name: "motion", value: "inactive", descriptionText: "Camera Motion Inactive", displayed: false)  //initializes camera motion state
+    sendEvent(name: "motion", value: "inactive", descriptionText: "${state.cameraSettings.shortName} Camera Motion Inactive", displayed: false)  //initializes camera motion state
     log.info "${state.cameraSettings.shortName} camera DTH initialized"
 }
 
@@ -122,23 +124,23 @@ def parse(String description) {  //Don't need to parse anything because it's all
 
 def on() {   //Trigger to start recording with BI Camera
 	log.info "${state.cameraSettings.shortName} Executing 'on'"
-    sendEvent(name: "switch", value: "on", descriptionText: "Recording Triggered", displayed: true)
+    sendEvent(name: "switch", value: "on", descriptionText: "${state.cameraSettings.shortName} Recording Triggered", displayed: true)
     runIn(10,off)
 }
 
 def off() {  //Can't actually turn off recording, the trigger is for a defined period in Blue Iris Settings for each camera and profile, this just puts the tile back to normal.
 	log.info "${state.cameraSettings.shortName} Executing 'off'"
-    sendEvent(name: "switch", value: "off", descriptionText: "Recording Trigger Ended", displayed: true)
+    sendEvent(name: "switch", value: "off", descriptionText: "${state.cameraSettings.shortName} Recording Trigger Ended", displayed: true)
 }
 
 def active() {  //BI Camera senses motion
 	log.info "${state.cameraSettings.shortName} Motion 'active'"
-	sendEvent(name: "motion", value: "active", descriptionText: "Camera Motion Active", displayed: true)
+	sendEvent(name: "motion", value: "active", descriptionText: "${state.cameraSettings.shortName} Camera Motion Active", displayed: true)
 }
 
 def inactive() {  //BI Camera no longer senses motion
 	log.info "${state.cameraSettings.shortName} Motion 'inactive'"
-    sendEvent(name: "motion", value: "inactive", descriptionText: "Camera Motion Inactive", displayed: true)
+    sendEvent(name: "motion", value: "inactive", descriptionText: "${state.cameraSettings.shortName} Camera Motion Inactive", displayed: true)
 }
 
 def push() {
@@ -149,7 +151,7 @@ def push() {
 def moveToPreset(preset) {
 	def receivedPreset = preset
 	log.info "${state.cameraSettings.shortName} commanded to move to preset '${receivedPreset}'"
-    sendEvent(name: "cameraPreset", value: "$receivedPreset", descriptionText: "Camera Commanded to Preset $receivedPreset", displayed: true)
+    sendEvent(name: "cameraPreset", value: "$receivedPreset", descriptionText: "${state.cameraSettings.shortName} Camera Commanded to Preset $receivedPreset", displayed: true)
 }
 
 def start() {
