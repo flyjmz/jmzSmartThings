@@ -72,8 +72,19 @@ Version 3.2 - 17Apr18       Hopefully fixed external profile switch error
 Version 3.2.1 - 18Apr18     Cleaned up some of the logs, fixed the external command lock code (1 & 2 are opposite in external vs local commands)
 Version 3.2.2 - 6Jul2018    Updated notes after comfirming v3.2.1's fixes worked & did some logging cleanup. Updated language in preferences.  Custom polling code redone to be more robust. Added Periodic notifications for server offline.
 Version 3.2.3 - 23Jul2018  	Updated Nofications to support SmartThings' depricating the Contact Book feature (which was a dumb move on their part).
+Version 3.2.4 - 6Feb2019	Added timestamps to notifications. Added cameradisplayName to cameraSettings.
 
 TODO:
+- make this work with the smartapp installer app:  https://community.smartthings.com/t/beta-community-smartapp-installer/118348
+- Make this all work with MQTT or using session keys so that we don't have to uncheck that secure login box in blue iris?
+- Delete "Fix for having DNI tied to shortname" code chunk from v3.0.5.
+- Change timing of software update notifications (so user doesn't get spammed every day...give them some options)
+- make this work for more profiles than modes (or 2 profiles on the same mode)?  in the integration setup, list all the profiles and have them type in the mode name?
+--Allow user to enter own name.  So have them select mode, and then below where they can give names to the rest of the profiles, just show all the profiles and let them overwrite the defaulted-in ST mode
+--------I have a todo down the way with a suggestion for 2 profiles to one mode, but can i create fake modes for profiles that don't have an equivalent mode?
+--------Or first ask if they have more than one so that normal folks can just number the modes.  
+--------Or maybe better yet is list each profile and then click on it to go to another setup page to set it up.  You'd select a mode from a list, give it a different name if desired, or create a fake ST mode.
+- See todos throughout.
 - getting "error physicalgraph.app.exception.smartAppException: Method Not Allowed" 3-5 times in log 5-10 seconds after mode switches to away
     >>this isn't happening in any other mode switches. ?????
     >>need to check if this is still happening after all the other updates first
@@ -88,7 +99,7 @@ https://community.smartthings.com/t/help-receiving-http-events-from-raspberry-pi
 https://community.smartthings.com/t/tutorial-creating-a-rest-smartapp-endpoint/4331
 */
 
-def appVersion() {"3.2.3"}
+def appVersion() {"3.2.4"}
 
 mappings {
     path("/active/:camera") {
@@ -134,6 +145,7 @@ def BIFusionSetup() {
             app(name: "Blue Iris Fusion - Trigger", appName: "Blue Iris Fusion - Trigger", namespace: "flyjmz", title: "Add Camera Trigger", multiple: true)
         }
         section("Notification Delivery Settings", hidden: false, hideable: true) {
+        	input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
             input("recipients", "contact", title: "Send notifications to") {
                 input "wantsPush", "bool", title: "Send Push Notification? (pushes to all this location's users)", required: false
                 paragraph "If you want SMS Notifications, enter phone numbers including the country code (1 for USA), otherwise leave blank. Separate multiple numbers with a semi-colon (;). Only enter the numbers, no spaces or special characters."
@@ -330,7 +342,7 @@ def updated() {
 }
 
 def uninstalled() {
-    removeChildDevices(getChildDevices(true))
+    removeChildDevices(getChildDevices(true))  //todo - make this optional?  Folks are having trouble deleting the app because they didn't un-associate the child devices from other smartapps yet.  but if we make it optional, they'd end up with broken children all over.
     unschedule()
     revokeAccessToken()
 }
@@ -462,6 +474,7 @@ def createInfoMaps() {
     state.cameraSettings.username = username
     state.cameraSettings.password = password
     state.cameraSettings.shortName = ""
+    state.cameraSettings.displayName = ""
 
     //Finally, go make the devices:
     makeDevices()
@@ -590,6 +603,7 @@ def createCameraDevice() {
                 subscribe(cameraDevice, "switch.on", cameraTriggerHandler)
                 subscribe(cameraDevice, "cameraPreset", cameraPresetHandler)
                 state.cameraSettings.shortName = state.camerashortName[i]
+                state.cameraSettings.displayName = state.cameradisplayName[i]
                 cameraDevice.initializeCamera(state.cameraSettings)  //pass settings
             } catch (e) {
                 log.error "Error creating '${state.cameradisplayName[i]}' Device: ${e}"
@@ -599,6 +613,7 @@ def createCameraDevice() {
             subscribe(cameraDevice, "switch.on", cameraTriggerHandler) //still have to subscribe (intialize() wiped old subscriptions)
             subscribe(cameraDevice, "cameraPreset", cameraPresetHandler)
             state.cameraSettings.shortName = state.camerashortName[i]
+            state.cameraSettings.displayName = state.cameradisplayName[i]
             cameraDevice.initializeCamera(state.cameraSettings)  //pass/update settings
         }
     }
@@ -1044,15 +1059,21 @@ def checkUpdates(name, installedVersion, website) {
     } else if (!publishedVersion) {log.error "Cannot get published app version for ${name} from the web."}
 }
 
-private send(msg) {  
+private send(msg) {
+    if (useTimeStamp) {
+    	def stamp = new Date().format('yyyy-M-d HH:mm:ss',location.timeZone)
+        msg = msg + " (" + stamp + ")"
+    }
+    
 	//First try to use Contact Book (Depricated 30July2018)
     if (location.contactBookEnabled) {
         if (loggingOn) log.debug("sending '$msg' notification to: ${recipients?.size()}")
         sendNotificationToContacts(msg, recipients)
     }
+    
     //Otherwise use old school Push/SMS notifcations
     else {
-        if (loggingOn) log.debug("sending message to app notications tab: '$msg'")
+        if (loggingOn) log.debug("sending message to app notifications tab: '$msg'")
         sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
         if (wantsPush) {
             sendPushMessage(msg)  //Second, send the push notification if user wanted it
