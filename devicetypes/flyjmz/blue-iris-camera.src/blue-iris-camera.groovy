@@ -39,13 +39,14 @@ v1.3 5Mar18		Tried Image capture, but it gets weird because the captured image w
                 Added "moveToPreset" command so webcore (and others) can call "moveToPreset.cameraPreset(#)" to move camera to specific presets. -requested by @jrfarrar
 v1.4 17Apr18    Allows user to change the icon per @jasonrwise77 request
 v1.5 5Feb19		Added Camera name to notifications. Added some todos.
+v1.5.1 6Feb19	Changed notifications to display name instead of shortname.
 
 
 ToDo:
 - add code for new smartthings app to work (mnmn: “SmartThings”, vid: “generic-motion-3”) from post, but whole thread on all of them.
 */
 
-def appVersion() {"1.5"}
+def appVersion() {"1.5.1"}
 
 metadata {
     definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
@@ -114,7 +115,8 @@ metadata {
 
 def initializeCamera(cameraSettings) {
 	state.cameraSettings = cameraSettings
-    sendEvent(name: "motion", value: "inactive", descriptionText: "${state.cameraSettings.shortName} Camera Motion Inactive", displayed: false)  //initializes camera motion state
+    log.info "state.cameraSettings is: ${state.cameraSettings}"
+    sendEvent(name: "motion", value: "inactive", descriptionText: "${state.cameraSettings.displayName} Camera Motion Inactive", displayed: false)  //initializes camera motion state
     log.info "${state.cameraSettings.shortName} camera DTH initialized"
 }
 
@@ -123,24 +125,24 @@ def parse(String description) {  //Don't need to parse anything because it's all
 }
 
 def on() {   //Trigger to start recording with BI Camera
-	log.info "${state.cameraSettings.shortName} Executing 'on'"
-    sendEvent(name: "switch", value: "on", descriptionText: "${state.cameraSettings.shortName} Recording Triggered", displayed: true)
+	log.info "${state.cameraSettings.shortName} Executing 'on'."
+    sendEvent(name: "switch", value: "on", descriptionText: "${state.cameraSettings.displayName.replaceAll("\\s","")} Recording Triggered", displayed: true)  //NOTE: "state.cameraSettings.displayName" doesn't work within descriptionText when the displayName contains spaces.  Also "device.displayName", "device.label", and "label" do not work within descriptionText.   
     runIn(10,off)
 }
 
 def off() {  //Can't actually turn off recording, the trigger is for a defined period in Blue Iris Settings for each camera and profile, this just puts the tile back to normal.
 	log.info "${state.cameraSettings.shortName} Executing 'off'"
-    sendEvent(name: "switch", value: "off", descriptionText: "${state.cameraSettings.shortName} Recording Trigger Ended", displayed: true)
+    sendEvent(name: "switch", value: "off", descriptionText: "${state.cameraSettings.displayName.replaceAll("\\s","")} Recording Trigger Ended", displayed: true)
 }
 
 def active() {  //BI Camera senses motion
 	log.info "${state.cameraSettings.shortName} Motion 'active'"
-	sendEvent(name: "motion", value: "active", descriptionText: "${state.cameraSettings.shortName} Camera Motion Active", displayed: true)
+	sendEvent(name: "motion", value: "active", descriptionText: "${state.cameraSettings.displayName.replaceAll("\\s","")} Camera Motion Active", displayed: true)
 }
 
 def inactive() {  //BI Camera no longer senses motion
 	log.info "${state.cameraSettings.shortName} Motion 'inactive'"
-    sendEvent(name: "motion", value: "inactive", descriptionText: "${state.cameraSettings.shortName} Camera Motion Inactive", displayed: true)
+    sendEvent(name: "motion", value: "inactive", descriptionText: "${state.cameraSettings.displayName.replaceAll("\\s","")} Camera Motion Inactive", displayed: true)
 }
 
 def push() {
@@ -151,7 +153,7 @@ def push() {
 def moveToPreset(preset) {
 	def receivedPreset = preset
 	log.info "${state.cameraSettings.shortName} commanded to move to preset '${receivedPreset}'"
-    sendEvent(name: "cameraPreset", value: "$receivedPreset", descriptionText: "${state.cameraSettings.shortName} Camera Commanded to Preset $receivedPreset", displayed: true)
+    sendEvent(name: "cameraPreset", value: "$receivedPreset", descriptionText: "${state.cameraSettings.displayName.replaceAll("\\s","")} Camera Commanded to Preset $receivedPreset", displayed: true)
 }
 
 def start() {
