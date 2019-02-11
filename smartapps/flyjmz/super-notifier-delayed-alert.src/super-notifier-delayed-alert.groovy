@@ -29,6 +29,7 @@ Version History:
     1.9.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
     1.9.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
     1.9.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings, user can now set if the snooze switch snoozes when it is on or off.
+	1.9.5 - beta, added tts device support
 
 To Do:
 -None!
@@ -122,11 +123,9 @@ def settings() {
         } 
         
         section("Audio Notifications", hidden: false, hideable: true) {
-        	paragraph "Can choose to have the message spoken using a speech synthesis device (e.g. LANnouncer)"
-            input "speakNotifications", "bool", title: "Use Audio Notifications?", required: false, submitOnChange: true
-            if (speakNotifications) {
-                input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers?", required: true, multiple: true
-            }
+        	paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
+            input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g., LANnouncer)?", required: false, multiple: true
+            input name: "ttsDevices", type: "capability.musicPlayer", title: "Which Text-To-Speech Speakers (e.g., Sonos)?", required: false, multiple: true
         }
 
         section() {
@@ -520,9 +519,18 @@ private timeIntervalLabel() {
 
 private sendMessage(msg) {
     //Speak Message
-    if (speakNotifications) {
+    if (speechDevices) {
         speechDevices.each() {
     		it.speak(msg)
+            log.info "Spoke '" + msg + "' with " + it.device.displayName
+    	}
+    }
+    if (ttsDevices) {
+    	def sound = textToSpeech(msg, true)
+    	sound.uri = sound.uri.replace('https:', 'http:')  //not sure I need this, it's in some examples but not others
+        
+        ttsDevices.each() {
+        	it.playTrack(sound.uri)
             log.info "Spoke '" + msg + "' with " + it.device.displayName
     	}
     }

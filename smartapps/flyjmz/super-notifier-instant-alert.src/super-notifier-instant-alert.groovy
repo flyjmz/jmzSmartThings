@@ -26,6 +26,8 @@ Version History:
     1.6.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
     1.6.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
 	1.6.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings,
+    1.6.5 - Beta, deleted 'is' from notification message, added switch and alarm control, added ability to notify on alarm activation, added v1 of TTS device support- needs to be confirmed
+    
 To Do:
 */
 
@@ -50,6 +52,7 @@ preferences {
 def settings() {
     dynamicPage(name: "settings", title: "", install: true, uninstall: true) {
         section("Choose one or more, notify when..."){
+            input "myAlarm", "capability.alarm", title: "Alarm Activated", required: false, multiple: true
             input "button", "capability.button", title: "Button Pushed", required: false, multiple: true
             input "motion", "capability.motionSensor", title: "Motion Here", required: false, multiple: true
             input "contact", "capability.contactSensor", title: "Contact Opens", required: false, multiple: true
@@ -84,6 +87,12 @@ def settings() {
         section("Send this custom message (optional, sends standard status message if not specified)") {
             input "messageText", "text", title: "Message Text", required: false
         }
+        
+        section("Message Details") {
+            paragraph "Minimum time between messages (optional, defaults to every message)"
+            input "frequency", "decimal", title: "Minutes", required: false
+            input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
+        }
 
         section("Text/Push Notifications", hidden: false, hideable: true) {
             def SMSContactsSendSMS = []
@@ -110,19 +119,19 @@ def settings() {
         }
  
  		section("Audio Notifications", hidden: false, hideable: true) {
-        	paragraph "Can choose to have the message spoken using a speech synthesis device (e.g. LANnouncer)"
-			input "speakNotifications", "bool", title: "Use Audio Notifications?", required: false, submitOnChange: true
-            if (speakNotifications) {
-                input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g. LANnouncer)?", required: true, multiple: true
+        	paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
+            input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g., LANnouncer)?", required: false, multiple: true
+            input name: "ttsDevices", type: "capability.musicPlayer", title: "Which Text-To-Speech Speakers (e.g., Sonos)?", required: false, multiple: true
+        }
+        
+        section("Notify via Switch or Alarm") {
+            input "controlledSwitch", "capability.switch", title: "Use this Switch", required: false, multiple: true, submitOnChange: true
+            if (controlledSwitch) {
+           		input "controlledSwitchOn", "bool", title: "Turn switch on or off?", required: false
             }
+            input "controlledAlarm", "capability.alarm", title: "Turn on this Alarm", required: false, multiple: true
         }
-
-        section("Message Details") {
-            paragraph "Minimum time between messages (optional, defaults to every message)"
-            input "frequency", "decimal", title: "Minutes", required: false
-            input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
-        }
-
+        
         section() {
                 label title: "Assign a name", required: true
         }
@@ -172,6 +181,9 @@ def updated() {
 }
 
 def initialize() {
+    subscribe(myAlarm, "alarm.strobe", eventHandler)
+    subscribe(myAlarm, "alarm.siren", eventHandler)
+    subscribe(myAlarm, "alarm.both", eventHandler)
 	subscribe(button, "button.pushed", eventHandler)
 	subscribe(contact, "contact.open", eventHandler)
    	subscribe(contactClosed, "contact.closed", eventHandler)
@@ -282,7 +294,7 @@ def createInstantMessage(name,value,device) {
 				messageDefault = "${device} has left"
 			}
 		} else {
-			messageDefault = "${device} is ${value}"
+			messageDefault = "${device} ${value}"  //removed 'is' in v1.6.5.  Was "${device} is ${value}" 
 		}
         msg = messageDefault
 	}
@@ -375,10 +387,31 @@ private timeIntervalLabel() {
 }
 
 private sendMessage(msg) {  
-	//Speak Message
-    if (speakNotifications) {
+	//Notify via switch or alarm
+    if (controlledSwitch) {
+    	if (controlledSwitchOn) {
+        	controlledSwitch.on()
+        } else {
+        	controlledSwitch.off()
+        }
+    }
+    if (controlledAlarm) {
+    	controlledAlarm.on()
+    }
+    
+    //Speak Message
+    if (speechDevices) {
         speechDevices.each() {
     		it.speak(msg)
+            log.info "Spoke '" + msg + "' with " + it.device.displayName
+    	}
+    }
+    if (ttsDevices) {
+    	def sound = textToSpeech(msg, true)
+    	sound.uri = sound.uri.replace('https:', 'http:')  //not sure I need this, it's in some examples but not others
+        
+        ttsDevices.each() {
+        	it.playTrack(sound.uri)
             log.info "Spoke '" + msg + "' with " + it.device.displayName
     	}
     }
