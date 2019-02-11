@@ -525,14 +525,44 @@ private sendMessage(msg) {
             log.info "Spoke '" + msg + "' with " + it.device.displayName
     	}
     }
-    if (ttsDevices) {
+if (ttsDevices) {
     	def sound = textToSpeech(msg, true)
     	sound.uri = sound.uri.replace('https:', 'http:')  //not sure I need this, it's in some examples but not others
         
+        sound.duration = (sound.duration.toInteger() + 5).toString()
         ttsDevices.each() {
-        	it.playTrack(sound.uri)
+            def currentStatus = ""
+            try {
+                currentStatus = it?.latestValue("status")
+            } catch (e) { log.error "Error getting device currentStatus" }
+            def currentTrack = ""
+            try {
+                currentTrack = it?.latestState("trackData")?.jsonValue
+            } catch (e) { log.error "Error getting device currentTrack" }
+            if (currentTrack != null) {
+                //currentTrack has data
+                if ((currentStatus == 'playing' || currentTrack?.status == 'playing') && (!((currentTrack?.status == 'stopped') || (currentTrack?.status == 'paused')))) { 
+                    it.playTrackAndResume(sound.uri, sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
+                } else {
+                    it.playTrackAndRestore(sound.uri, sound.duration)
+                }
+            } else {
+                if (currentStatus != null) { 
+                    if (currentStatus == "disconnected") {
+                        it.playTrackAndResume(state.sound.uri, state.sound.duration)
+                    } else {
+                        if (currentStatus == "playing") {   
+                            it.playTrackAndResume(state.sound.uri, state.sound.duration)       
+                        } else {
+                            it.playTrackAndRestore(state.sound.uri, state.sound.duration)     
+                        }
+                    }
+                } else {
+                    it.playTrackAndRestore(state.sound.uri, state.sound.duration)       
+                }
+            }
             log.info "Spoke '" + msg + "' with " + it.device.displayName
-    	}
+        }
     }
     
     //Add time stamps for text/push messages (not for audio)
