@@ -26,12 +26,14 @@ Version History:
     1.6.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
     1.6.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
 	1.6.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings,
-    1.6.5 - Beta, deleted 'is' from notification message, added switch and alarm control, added ability to notify on alarm activation, added v1 of TTS device support- needs to be confirmed
+    1.6.5 - 14Mar2019, deleted 'is' from notification message, added switch and alarm control, added ability to notify on alarm activation, added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
     
 To Do:
+-Does TTS work?
+-Does Pushover work?  Looks like priority will always be normal based on the DTH...
 */
 
-def appVersion() {"1.6.4"}
+def appVersion() {"1.6.5"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -94,7 +96,7 @@ def settings() {
             input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
         }
 
-        section("Text/Push Notifications", hidden: false, hideable: true) {
+        section("Text/Push Notifications", hidden: true, hideable: true) {
             def SMSContactsSendSMS = []
 
             if (location.contactBookEnabled ==  true) {
@@ -118,13 +120,13 @@ def settings() {
             }
         }
  
- 		section("Audio Notifications", hidden: false, hideable: true) {
+ 		section("Audio Notifications", hidden: true, hideable: true) {
         	paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
             input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g., LANnouncer)?", required: false, multiple: true
             input name: "ttsDevices", type: "capability.musicPlayer", title: "Which Text-To-Speech Speakers (e.g., Sonos)?", required: false, multiple: true
         }
         
-        section("Notify via Switch or Alarm") {
+        section("Notify via Switch or Alarm", hidden: true, hideable: true) {
             input "controlledSwitch", "capability.switch", title: "Use this Switch", required: false, multiple: true, submitOnChange: true
             if (controlledSwitch) {
            		input "controlledSwitchOn", "bool", title: "Turn switch on or off?", required: false
@@ -132,8 +134,13 @@ def settings() {
             input "controlledAlarm", "capability.alarm", title: "Turn on this Alarm", required: false, multiple: true
         }
         
-        section() {
-                label title: "Assign a name", required: true
+        section("Pushover Notifications", hidden: true, hideable: true) {
+            paragraph "Optionally send messages via Pushover." 
+            input name: "pushoverDevice", type: "capability.notification", title: "Which Pushover Devices?", required: false, multiple: true, submitOnChange: true
+            if (pushoverDevice) input name: "messagePriority", type: "enum", title: "Message Priority", options: ["Low", "Normal", "High", "Emergency"], required: true
+            paragraph "Pushover Device Type Handler must be installed in your SmartThings IDE & the device setup first:"
+            href url: "https://github.com/flyjmz/jmzSmartThings/blob/master/devicetypes/flyjmz/ZP_Pushover_device.groovy", style:"embedded", title: "Link to Pushover DTH code"
+            href url: "https://community.smartthings.com/t/pushover-notifications-device-type/34562", style:"embedded", title: "Link to Pushover DTH Community Forums"
         }
 
         section(title: "Execution Restrictions", hidden: hideOptionsSection(), hideable: true) {
@@ -143,6 +150,10 @@ def settings() {
             input "controlSwitch", "capability.switch", title: "Only when this switch is...?", required: false, submitOnChange: true
             if (controlSwitch) input "controlSwitchOnOrOff","enum", title: "...On or Off?", multiple: false, required: true, options: ["On", "Off"]
             mode(title: "Only during specific mode(s)")
+        }
+        
+        section() {
+                label title: "Assign a name", required: true
         }
      }
  }
@@ -456,10 +467,8 @@ private sendMessage(msg) {
     if (location.contactBookEnabled) {
         log.info "sent '$msg' notification to: ${recipients?.size()}"
         sendNotificationToContacts(msg, recipients)
-    }
-
-    //Otherwise use old school Push/SMS notifcations
-    else {
+    } else {
+    	//Otherwise use old school Push/SMS notifications
         if (loggingOn) log.debug("sending message to app notifications tab: '$msg'")
         sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
         if (wantsPush) {
@@ -476,5 +485,10 @@ private sendMessage(msg) {
                 }
             }
         }
+    }
+    
+    //Then send Pushover notifications:
+    if (pushoverDevice) {
+    	pushoverDevice.sendMessage(msg, messagePriority)
     }
 }
