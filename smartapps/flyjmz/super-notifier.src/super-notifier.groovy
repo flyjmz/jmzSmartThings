@@ -28,6 +28,7 @@ Version History:
     1.3 - 17Apr2017, updated with Door Knocker monitoring
     1.4 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
 
+Todo:
 */
 
 def appVersion() {"1.4"}

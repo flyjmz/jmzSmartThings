@@ -27,6 +27,7 @@ Version History:
     1.6.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
 	1.6.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings,
     1.6.5 - 14Mar2019, deleted 'is' from notification message, added switch and alarm control, added ability to notify on alarm activation, added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
+    1.6.6 - 10Jun2019, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
     
 To Do:
 -Does TTS work?
@@ -96,7 +97,7 @@ def settings() {
             input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
         }
 
-        section("Text/Push Notifications", hidden: true, hideable: true) {
+        section("Text/Push Notifications", hidden: hideTextPushNotificationsSection(), hideable: true) {
             def SMSContactsSendSMS = []
 
             if (location.contactBookEnabled ==  true) {
@@ -120,13 +121,13 @@ def settings() {
             }
         }
  
- 		section("Audio Notifications", hidden: true, hideable: true) {
+ 		section("Audio Notifications", hidden: hideAudioNotificationsSection(), hideable: true) {
         	paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
             input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g., LANnouncer)?", required: false, multiple: true
             input name: "ttsDevices", type: "capability.musicPlayer", title: "Which Text-To-Speech Speakers (e.g., Sonos)?", required: false, multiple: true
         }
         
-        section("Notify via Switch or Alarm", hidden: true, hideable: true) {
+        section("Notify via Switch or Alarm", hidden: hideSwitchAlarmSection(), hideable: true) {
             input "controlledSwitch", "capability.switch", title: "Use this Switch", required: false, multiple: true, submitOnChange: true
             if (controlledSwitch) {
            		input "controlledSwitchOn", "bool", title: "Turn switch on or off?", required: false
@@ -134,7 +135,7 @@ def settings() {
             input "controlledAlarm", "capability.alarm", title: "Turn on this Alarm", required: false, multiple: true
         }
         
-        section("Pushover Notifications", hidden: true, hideable: true) {
+        section("Pushover Notifications", hidden: hidePushoverNotificationsSection(), hideable: true) {
             paragraph "Optionally send messages via Pushover." 
             input name: "pushoverDevice", type: "capability.notification", title: "Which Pushover Devices?", required: false, multiple: true, submitOnChange: true
             if (pushoverDevice) input name: "messagePriority", type: "enum", title: "Message Priority", options: ["Low", "Normal", "High", "Emergency"], required: true
@@ -143,7 +144,7 @@ def settings() {
             href url: "https://community.smartthings.com/t/pushover-notifications-device-type/34562", style:"embedded", title: "Link to Pushover DTH Community Forums"
         }
 
-        section(title: "Execution Restrictions", hidden: hideOptionsSection(), hideable: true) {
+        section(title: "Execution Restrictions", hidden: hideExecutionRestrictionsSection(), hideable: true) {
             def timeLabel = timeIntervalLabel()
             href "certainTime", title: "Only during a certain time", description: timeLabel ?: "Tap to set", state: timeLabel ? "complete" : null
             input "days", "enum", title: "Only on certain days of the week", multiple: true, required: false, options: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -376,8 +377,24 @@ private hhmm(time, fmt = "h:mm a") {
 	f.format(t)
 }
 
-private hideOptionsSection() {
+private hideExecutionRestrictionsSection() {
 	(starting || ending || days || modes || startingX || endingX || controlSwitch) ? false : true
+}
+
+private hideSwitchAlarmSection() {
+    (controlledSwitch || controlledAlarm) ? false : true
+}
+
+private hidePushoverNotificationsSection() {
+	(pushoverDevice) ? false : true
+}
+
+private hideTextPushNotificationsSection() {
+    (wantsPush || recipients || SMSContactsSendSMS) ? false : true
+}
+
+private hideAudioNotificationsSection() {
+    (speechDevices || ttsDevices) ? false : true
 }
 
 private offset(value) {
@@ -418,10 +435,10 @@ private sendMessage(msg) {
     	}
     }
     if (ttsDevices) {
-    	def sound = textToSpeech(msg, true)
-    	sound.uri = sound.uri.replace('https:', 'http:')  //not sure I need this, it's in some examples but not others
+    	state.sound = textToSpeech(msg, true)
+    	//sound.uri = sound.uri.replace('https:', 'http:')  //todo not sure I need this, it's in some examples but not others
         
-        sound.duration = (sound.duration.toInteger() + 5).toString()
+        state.sound.duration = (state.sound.duration.toInteger() + 5).toString()
         ttsDevices.each() {
             def currentStatus = ""
             try {
@@ -434,23 +451,23 @@ private sendMessage(msg) {
             if (currentTrack != null) {
                 //currentTrack has data
                 if ((currentStatus == 'playing' || currentTrack?.status == 'playing') && (!((currentTrack?.status == 'stopped') || (currentTrack?.status == 'paused')))) { 
-                    it.playTrackAndResume(sound.uri, sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
+                    it.playTrackAndResume(state.sound, state.sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
                 } else {
-                    it.playTrackAndRestore(sound.uri, sound.duration)
+                    it.playTrackAndRestore(state.sound, state.sound.duration)
                 }
             } else {
                 if (currentStatus != null) { 
                     if (currentStatus == "disconnected") {
-                        it.playTrackAndResume(state.sound.uri, state.sound.duration)
+                        it.playTrackAndResume(state.sound, state.sound.duration)
                     } else {
                         if (currentStatus == "playing") {   
-                            it.playTrackAndResume(state.sound.uri, state.sound.duration)       
+                            it.playTrackAndResume(state.sound, state.sound.duration)       
                         } else {
-                            it.playTrackAndRestore(state.sound.uri, state.sound.duration)     
+                            it.playTrackAndRestore(state.sound, state.sound.duration)     
                         }
                     }
                 } else {
-                    it.playTrackAndRestore(state.sound.uri, state.sound.duration)       
+                    it.playTrackAndRestore(state.sound, state.sound.duration)       
                 }
             }
             log.info "Spoke '" + msg + "' with " + it.device.displayName

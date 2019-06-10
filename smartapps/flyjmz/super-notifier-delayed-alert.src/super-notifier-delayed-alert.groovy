@@ -30,6 +30,7 @@ Version History:
     1.9.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
     1.9.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings, user can now set if the snooze switch snoozes when it is on or off.
 	1.9.5 - 14Mar2019, updated logging, fixed custom messages (messageText was never used), added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
+	1.9.6 - 10Jun2019, added water sensor, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
 
 To Do:
 -Is TTS working?  I haven't been able to test it and haven't heard from other users.
@@ -42,7 +43,7 @@ To Do:
     --Not sure how to use the safe navigation operator (like myContact?.value) because there isn't a .value method for non-map/list/array variables.
     --I'd rather not first define all the variables only to later set them null if they aren't used.
     --This can be avoided if they create new child instances instead of changing existing ones.
--None!
+-Prevent bonus fridge executions.  Add unschedule() to okhandler? Only issue may be for multiple devices of the same type (e.g. multiple leak sensors), if one becomes ok, then it'd unschedule any other updates for other ones that aren't ok yet.
 */
 
 def appVersion() {"1.9.5"}
@@ -65,19 +66,10 @@ preferences {
 def settings() {
     dynamicPage(name: "settings", title: "", install: true, uninstall: true) {
         section("") {
-            input "monitorType", "enum", title: "Monitor what?", required: true, options: ["Contact Sensor", "Switch", "Temperature", "Lock", "Power"], submitOnChange: true
+            input "monitorType", "enum", title: "Monitor what?", required: true, options: ["Contact Sensor", "Lock", "Power", "Switch", "Temperature", "Water or Leak"], submitOnChange: true
             if (monitorType == "Contact Sensor") {
                 input "myContact", "capability.contactSensor", title: "Which contact?", required: true
                 input "openClosed", "enum", title: "When left open or closed?", required: true, options: ["Open", "Closed"]
-            }
-            if (monitorType == "Switch") {
-                input "mySwitch", "capability.switch", title: "Which switch?", required: true
-                input "onOff", "enum", title: "When left on or off?", required: true, options: ["On", "Off"]
-            }
-            if (monitorType == "Temperature") {
-                input "temp", "capability.temperatureMeasurement", title: "Which Temp Sensor?", required: true
-                input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
-                input "tempTooCold", "number", title: "Too Cold When Temp is Below:", range: "*..*", required: false
             }
             if (monitorType == "Lock") {
                 input "myLock", "capability.lock", title: "Which Lock?", required: true
@@ -88,6 +80,19 @@ def settings() {
                 input "powerTooHigh", "number", title: "Power Too High When Above:", range: "*..*", required: false
                 input "powerTooLow", "number", title: "Power Too Low When Below:", range: "*..*", required: false
             }
+            if (monitorType == "Switch") {
+                input "mySwitch", "capability.switch", title: "Which switch?", required: true
+                input "onOff", "enum", title: "When left on or off?", required: true, options: ["On", "Off"]
+            }
+            if (monitorType == "Temperature") {
+                input "temp", "capability.temperatureMeasurement", title: "Which Temp Sensor?", required: true
+                input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
+                input "tempTooCold", "number", title: "Too Cold When Temp is Below:", range: "*..*", required: false
+            }
+            if (monitorType == "Water or Leak") {
+                input "myWater", "capability.waterSensor", title: "Which Water or Leak Sensor?", required: true
+                input "wetDry", "enum", title: "When left wet or dry?", required: true, options: ["Wet", "Dry"]
+            }
         }
         section("Message Details") {
             input "waitThreshold", "number", title: "Delay time before alerting (minutes):", required: true
@@ -95,7 +100,7 @@ def settings() {
             input "useTimeStamp", "bool", title: "Add timestamp to messages?", required: false
         }
 
-        section("Periodic Notifications", hidden: true, hideable: true) {
+        section("Periodic Notifications", hidden: hidePeriodicNotificationsSection(), hideable: true) {
             paragraph "You'll receive an alert when it is left that way after your defined time period (above) and also onces it returns to normal.  Optionally, you can set periodic notifications for times in between as well." 
             input "periodicNotifications", "bool", title: "Receive periodic notifications?", required: false, submitOnChange: true
             if (periodicNotifications) {
@@ -108,7 +113,7 @@ def settings() {
             }      
         }
 
-        section("Text/Push Notifications", hidden: true, hideable: true) {
+        section("Text/Push Notifications", hidden: hideTextPushNotificationsSection(), hideable: true) {
             def SMSContactsSendSMS = []
 
             if (location.contactBookEnabled ==  true) {
@@ -132,13 +137,13 @@ def settings() {
             }
         } 
 
-        section("Audio Notifications", hidden: true, hideable: true) {
+        section("Audio Notifications", hidden: hideAudioNotificationsSection(), hideable: true) {
             paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
             input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g., LANnouncer)?", required: false, multiple: true
             input name: "ttsDevices", type: "capability.musicPlayer", title: "Which Text-To-Speech Speakers (e.g., Sonos)?", required: false, multiple: true
         }
 
-        section("Pushover Notifications", hidden: true, hideable: true) {
+        section("Pushover Notifications", hidden: hidePushoverNotificationsSection(), hideable: true) {
             paragraph "Optionally send messages via Pushover." 
             input name: "pushoverDevice", type: "capability.notification", title: "Which Pushover Devices?", required: false, multiple: true, submitOnChange: true
             if (pushoverDevice) input name: "messagePriority", type: "enum", title: "Message Priority", options: ["Low", "Normal", "High", "Emergency"], required: true
@@ -147,7 +152,7 @@ def settings() {
             href url: "https://community.smartthings.com/t/pushover-notifications-device-type/34562", style:"embedded", title: "Link to Pushover DTH Community Forums"
         }
 
-        section(title: "Execution Restrictions", hidden: true, hideable: true) {
+        section(title: "Execution Restrictions", hidden: hideExecutionRestrictionsSection(), hideable: true) {
             def timeLabel = timeIntervalLabel()
             href "certainTime", title: "Only during a certain time", description: timeLabel ?: "Tap to set", state: timeLabel ? "complete" : null
             input "days", "enum", title: "Only on certain days of the week", multiple: true, required: false, options: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -228,6 +233,14 @@ def initialize () {
     } else if (monitorType == "Power") {
         if (myPower) {
             subscribe(myPower, "power", powerHandler)
+        }
+  	} else if (monitorType == "Water or Leak") {
+        if (wetDry && wetDry == "Wet") {
+            subscribe(myWater, "water.wet", eventHandler)
+            subscribe(myWater, "water.dry", okHandler)
+        } else if (wetDry && wetDry == "Dry") {
+            subscribe(myWater, "water.dry", eventHandler)
+            subscribe(myWater, "water.wet", okHandler)
         }
     } else {if (parent.loggingOn) log.debug "Not subscribing to any device events"}
     if (modeChange) subscribe(location, "mode", periodicNotifier) //checks status every time mode changes (in case it missed it)
@@ -316,7 +329,8 @@ def stillWrong() {
     def tempState2 = temp?.currentState("temperature")?.doubleValue
     def myLockState = myLock?.currentState("lock")?.value
     def myPowerState = myPower?.currentState("power")?.doubleValue
-    if (parent.loggingOn) log.debug "myContactState is $myContactState, mySwitchState is $mySwitchState, tempState2 is $tempState2, myLockState is $myLockState, myPowerState is $myPowerState"
+    def myWaterState = myWater?.currentState("water")?.value
+    if (parent.loggingOn) log.debug "myContactState is $myContactState, mySwitchState is $mySwitchState, tempState2 is $tempState2, myLockState is $myLockState, myPowerState is $myPowerState, myWaterState is $myWaterState"
     if (monitorType == "Contact Sensor") {
         if (openClosed == "Open") {
             if (myContactState == "open") {
@@ -344,7 +358,7 @@ def stillWrong() {
         }
     }
     if (monitorType == "Lock") {
-        if (lockedUnlocked == "locked") {
+        if (lockedUnlocked == "Locked") {
             if (myLockState == "locked") {
                 if (parent.loggingOn) log.debug "Lock is still locked"
                 stillWrongMsger()
@@ -353,7 +367,20 @@ def stillWrong() {
             if (myLockState == "unlocked") {
                 if (parent.loggingOn) log.debug "Lock is still unlocked"
                 stillWrongMsger()
-            } else {if (parent.loggingOn) log.debug "the lock is lcoked and you want it that way"}
+            } else {if (parent.loggingOn) log.debug "the lock is locked and you want it that way"}
+        }
+    }
+    if (monitorType == "Water or Leak") {
+        if (wetDry == "Wet") {
+            if (myWaterState == "wet") {
+                if (parent.loggingOn) log.debug "Water sensor is still wet"
+                stillWrongMsger()
+            } else {if (parent.loggingOn) log.debug "the water sensor is dry and you want it that way"}
+        } else {
+            if (myWaterState == "dry") {
+                if (parent.loggingOn) log.debug "Water sensor is still dry"
+                stillWrongMsger()
+            } else {if (parent.loggingOn) log.debug "the water sensor is wet and you want it that way"}
         }
     }
     if (monitorType == "Temperature") {
@@ -377,6 +404,7 @@ def stillWrongMsger() {
     def myLockState2 = myLock?.currentState("lock")
     def tempState3 = temp?.currentState("temperature")
     def myPowerState2 = myPower?.currentState("power")
+    def myWaterState2 = myWater?.currentState("water")
     if (allOk) {
         if (parent.loggingOn) log.debug "Event within time/day/mode/switch constraints"
         if (!atomicState.msgSent) {
@@ -388,6 +416,7 @@ def stillWrongMsger() {
                 if (monitorType == "Lock") sendMessage("${myLock?.displayName} is still ${myLockState2?.value}!")
                 if (monitorType == "Temperature") sendMessage("${temp?.displayName} is still ${tempState3?.value} ${location.temperatureScale}!")
                 if (monitorType == "Power") sendMessage("${myPower?.displayName} is still ${myPowerState2?.value} W!")
+                if (monitorType == "Water or Leak") sendMessage("${myWater?.displayName} is still ${myWaterState2?.value}!")
             }
             atomicState.msgSent = true
             if (parent.loggingOn) log.debug "sent first message, set atomicState.msgSent to ${atomicState.msgSent}"
@@ -426,6 +455,7 @@ def stillWrongMsger() {
                     if (monitorType == "Lock") sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeMsg} hours!")
                     if (monitorType == "Temperature") sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeMsg} hours! (Currently $tempState3.value ${location.temperatureScale}).")
                     if (monitorType == "Power") sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeMsg} hours! (Currently $myPowerState2.value W).")
+                	if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeMsg} hours!")
                 }
             } 
             if (!snooze && timeSince < 180) {
@@ -437,6 +467,7 @@ def stillWrongMsger() {
                     if (monitorType == "Lock") sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeSince} minutes!")
                     if (monitorType == "Temperature") sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeSince} minutes! (Currently $tempState3.value ${location.temperatureScale})")
                     if (monitorType == "Power") sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeSince} minutes! (Currently $myPowerState2.value W).")
+                	if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeSince} minutes!")
                 }
             }
             if (waitMinutes != null) {
@@ -537,8 +568,24 @@ private hhmm(time, fmt = "h:mm a") {
     f.format(t)
 }
 
-private hideOptionsSection() {
+private hideExecutionRestrictionsSection() {
     (starting || ending || days || modes || startingX || endingX) ? false : true
+}
+
+private hidePushoverNotificationsSection() {
+	(pushoverDevice) ? false : true
+}
+
+private hidePeriodicNotificationsSection() {
+    (periodicNotifications) ? false : true
+}
+
+private hideTextPushNotificationsSection() {
+    (wantsPush || recipients || SMSContactsSendSMS) ? false : true
+}
+
+private hideAudioNotificationsSection() {
+    (speechDevices || ttsDevices) ? false : true
 }
 
 private offset(value) {
@@ -567,10 +614,10 @@ private sendMessage(msg) {
         }
     }
     if (ttsDevices) {
-        def sound = textToSpeech(msg, true)
-        sound.uri = sound.uri.replace('https:', 'http:')  //not sure I need this, it's in some examples but not others
+        state.sound = textToSpeech(msg, true)
+        //sound.uri = sound.uri.replace('https:', 'http:')  //todo not sure I need this, it's in some examples but not others
 
-        sound.duration = (sound.duration.toInteger() + 5).toString()
+        state.sound.duration = (state.sound.duration.toInteger() + 5).toString()
         ttsDevices.each() {
             def currentStatus = ""
             try {
@@ -583,23 +630,23 @@ private sendMessage(msg) {
             if (currentTrack != null) {
                 //currentTrack has data
                 if ((currentStatus == 'playing' || currentTrack?.status == 'playing') && (!((currentTrack?.status == 'stopped') || (currentTrack?.status == 'paused')))) { 
-                    it.playTrackAndResume(sound.uri, sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
+                    it.playTrackAndResume(state.sound, state.sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
                 } else {
-                    it.playTrackAndRestore(sound.uri, sound.duration)
+                    it.playTrackAndRestore(state.sound, state.sound.duration)
                 }
             } else {
                 if (currentStatus != null) { 
                     if (currentStatus == "disconnected") {
-                        it.playTrackAndResume(state.sound.uri, state.sound.duration)
+                        it.playTrackAndResume(state.sound, state.sound.duration)
                     } else {
                         if (currentStatus == "playing") {   
-                            it.playTrackAndResume(state.sound.uri, state.sound.duration)       
+                            it.playTrackAndResume(state.sound, state.sound.duration)       
                         } else {
-                            it.playTrackAndRestore(state.sound.uri, state.sound.duration)     
+                            it.playTrackAndRestore(state.sound, state.sound.duration)     
                         }
                     }
                 } else {
-                    it.playTrackAndRestore(state.sound.uri, state.sound.duration)       
+                    it.playTrackAndRestore(state.sound, state.sound.duration)       
                 }
             }
             log.info "Spoke '" + msg + "' with " + it.device.displayName
