@@ -34,7 +34,7 @@ To Do:
 -Does Pushover work?  Looks like priority will always be normal based on the DTH...
 */
 
-def appVersion() {"1.6.5"}
+def appVersion() {"1.6.6"}
  
 definition(
 	name: "Super Notifier - Instant Alert",

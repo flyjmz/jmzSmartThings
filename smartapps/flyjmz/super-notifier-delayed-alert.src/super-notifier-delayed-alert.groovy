@@ -46,7 +46,7 @@ To Do:
 -Prevent bonus fridge executions.  Add unschedule() to okhandler? Only issue may be for multiple devices of the same type (e.g. multiple leak sensors), if one becomes ok, then it'd unschedule any other updates for other ones that aren't ok yet.
 */
 
-def appVersion() {"1.9.5"}
+def appVersion() {"1.9.6"}
 
 definition(
     name: "Super Notifier - Delayed Alert",
