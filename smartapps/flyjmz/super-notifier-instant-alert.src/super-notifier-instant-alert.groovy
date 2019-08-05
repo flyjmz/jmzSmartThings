@@ -28,13 +28,15 @@ Version History:
 	1.6.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings,
     1.6.5 - 14Mar2019, deleted 'is' from notification message, added switch and alarm control, added ability to notify on alarm activation, added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
     1.6.6 - 10Jun2019, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
-    
+    1.6.7 - beta, added chime notifications, updated alarm and switch notification execution code (added each, it)
+
 To Do:
+-Make notifications for for new app?
 -Does TTS work?
 -Does Pushover work?  Looks like priority will always be normal based on the DTH...
 */
 
-def appVersion() {"1.6.6"}
+def appVersion() {"1.6.7"}
  
 definition(
 	name: "Super Notifier - Instant Alert",
@@ -121,18 +123,21 @@ def settings() {
             }
         }
  
- 		section("Audio Notifications", hidden: hideAudioNotificationsSection(), hideable: true) {
+ 		section("Speech Notifications", hidden: hideSpeechNotificationsSection(), hideable: true) {
         	paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
             input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g., LANnouncer)?", required: false, multiple: true
             input name: "ttsDevices", type: "capability.musicPlayer", title: "Which Text-To-Speech Speakers (e.g., Sonos)?", required: false, multiple: true
         }
         
-        section("Notify via Switch or Alarm", hidden: hideSwitchAlarmSection(), hideable: true) {
-            input "controlledSwitch", "capability.switch", title: "Use this Switch", required: false, multiple: true, submitOnChange: true
+        section("Notify via Switch/Alarm/Chime", hidden: hideSwitchAlarmSection(), hideable: true) {
+            input "controlledSwitch", "capability.switch", title: "Which Switches?", required: false, multiple: true, submitOnChange: true
             if (controlledSwitch) {
            		input "controlledSwitchOn", "bool", title: "Turn switch on or off?", required: false
             }
-            input "controlledAlarm", "capability.alarm", title: "Turn on this Alarm", required: false, multiple: true
+            input name: "controlledAlarm", type: "capability.alarm", title: "Which Alarms?", required: false, multiple: true
+            input name: "chimeDevices", type: "capability.tone", title: "Which Chimes?", required: false, multiple: true
+            paragraph "Optionally set a delay time to revert switches, or turn off the alarm or chimes. If left blank, you'll have to revert them manually."
+            input name: "revertDelay", type: "number", title: "Delay Time (seconds)", required: false
         }
         
         section("Pushover Notifications", hidden: hidePushoverNotificationsSection(), hideable: true) {
@@ -382,7 +387,7 @@ private hideExecutionRestrictionsSection() {
 }
 
 private hideSwitchAlarmSection() {
-    (controlledSwitch || controlledAlarm) ? false : true
+    (controlledSwitch || controlledAlarm || chimeDevices || revertDelay) ? false : true
 }
 
 private hidePushoverNotificationsSection() {
@@ -393,7 +398,7 @@ private hideTextPushNotificationsSection() {
     (wantsPush || recipients || SMSContactsSendSMS) ? false : true
 }
 
-private hideAudioNotificationsSection() {
+private hideSpeechNotificationsSection() {
     (speechDevices || ttsDevices) ? false : true
 }
 
@@ -414,17 +419,32 @@ private timeIntervalLabel() {
 	else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
 }
 
-private sendMessage(msg) {  
-	//Notify via switch or alarm
+private sendMessage(msg) {
+    //Schedule switch/alarm/chime end time
+    if (revertDelay) {
+        runIn(revertDelay.toInteger(),"resetSwitchAlarmChime")
+    }  
+	//Notify via switch
     if (controlledSwitch) {
     	if (controlledSwitchOn) {
-        	controlledSwitch.on()
+        	controlledSwitch.each() {
+                it.on()
+            }
         } else {
-        	controlledSwitch.off()
+        	controlledSwitch.each() {
+                it.off()
+            }
         }
     }
-    if (controlledAlarm) {
-    	controlledAlarm.on()
+    
+    //Notify via alarm
+    controlledAlarm?.each() {
+    	it.on()
+    }
+
+    //Notify via chime
+    chimeDevices.each() {
+        it.beep()
     }
     
     //Speak Message
@@ -488,8 +508,11 @@ private sendMessage(msg) {
     	//Otherwise use old school Push/SMS notifications
         if (loggingOn) log.debug("sending message to app notifications tab: '$msg'")
         sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
+        
         if (wantsPush) {
-            sendPushMessage(msg)  //Second, send the push notification if user wanted it
+            sendNotification(msg, [event: false]) //sends a push notification without repeating it in the app event list
+            //todo-delete following line if above works. if not, "sendPush(msg)" and "sendSms(msg)" should work, but duplicate the message in the event list...
+            //sendPushMessage(msg)  //Second, send the push notification if user wanted it
             log.info "sent '$msg' via push"
         }
 
@@ -507,5 +530,30 @@ private sendMessage(msg) {
     //Then send Pushover notifications:
     if (pushoverDevice) {
     	pushoverDevice.sendMessage(msg, messagePriority)
+    }
+}
+
+def resetSwitchAlarmChime() {
+    //Revert switch
+    if (controlledSwitch) {
+        if (controlledSwitchOn) {
+            controlledSwitch.each() {
+                it.off()
+            }
+        } else {
+            controlledSwitch.each() {
+                it.on()
+            }
+        }
+    }
+    
+    //Revert alarm
+    controlledAlarm?.each() {
+        it.off()
+    }
+
+    //Revert chime
+    chimeDevices.each() {
+        it.off()
     }
 }

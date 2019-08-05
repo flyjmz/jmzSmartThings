@@ -27,11 +27,13 @@ Version History:
     1.2 - 1Feb2018, added update notifications and debug logging option
     1.3 - 17Apr2017, updated with Door Knocker monitoring
     1.4 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
+    1.5 - 4Aug2019, added about page for more info
 
 Todo:
+    -Add instructions on github and add link in here
 */
 
-def appVersion() {"1.4"}
+def appVersion() {"1.5"}
  
 definition(
   name: "Super Notifier",
@@ -45,12 +47,16 @@ definition(
 )
 
 preferences {
-    page(name:"superNotifierSetup")
+    page name:"superNotifierSetup"
+    page name:"pageAbout"
 }
-
 
 def superNotifierSetup() {
     dynamicPage(name: "superNotifierSetup", title: "Super Notifier", install: true, uninstall: true, submitOnChange: true) {
+        section() {
+        	href "pageAbout", title: "About Super Notifier"
+        }
+        
         section("Alerts") {
             app(name: "Instant Alert", appName: "Super Notifier - Instant Alert", namespace: "flyjmz", title: "Add instant alert", description: "Add an instant alert to notify as soon as something happens", multiple: true)
             app(name: "Delayed Alert", appName: "Super Notifier - Delayed Alert", namespace: "flyjmz", title: "Add delayed alert", description: "Add a delayed alert to notify when something has been left open/closed or on/off",multiple: true)
@@ -85,6 +91,72 @@ def superNotifierSetup() {
                     input "phoneNumbers", "string", title: "Enter Phone Numbers for SMS Notifications:", required: false
                 }
             }
+        }
+    }
+}
+
+def pageAbout() {
+    def instantVersion = "Not yet installed/initialized"
+    def delayedVersion = "Not yet installed/initialized"
+    if (state.instantVersion) instantVersion = state.instantVersion
+    if (state.delayedVersion) delayedVersion = state.delayedVersion
+
+    def textAbout = 
+        "Super Notifier: ${appVersion()}\n" +
+        "Instant Alert: ${instantVersion}\n" +
+        "Delayed Alert: ${delayedVersion}\n\n" +
+        "(versions update after app settings are saved and reopened)"
+
+    def githubInstructionsMap = [
+        url:         "https://github.com/flyjmz/jmzSmartThings",
+        style:       "embedded",
+        title:       "Tap here for installation instructions on Github",
+        description: "https://github.com/flyjmz/jmzSmartThings",
+        required:    false
+    ]
+
+    def communityPageMap = [
+        url:         "https://community.smartthings.com/t/release-super-notifier-all-your-alerts-in-one-place/59707",
+        style:       "embedded",
+        title:       "Tap here for this app's community thread",
+        description: "https://community.smartthings.com/t/release-super-notifier-all-your-alerts-in-one-place/59707",
+        required:    false
+    ]
+
+    def donatePageMap = [
+        url:         "https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6T44ZPUKCMYL6&lc=US&item_name=FLYJMZ%20Custom%20SmartApps&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted",
+        style:       "embedded",
+        title:       "Tap here to donate",
+        description: "https://www.paypal.com/",
+        required:    false
+    ]
+
+    def pageProperties = [
+        name:       "pageAbout",
+        nextPage:   "superNotifierSetup",
+        uninstall:  false
+    ]
+
+    return dynamicPage(pageProperties) {
+        section("App Versions") {
+            paragraph textAbout
+        }
+        section("Resources") {
+            href githubInstructionsMap
+            href communityPageMap
+        }
+        section("Support Development") {
+            paragraph "I develop and maintain Super Notifier as a private individual, " +
+            "for fun, to hone my develper skills, and to help others. If you'd like to support me "+
+            "in future updates, you can buy me a beer. I appreciate it, but don't expect it, and if you " +
+            "donate it doesn't guarantee the app will always work perfectly. Thanks!"
+            href donatePageMap
+        }
+        section("Disclaimers") {
+            paragraph "This program is distributed in the hope that it will be useful, " +
+            "but WITHOUT ANY WARRANTY; without even the implied warranty of " +
+            "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU " +
+            "General Public License for more details."
         }
     }
 }
@@ -133,6 +205,7 @@ def checkForChildUpdates() {
                 def website = "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/super-notifier-instant-alert.src/version.txt"
                 checkUpdates(name, installedVersion, website)
                 if (loggingOn) log.debug "Instant child app installedVersion is $installedVersion"
+                state.instantVersion = installedVersion
                 instantcheckdone = true
             }
             if (!delayedcheckdone && childApps[i].getName() == "Super Notifier - Delayed Alert") {
@@ -141,6 +214,7 @@ def checkForChildUpdates() {
                 def website = "https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/smartapps/flyjmz/super-notifier-delayed-alert.src/version.txt"
                 checkUpdates(name, installedVersion, website)
                 if (loggingOn) log.debug "Delayed child app installedVersion is $installedVersion"
+                state.delayedVersion = installedVersion
                 delayedcheckdone = true
             }
         }
