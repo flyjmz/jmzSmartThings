@@ -15,9 +15,9 @@ Forum: https://community.smartthings.com/t/release-super-notifier-all-your-alert
    for the specific language governing permissions and limitations under the License.
 
 Version History:
-	1.0 - 5Sep2016, Initial Commit
+    1.0 - 5Sep2016, Initial Commit
     1.1 - 10Oct2016, all tweaks rolled into public release
- 	1.2 - 5Oct2017, added temperature sensor alert capability
+    1.2 - 5Oct2017, added temperature sensor alert capability
     1.3 - 10Oct2017, added lock locked/unlocked capability
     1.4 - 1Feb2018, added timestamp to messages and debug logging option
     1.5 - 21Feb2018, fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
@@ -25,28 +25,29 @@ Version History:
     1.6.1 - 20Apr2018, fixed power metering.
     1.6.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
     1.6.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
-	1.6.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings,
+    1.6.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings,
     1.6.5 - 14Mar2019, deleted 'is' from notification message, added switch and alarm control, added ability to notify on alarm activation, added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
     1.6.6 - 10Jun2019, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
-    1.6.7 - beta, added chime notifications, updated alarm and switch notification execution code (added each, it)
+    1.6.7 - 4Aug2019, added chime notifications, updated alarm and switch notification execution code (added each, it)
+    1.6.8 - 15Sep19, fixed TTS with @xraive's help
 
 To Do:
--Make notifications for for new app?
--Does TTS work?
+-Make notifications for for new app? - should be done
+-Does TTS work? - should be done
 -Does Pushover work?  Looks like priority will always be normal based on the DTH...
 */
 
-def appVersion() {"1.6.7"}
+def appVersion() {"1.6.8"}
  
 definition(
-	name: "Super Notifier - Instant Alert",
-	namespace: "flyjmz",
-	author: "flyjmz230@gmail.com",
+    name: "Super Notifier - Instant Alert",
+    namespace: "flyjmz",
+    author: "flyjmz230@gmail.com",
     parent: "flyjmz:Super Notifier",
-	description: "Child app for Super Notifier that provides an instant alert whenever something happens",
-	category: "My Apps",
-	iconUrl: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png",
-	iconX2Url: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png"
+    description: "Child app for Super Notifier that provides an instant alert whenever something happens",
+    category: "My Apps",
+    iconUrl: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png",
+    iconX2Url: "https://github.com/flyjmz/jmzSmartThings/raw/master/resources/phone2x.png"
 )
 
 preferences {
@@ -123,8 +124,8 @@ def settings() {
             }
         }
  
- 		section("Speech Notifications", hidden: hideSpeechNotificationsSection(), hideable: true) {
-        	paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
+        section("Speech Notifications", hidden: hideSpeechNotificationsSection(), hideable: true) {
+            paragraph "Optionally have the message spoken using a speech synthesis or text-to-speed device (e.g. LANnouncer or Sonos)"
             input name: "speechDevices", type: "capability.speechSynthesis", title: "Which Speakers (e.g., LANnouncer)?", required: false, multiple: true
             input name: "ttsDevices", type: "capability.musicPlayer", title: "Which Text-To-Speech Speakers (e.g., Sonos)?", required: false, multiple: true
         }
@@ -132,7 +133,7 @@ def settings() {
         section("Notify via Switch/Alarm/Chime", hidden: hideSwitchAlarmSection(), hideable: true) {
             input "controlledSwitch", "capability.switch", title: "Which Switches?", required: false, multiple: true, submitOnChange: true
             if (controlledSwitch) {
-           		input "controlledSwitchOn", "bool", title: "Turn switch on or off?", required: false
+                input "controlledSwitchOn", "bool", title: "Turn switch on or off?", required: false
             }
             input name: "controlledAlarm", type: "capability.alarm", title: "Which Alarms?", required: false, multiple: true
             input name: "chimeDevices", type: "capability.tone", title: "Which Chimes?", required: false, multiple: true
@@ -165,55 +166,55 @@ def settings() {
  }
  
 def certainTime() {
-	dynamicPage(name:"certainTime",title: "Only during a certain time", uninstall: false) {
-		section() {
-			input "startingX", "enum", title: "Starting at", options: ["A specific time", "Sunrise", "Sunset"], defaultValue: "A specific time", submitOnChange: true
-			if(startingX in [null, "A specific time"]) input "starting", "time", title: "Start time", required: false
-			else {
-				if(startingX == "Sunrise") input "startSunriseOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
-				else if(startingX == "Sunset") input "startSunsetOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
-			}
-		}
-		
-		section() {
-			input "endingX", "enum", title: "Ending at", options: ["A specific time", "Sunrise", "Sunset"], defaultValue: "A specific time", submitOnChange: true
-			if(endingX in [null, "A specific time"]) input "ending", "time", title: "End time", required: false
-			else {
-				if(endingX == "Sunrise") input "endSunriseOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
-				else if(endingX == "Sunset") input "endSunsetOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
-			}
-		}
-	}
+    dynamicPage(name:"certainTime",title: "Only during a certain time", uninstall: false) {
+        section() {
+            input "startingX", "enum", title: "Starting at", options: ["A specific time", "Sunrise", "Sunset"], defaultValue: "A specific time", submitOnChange: true
+            if(startingX in [null, "A specific time"]) input "starting", "time", title: "Start time", required: false
+            else {
+                if(startingX == "Sunrise") input "startSunriseOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
+                else if(startingX == "Sunset") input "startSunsetOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
+            }
+        }
+        
+        section() {
+            input "endingX", "enum", title: "Ending at", options: ["A specific time", "Sunrise", "Sunset"], defaultValue: "A specific time", submitOnChange: true
+            if(endingX in [null, "A specific time"]) input "ending", "time", title: "End time", required: false
+            else {
+                if(endingX == "Sunrise") input "endSunriseOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
+                else if(endingX == "Sunset") input "endSunsetOffset", "number", range: "*..*", title: "Offset in minutes (+/-)", required: false
+            }
+        }
+    }
 }
 
 def installed() {
-	log.info "Installed with settings: ${settings}"
-	initialize()
+    log.info "Installed with settings: ${settings}"
+    initialize()
 }
 
 def updated() {
-	log.info "Updated with settings: ${settings}"
-	unsubscribe()
-	initialize()
+    log.info "Updated with settings: ${settings}"
+    unsubscribe()
+    initialize()
 }
 
 def initialize() {
     subscribe(myAlarm, "alarm.strobe", eventHandler)
     subscribe(myAlarm, "alarm.siren", eventHandler)
     subscribe(myAlarm, "alarm.both", eventHandler)
-	subscribe(button, "button.pushed", eventHandler)
-	subscribe(contact, "contact.open", eventHandler)
-   	subscribe(contactClosed, "contact.closed", eventHandler)
-	subscribe(acceleration, "acceleration.active", eventHandler)
-	subscribe(motion, "motion.active", eventHandler)
-	subscribe(mySwitch, "switch.on", eventHandler)
+    subscribe(button, "button.pushed", eventHandler)
+    subscribe(contact, "contact.open", eventHandler)
+    subscribe(contactClosed, "contact.closed", eventHandler)
+    subscribe(acceleration, "acceleration.active", eventHandler)
+    subscribe(motion, "motion.active", eventHandler)
+    subscribe(mySwitch, "switch.on", eventHandler)
     subscribe(mySwitchOff, "switch.off", eventHandler)
-	subscribe(arrivalPresence, "presence.present", eventHandler)
-	subscribe(departurePresence, "presence.not present", eventHandler)
-	subscribe(smoke, "smoke.detected", eventHandler)
-	subscribe(smoke, "smoke.tested", eventHandler)
-	subscribe(smoke, "carbonMonoxide.detected", eventHandler)
-	subscribe(water, "water.wet", eventHandler)
+    subscribe(arrivalPresence, "presence.present", eventHandler)
+    subscribe(departurePresence, "presence.not present", eventHandler)
+    subscribe(smoke, "smoke.detected", eventHandler)
+    subscribe(smoke, "smoke.tested", eventHandler)
+    subscribe(smoke, "carbonMonoxide.detected", eventHandler)
+    subscribe(water, "water.wet", eventHandler)
     subscribe(temp, "temperature", tempHandler)
     subscribe(lockLocked,"lock.locked", eventHandler)
     subscribe(lockUnlocked,"lock.unlocked", eventHandler)
@@ -224,13 +225,13 @@ def initialize() {
 }
 
 def gettooCold() {
-	def temp1 = tempTooCold
+    def temp1 = tempTooCold
     if (temp1 == null) temp1 = -460.0
     return temp1
 }
 
 def gettooHot() {
-	def temp2 = tempTooHot 
+    def temp2 = tempTooHot 
     if (temp2 == null) temp2 = 3000.0
     return temp2
 }
@@ -238,27 +239,27 @@ def gettooHot() {
 def tempHandler(evt) {
     def tempState = temp.currentState("temperature")  //trigger is based on the event subcription, but the temp value for notifications is a direct state pull
     if (tempState.doubleValue > tooHot || tempState.doubleValue < tooCold) {
-    	eventHandler(evt)
+        eventHandler(evt)
     } else {if (parent.loggingOn) log.debug "Temp within limits, no action taken."}
 }
 
 def gettooHigh() {
-	def power1 = powerTooHigh
+    def power1 = powerTooHigh
     if (power1 == null) power1 = 2000.0
     return power1
 }
 
 def gettooLow() {
-	def power2 = powerTooLow 
+    def power2 = powerTooLow 
     if (power2 == null) power2 = -2000.0
     return power2
 }
 
 def powerHandler(evt) {
-	if (parent.loggingOn) log.debug "Notify got event ${evt} from ${evt.displayName}"
+    if (parent.loggingOn) log.debug "Notify got event ${evt} from ${evt.displayName}"
     def powerValue = evt.value.toDouble()
     if (powerValue > tooHigh || powerValue < tooLow) {
-    	eventHandler(evt)
+        eventHandler(evt)
     } else {if (parent.loggingOn) log.debug "Power within limits, no action taken."}
 }
 
@@ -282,50 +283,50 @@ def doorKnock() {
 }
 
 def eventHandler(evt) {
-	if (parent.loggingOn) log.debug "Notify got event ${evt} from ${evt.displayName}"
-	if (frequency) {
-		def lastTime = state[evt.deviceId]
-		if (lastTime == null || now() - lastTime >= frequency * 60000) {
-        	if (parent.loggingOn) log.debug "frequency used and it is time for new message, checking if within time/day/mode/switch parameters"
+    if (parent.loggingOn) log.debug "Notify got event ${evt} from ${evt.displayName}"
+    if (frequency) {
+        def lastTime = state[evt.deviceId]
+        if (lastTime == null || now() - lastTime >= frequency * 60000) {
+            if (parent.loggingOn) log.debug "frequency used and it is time for new message, checking if within time/day/mode/switch parameters"
             if (allOk) createInstantMessage(evt.name,evt.value,evt.device)
             state[evt.deviceId] = now()
-		}
-        else {
-        	if (parent.loggingOn) log.debug "frequency used but it is too early to send a new message"
         }
-	}
-	else {
-    	if (parent.loggingOn) log.debug "frequency not used, checking if within time/day/mode/switch parameters"
-		if (allOk) createInstantMessage(evt.name,evt.value,evt.device)
-	}
+        else {
+            if (parent.loggingOn) log.debug "frequency used but it is too early to send a new message"
+        }
+    }
+    else {
+        if (parent.loggingOn) log.debug "frequency not used, checking if within time/day/mode/switch parameters"
+        if (allOk) createInstantMessage(evt.name,evt.value,evt.device)
+    }
 }
 
 def createInstantMessage(name,value,device) {
-	String msg = messageText
+    String msg = messageText
     def messageDefault = ""
     if (!messageText) {
-		if (name == 'presence') {
-			if (value == 'present') {
-				messageDefault = "${device} has arrived"
-			} else {
-				messageDefault = "${device} has left"
-			}
-		} else {
-			messageDefault = "${device} ${value}"  //removed 'is' in v1.6.5.  Was "${device} is ${value}" 
-		}
+        if (name == 'presence') {
+            if (value == 'present') {
+                messageDefault = "${device} has arrived"
+            } else {
+                messageDefault = "${device} has left"
+            }
+        } else {
+            messageDefault = "${device} ${value}"  //removed 'is' in v1.6.5.  Was "${device} is ${value}" 
+        }
         msg = messageDefault
-	}
+    }
     sendMessage(msg)
 }
 
 private getAllOk() {
-	daysOk && timeOk && switchOk
+    daysOk && timeOk && switchOk
 }
 
 private getSwitchOk() {
     def result = true
     if (controlSwitch) {
-		if (controlSwitchOnOrOff == "On" && controlSwitch.currentState("switch")?.value != "on") {
+        if (controlSwitchOnOrOff == "On" && controlSwitch.currentState("switch")?.value != "on") {
         result = false
         } else if (controlSwitchOnOrOff == "Off" && controlSwitch.currentState("switch")?.value != "off") {
         result = false
@@ -336,54 +337,54 @@ private getSwitchOk() {
 }
 
 private getDaysOk() {
-	def result = true
-	if (days) {
-		def df = new java.text.SimpleDateFormat("EEEE")
-		if (location.timeZone) {
-			df.setTimeZone(location.timeZone)
-		}
-		else {
-			df.setTimeZone(TimeZone.getTimeZone("America/New_York"))
-		}
-		def day = df.format(new Date())
-		result = days.contains(day)
-	}
-	if (parent.loggingOn) log.debug "daysOk = $result"
-	return result
+    def result = true
+    if (days) {
+        def df = new java.text.SimpleDateFormat("EEEE")
+        if (location.timeZone) {
+            df.setTimeZone(location.timeZone)
+        }
+        else {
+            df.setTimeZone(TimeZone.getTimeZone("America/New_York"))
+        }
+        def day = df.format(new Date())
+        result = days.contains(day)
+    }
+    if (parent.loggingOn) log.debug "daysOk = $result"
+    return result
 }
 
 private getTimeOk() {
-	def result = true
-	if ((starting && ending) ||
-	(starting && endingX in ["Sunrise", "Sunset"]) ||
-	(startingX in ["Sunrise", "Sunset"] && ending) ||
-	(startingX in ["Sunrise", "Sunset"] && endingX in ["Sunrise", "Sunset"])) {
-		def currTime = now()
-		def start = null
-		def stop = null
-		def s = getSunriseAndSunset(zipCode: zipCode, sunriseOffset: startSunriseOffset, sunsetOffset: startSunsetOffset)
-		if(startingX == "Sunrise") start = s.sunrise.time
-		else if(startingX == "Sunset") start = s.sunset.time
-		else if(starting) start = timeToday(starting,location.timeZone).time
-		s = getSunriseAndSunset(zipCode: zipCode, sunriseOffset: endSunriseOffset, sunsetOffset: endSunsetOffset)
-		if(endingX == "Sunrise") stop = s.sunrise.time
-		else if(endingX == "Sunset") stop = s.sunset.time
-		else if(ending) stop = timeToday(ending,location.timeZone).time
-		result = start < stop ? currTime >= start && currTime <= stop : currTime <= stop || currTime >= start
-	}
-	if (parent.loggingOn) log.debug "TimeOk = $result"
-	return result
+    def result = true
+    if ((starting && ending) ||
+    (starting && endingX in ["Sunrise", "Sunset"]) ||
+    (startingX in ["Sunrise", "Sunset"] && ending) ||
+    (startingX in ["Sunrise", "Sunset"] && endingX in ["Sunrise", "Sunset"])) {
+        def currTime = now()
+        def start = null
+        def stop = null
+        def s = getSunriseAndSunset(zipCode: zipCode, sunriseOffset: startSunriseOffset, sunsetOffset: startSunsetOffset)
+        if(startingX == "Sunrise") start = s.sunrise.time
+        else if(startingX == "Sunset") start = s.sunset.time
+        else if(starting) start = timeToday(starting,location.timeZone).time
+        s = getSunriseAndSunset(zipCode: zipCode, sunriseOffset: endSunriseOffset, sunsetOffset: endSunsetOffset)
+        if(endingX == "Sunrise") stop = s.sunrise.time
+        else if(endingX == "Sunset") stop = s.sunset.time
+        else if(ending) stop = timeToday(ending,location.timeZone).time
+        result = start < stop ? currTime >= start && currTime <= stop : currTime <= stop || currTime >= start
+    }
+    if (parent.loggingOn) log.debug "TimeOk = $result"
+    return result
 }
 
 private hhmm(time, fmt = "h:mm a") {
-	def t = timeToday(time, location.timeZone)
-	def f = new java.text.SimpleDateFormat(fmt)
-	f.setTimeZone(location.timeZone ?: timeZone(time))
-	f.format(t)
+    def t = timeToday(time, location.timeZone)
+    def f = new java.text.SimpleDateFormat(fmt)
+    f.setTimeZone(location.timeZone ?: timeZone(time))
+    f.format(t)
 }
 
 private hideExecutionRestrictionsSection() {
-	(starting || ending || days || modes || startingX || endingX || controlSwitch) ? false : true
+    (starting || ending || days || modes || startingX || endingX || controlSwitch) ? false : true
 }
 
 private hideSwitchAlarmSection() {
@@ -391,7 +392,7 @@ private hideSwitchAlarmSection() {
 }
 
 private hidePushoverNotificationsSection() {
-	(pushoverDevice) ? false : true
+    (pushoverDevice) ? false : true
 }
 
 private hideTextPushNotificationsSection() {
@@ -403,20 +404,20 @@ private hideSpeechNotificationsSection() {
 }
 
 private offset(value) {
-	def result = value ? ((value > 0 ? "+" : "") + value + " min") : ""
+    def result = value ? ((value > 0 ? "+" : "") + value + " min") : ""
 }
 
 private timeIntervalLabel() {
-	def result = ""
-	if (startingX == "Sunrise" && endingX == "Sunrise") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
-	else if (startingX == "Sunrise" && endingX == "Sunset") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-	else if (startingX == "Sunset" && endingX == "Sunrise") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
-	else if (startingX == "Sunset" && endingX == "Sunset") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)
-	else if (startingX == "Sunrise" && ending) result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")
-	else if (startingX == "Sunset" && ending) result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")
-	else if (starting && endingX == "Sunrise") result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)
-	else if (starting && endingX == "Sunset") result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)
-	else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
+    def result = ""
+    if (startingX == "Sunrise" && endingX == "Sunrise") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
+    else if (startingX == "Sunrise" && endingX == "Sunset") result = "Sunrise" + offset(startSunriseOffset) + " to " + "Sunset" + offset(endSunsetOffset)
+    else if (startingX == "Sunset" && endingX == "Sunrise") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunrise" + offset(endSunriseOffset)
+    else if (startingX == "Sunset" && endingX == "Sunset") result = "Sunset" + offset(startSunsetOffset) + " to " + "Sunset" + offset(endSunsetOffset)
+    else if (startingX == "Sunrise" && ending) result = "Sunrise" + offset(startSunriseOffset) + " to " + hhmm(ending, "h:mm a z")
+    else if (startingX == "Sunset" && ending) result = "Sunset" + offset(startSunsetOffset) + " to " + hhmm(ending, "h:mm a z")
+    else if (starting && endingX == "Sunrise") result = hhmm(starting) + " to " + "Sunrise" + offset(endSunriseOffset)
+    else if (starting && endingX == "Sunset") result = hhmm(starting) + " to " + "Sunset" + offset(endSunsetOffset)
+    else if (starting && ending) result = hhmm(starting) + " to " + hhmm(ending, "h:mm a z")
 }
 
 private sendMessage(msg) {
@@ -424,14 +425,14 @@ private sendMessage(msg) {
     if (revertDelay) {
         runIn(revertDelay.toInteger(),"resetSwitchAlarmChime")
     }  
-	//Notify via switch
+    //Notify via switch
     if (controlledSwitch) {
-    	if (controlledSwitchOn) {
-        	controlledSwitch.each() {
+        if (controlledSwitchOn) {
+            controlledSwitch.each() {
                 it.on()
             }
         } else {
-        	controlledSwitch.each() {
+            controlledSwitch.each() {
                 it.off()
             }
         }
@@ -439,7 +440,7 @@ private sendMessage(msg) {
     
     //Notify via alarm
     controlledAlarm?.each() {
-    	it.on()
+        it.on()
     }
 
     //Notify via chime
@@ -450,13 +451,13 @@ private sendMessage(msg) {
     //Speak Message
     if (speechDevices) {
         speechDevices.each() {
-    		it.speak(msg)
+            it.speak(msg)
             log.info "Spoke '" + msg + "' with " + it.device.displayName
-    	}
+        }
     }
     if (ttsDevices) {
-    	state.sound = textToSpeech(msg, true)
-    	//sound.uri = sound.uri.replace('https:', 'http:')  //todo not sure I need this, it's in some examples but not others
+        state.sound = textToSpeech(msg, true)
+        //sound.uri = sound.uri.replace('https:', 'http:')  //todo not sure I need this, it's in some examples but not others
         
         state.sound.duration = (state.sound.duration.toInteger() + 5).toString()
         ttsDevices.each() {
@@ -471,23 +472,23 @@ private sendMessage(msg) {
             if (currentTrack != null) {
                 //currentTrack has data
                 if ((currentStatus == 'playing' || currentTrack?.status == 'playing') && (!((currentTrack?.status == 'stopped') || (currentTrack?.status == 'paused')))) { 
-                    it.playTrackAndResume(state.sound, state.sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
+                    it.playTrackAndResume(state.sound.uri, state.sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
                 } else {
-                    it.playTrackAndRestore(state.sound, state.sound.duration)
+                    it.playTrackAndRestore(state.sound.uri, state.sound.duration)
                 }
             } else {
                 if (currentStatus != null) { 
                     if (currentStatus == "disconnected") {
-                        it.playTrackAndResume(state.sound, state.sound.duration)
+                        it.playTrackAndResume(state.sound.uri, state.sound.duration)
                     } else {
                         if (currentStatus == "playing") {   
-                            it.playTrackAndResume(state.sound, state.sound.duration)       
+                            it.playTrackAndResume(state.sound.uri, state.sound.duration)       
                         } else {
-                            it.playTrackAndRestore(state.sound, state.sound.duration)     
+                            it.playTrackAndRestore(state.sound.uri, state.sound.duration)     
                         }
                     }
                 } else {
-                    it.playTrackAndRestore(state.sound, state.sound.duration)       
+                    it.playTrackAndRestore(state.sound.uri, state.sound.duration)       
                 }
             }
             log.info "Spoke '" + msg + "' with " + it.device.displayName
@@ -505,14 +506,12 @@ private sendMessage(msg) {
         log.info "sent '$msg' notification to: ${recipients?.size()}"
         sendNotificationToContacts(msg, recipients)
     } else {
-    	//Otherwise use old school Push/SMS notifications
+        //Otherwise use old school Push/SMS notifications
         if (loggingOn) log.debug("sending message to app notifications tab: '$msg'")
         sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
         
         if (wantsPush) {
-            sendNotification(msg, [event: false]) //sends a push notification without repeating it in the app event list
-            //todo-delete following line if above works. if not, "sendPush(msg)" and "sendSms(msg)" should work, but duplicate the message in the event list...
-            //sendPushMessage(msg)  //Second, send the push notification if user wanted it
+            sendNotification(msg, [event: false]) //sends a push notification without repeating it in the app event list, works with the new SmartThings app
             log.info "sent '$msg' via push"
         }
 
@@ -529,7 +528,7 @@ private sendMessage(msg) {
     
     //Then send Pushover notifications:
     if (pushoverDevice) {
-    	pushoverDevice.sendMessage(msg, messagePriority)
+        pushoverDevice.sendMessage(msg, messagePriority)
     }
 }
 

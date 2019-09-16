@@ -15,38 +15,39 @@ Forum: https://community.smartthings.com/t/release-super-notifier-all-your-alert
    for the specific language governing permissions and limitations under the License.
 
 Version History:
-	1.0 - 5Sep2016, Initial Commit
-	1.1 - 10Oct2016, added mode changes & sunrise/sunset to periodic notifications, public release
+    1.0 - 5Sep2016, Initial Commit
+    1.1 - 10Oct2016, added mode changes & sunrise/sunset to periodic notifications, public release
     1.2 - 23Oct2016, found & corrected error when using periodic notifications for mode/sun changes but not timed ones.  Added hours to notifications.
     1.3 - 29Aug2017, added ability to snooze periodic notifications.  Just add a virtual switch device.  (I have a virtual switch device type in my Github repository, linked above).
-	1.4 - 5Oct2017, added temperature sensor monitoring.
+    1.4 - 5Oct2017, added temperature sensor monitoring.
     1.5 - 10Oct2017, added lock monitoring.
     1.6 - 1Feb2018, added timestamp to messages and debug logging option
-   	1.7 - 21Feb2018, bugfix - fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
+    1.7 - 21Feb2018, bugfix - fixed timestamp so hours are in 24-hour time since there isn't an AM/PM
     1.8 - 5Mar2018, bugfix - fixed waitThreshold title in preferences
     1.9 - 17Apr2018, added power meter monitoring per @ErnieG request
     1.9.1 - 20Apr2018, fixed power meter monitoring, added "temp now ok" message (apparently I forgot it...)
     1.9.2 - 24Jul2018, added contact book like feature to ease SmartThings' depricating the real contact book
     1.9.3 - 6Aug2018, fixed bug that forced you to enter a SMS phone number in the parent app no matter what
     1.9.4 - 13Oct2018, added audio notifications for speech synthesis devices, added "only when switch on/off" to More Options settings, user can now set if the snooze switch snoozes when it is on or off.
-	1.9.5 - 14Mar2019, updated logging, fixed custom messages (messageText was never used), added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
-	1.9.6 - 10Jun2019, added water sensor, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
+    1.9.5 - 14Mar2019, updated logging, fixed custom messages (messageText was never used), added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
+    1.9.6 - 10Jun2019, added water sensor, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
+    1.9.7 - 15Sep2019, fixed TTS with @xraive's help, enabled push notifications for new ST app
 
 To Do:
 -Is TTS working?  I haven't been able to test it and haven't heard from other users.
 -Does Pushover work?  Looks like priority will always be normal based on the DTH...
 -Is there a way to wipe no longer used variables? If you change from monitoring contacts to power, the mycontact variable will still have a value.
-	--Should be mitigated in this app anyway, but need to update others and it'd be easier to just set old variables to null.
+    --Should be mitigated in this app anyway, but need to update others and it'd be easier to just set old variables to null.
     --Instead of using myContact/MySwitch, etc throughout the app, just put a if (monitorType == [each one]) then set a new variable myWatchDevice == that device.
-    	---Then throughout the app you don't have to check which kind of device it is, just use the monitortype variable to set type specific options. the myWatchDevice has the same methods for each device type (currentstatus, etc)
-	--Adding else { myContact = null } to if (monitorType == "Switch") just results in a null pointer exception because myContact isn't defined.
+        ---Then throughout the app you don't have to check which kind of device it is, just use the monitortype variable to set type specific options. the myWatchDevice has the same methods for each device type (currentstatus, etc)
+    --Adding else { myContact = null } to if (monitorType == "Switch") just results in a null pointer exception because myContact isn't defined.
     --Not sure how to use the safe navigation operator (like myContact?.value) because there isn't a .value method for non-map/list/array variables.
     --I'd rather not first define all the variables only to later set them null if they aren't used.
     --This can be avoided if they create new child instances instead of changing existing ones.
 -Prevent bonus fridge executions.  Add unschedule() to okhandler? Only issue may be for multiple devices of the same type (e.g. multiple leak sensors), if one becomes ok, then it'd unschedule any other updates for other ones that aren't ok yet.
 */
 
-def appVersion() {"1.9.6"}
+def appVersion() {"1.9.7"}
 
 definition(
     name: "Super Notifier - Delayed Alert",
@@ -217,7 +218,7 @@ def initialize () {
         } else if (onOff && onOff == "Off") {
             subscribe(mySwitch, "switch.off", eventHandler)
             subscribe(mySwitch, "switch.on", okHandler)
-        }	
+        }   
     } else if (monitorType == "Lock") {
         if (lockedUnlocked && lockedUnlocked == "Locked") {
             subscribe(myLock, "lock.locked", eventHandler)
@@ -234,7 +235,7 @@ def initialize () {
         if (myPower) {
             subscribe(myPower, "power", powerHandler)
         }
-  	} else if (monitorType == "Water or Leak") {
+    } else if (monitorType == "Water or Leak") {
         if (wetDry && wetDry == "Wet") {
             subscribe(myWater, "water.wet", eventHandler)
             subscribe(myWater, "water.dry", okHandler)
@@ -244,7 +245,7 @@ def initialize () {
         }
     } else {if (parent.loggingOn) log.debug "Not subscribing to any device events"}
     if (modeChange) subscribe(location, "mode", periodicNotifier) //checks status every time mode changes (in case it missed it)
-    if (sunChange) {				//checks status every sun rises/sets (in case it missed it)
+    if (sunChange) {                //checks status every sun rises/sets (in case it missed it)
         subscribe(location, "sunrise", periodicNotifier)
         subscribe(location, "sunset", periodicNotifier)
     }
@@ -455,7 +456,7 @@ def stillWrongMsger() {
                     if (monitorType == "Lock") sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeMsg} hours!")
                     if (monitorType == "Temperature") sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeMsg} hours! (Currently $tempState3.value ${location.temperatureScale}).")
                     if (monitorType == "Power") sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeMsg} hours! (Currently $myPowerState2.value W).")
-                	if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeMsg} hours!")
+                    if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeMsg} hours!")
                 }
             } 
             if (!snooze && timeSince < 180) {
@@ -467,7 +468,7 @@ def stillWrongMsger() {
                     if (monitorType == "Lock") sendMessage("Periodic Alert: ${myLock?.displayName} has been ${myLockState2?.value} for ${timeSince} minutes!")
                     if (monitorType == "Temperature") sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeSince} minutes! (Currently $tempState3.value ${location.temperatureScale})")
                     if (monitorType == "Power") sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeSince} minutes! (Currently $myPowerState2.value W).")
-                	if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeSince} minutes!")
+                    if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeSince} minutes!")
                 }
             }
             if (waitMinutes != null) {
@@ -573,7 +574,7 @@ private hideExecutionRestrictionsSection() {
 }
 
 private hidePushoverNotificationsSection() {
-	(pushoverDevice) ? false : true
+    (pushoverDevice) ? false : true
 }
 
 private hidePeriodicNotificationsSection() {
@@ -630,23 +631,23 @@ private sendMessage(msg) {
             if (currentTrack != null) {
                 //currentTrack has data
                 if ((currentStatus == 'playing' || currentTrack?.status == 'playing') && (!((currentTrack?.status == 'stopped') || (currentTrack?.status == 'paused')))) { 
-                    it.playTrackAndResume(state.sound, state.sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
+                    it.playTrackAndResume(state.sound.uri, state.sound.duration) //todo- removed last parameter: "[delay: myDelay]" from example, ok?
                 } else {
-                    it.playTrackAndRestore(state.sound, state.sound.duration)
+                    it.playTrackAndRestore(state.sound.uri, state.sound.duration)
                 }
             } else {
                 if (currentStatus != null) { 
                     if (currentStatus == "disconnected") {
-                        it.playTrackAndResume(state.sound, state.sound.duration)
+                        it.playTrackAndResume(state.sound.uri, state.sound.duration)
                     } else {
                         if (currentStatus == "playing") {   
-                            it.playTrackAndResume(state.sound, state.sound.duration)       
+                            it.playTrackAndResume(state.sound.uri, state.sound.duration)       
                         } else {
-                            it.playTrackAndRestore(state.sound, state.sound.duration)     
+                            it.playTrackAndRestore(state.sound.uri, state.sound.duration)     
                         }
                     }
                 } else {
-                    it.playTrackAndRestore(state.sound, state.sound.duration)       
+                    it.playTrackAndRestore(state.sound.uri, state.sound.duration)       
                 }
             }
             log.info "Spoke '" + msg + "' with " + it.device.displayName
@@ -664,11 +665,11 @@ private sendMessage(msg) {
         log.info "sent '$msg' notification to: ${recipients?.size()}"
         sendNotificationToContacts(msg, recipients)
     } else {
-    	//Otherwise use old school Push/SMS notifcations
+        //Otherwise use old school Push/SMS notifcations
         if (loggingOn) log.debug("sending message to app notifications tab: '$msg'")
         sendNotificationEvent(msg)  //First send to app notifications (because of the loop we're about to do, we need to use this version to avoid multiple instances) 
         if (wantsPush) {
-            sendPushMessage(msg)  //Second, send the push notification if user wanted it
+            sendNotification(msg, [event: false]) //Second, send the push notification if user wanted it  //sends a push notification without repeating it in the app event list, works with the new SmartThings app
             log.info "sent '$msg' via push"
         }
 
@@ -685,6 +686,6 @@ private sendMessage(msg) {
     
     //Then send Pushover notifications:
     if (pushoverDevice) {
-    	pushoverDevice.sendMessage(msg, messagePriority)
+        pushoverDevice.sendMessage(msg, messagePriority)
     }
 }
