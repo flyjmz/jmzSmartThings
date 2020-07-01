@@ -111,6 +111,12 @@ Older Major Changes:
 * Added ability to send preset commands to cameras when triggering.
 * Enabled full Camera Device DTH support even when not using Server DTH (works for both local and external connections).
 
+## Uninstall Instructions
+1.	Go into settings for BI Fusion, and turn off “Install Cameras” in the camera installation section. Click done until you’re out of the settings. 
+2.	Go back into settings, turn off “use/install blue iris server”, click done until out of settings again.
+3. Go to each of your camera devices and the server device, and delete any other smartapps the they are associated with. You'll have to "Force Delete" the BI Fusion smartapp from them.
+4. Go back into BI Fusion Settings, and click "Remove" at the bottom.
+5. Individually delete each camera and the server devices.
 
 [![Donate Button](https://raw.githubusercontent.com/flyjmz/jmzSmartThings/master/resources/donateButton.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6T44ZPUKCMYL6&lc=US&item_name=FLYJMZ%20Custom%20SmartApps&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted)
 *Thank You!  This is purely optional, no guarantees this will work perfectly, but brew money helps keep me going!*
