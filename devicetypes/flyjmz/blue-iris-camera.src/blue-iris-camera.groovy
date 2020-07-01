@@ -11,13 +11,7 @@ in compliance with the License. You may obtain a copy of the License at:
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
 on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
 for the specific language governing permissions and limitations under the License.
-*/
 
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-///										App Info											//
-//////////////////////////////////////////////////////////////////////////////////////////////
-/*
 This is the Camera device for Blue Iris Software, and must be used with the BI Fusion smartapp and Blue Iris Server DTH (see below).  
 It cannot function on its own.
 
@@ -40,16 +34,16 @@ v1.3 5Mar18		Tried Image capture, but it gets weird because the captured image w
 v1.4 17Apr18    Allows user to change the icon per @jasonrwise77 request
 v1.5 5Feb19		Added Camera name to notifications. Added some todos.
 v1.5.1 6Feb19	Changed notifications to display name instead of shortname.
+v1.6 1Jul20		Removed log.info for settings on initialization (because it logged passwords); removed video since it only worked for 1 person; added vid & mnmn.
 
 
 ToDo:
-- add code for new smartthings app to work (mnmn: “SmartThings”, vid: “generic-motion-3”) from post, but whole thread on all of them.
 */
 
-def appVersion() {"1.5.1"}
+def appVersion() {"1.6"}
 
 metadata {
-    definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com") {
+    definition (name: "Blue Iris Camera", namespace: "flyjmz", author: "flyjmz230@gmail.com", mnmn: "SmartThings", vid: "generic-doorbell-2", ocfDeviceType: "x.com.st.d.sensor.motion") {
         capability "Motion Sensor"  //To treat cameras as a motion sensor for other apps (e.g. BI camera senses motion, setting this device to active so an alarm can subscribe to it and go off
         capability "Switch"  //To trigger camera recording for other smartapps that may not accept momentary
         capability "Momentary" //To trigger camera recording w/momentary on
@@ -76,27 +70,6 @@ metadata {
     }
 
     tiles (scale: 2) {
-        multiAttributeTile(name: "videoPlayer", type: "videoPlayer", width: 6, height: 4) {
-            tileAttribute("device.errorMessage", key: "CAMERA_ERROR_MESSAGE") {
-                attributeState("errorMessage", label: "", value: "", defaultState: true)
-            }
-
-            tileAttribute("device.camera", key: "PRIMARY_CONTROL") {
-                attributeState("on", label: "Active", backgroundColor: "#79b821", defaultState: true)
-                attributeState("off", label: "Inactive", backgroundColor: "#ffffff")
-                attributeState("restarting", label: "Connecting", backgroundColor: "#53a7c0")
-                attributeState("unavailable", label: "Unavailable", backgroundColor: "#F22000")
-            }
-
-            tileAttribute("device.startLive", key: "START_LIVE") {
-                attributeState("live", action: "start", defaultState: true)
-            }
-
-            tileAttribute("device.stream", key: "STREAM_URL") {
-                attributeState("activeURL", defaultState: true)
-            }
-        }
-
         standardTile("motion", "device.motion", width: 4, height: 2, canChangeIcon: true, canChangeBackground: true) {
             state "inactive", label: 'No Motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
             state "active", label: 'Motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
@@ -107,7 +80,7 @@ metadata {
             state "on", label: 'Recording', icon: "st.switch.switch.on", backgroundColor: "#53a7c0"  //no action because you can't untrigger a camera
         }
         main (["motion"])
-        details(["videoPlayer","motion","button"])
+        details(["motion","button"])
     }
     preferences {
     }
@@ -115,7 +88,6 @@ metadata {
 
 def initializeCamera(cameraSettings) {
 	state.cameraSettings = cameraSettings
-    log.info "state.cameraSettings is: ${state.cameraSettings}"
     sendEvent(name: "motion", value: "inactive", descriptionText: "${state.cameraSettings.displayName} Camera Motion Inactive", displayed: false)  //initializes camera motion state
     log.info "${state.cameraSettings.shortName} camera DTH initialized"
 }
@@ -154,28 +126,4 @@ def moveToPreset(preset) {
 	def receivedPreset = preset
 	log.info "${state.cameraSettings.shortName} commanded to move to preset '${receivedPreset}'"
     sendEvent(name: "cameraPreset", value: "$receivedPreset", descriptionText: "${state.cameraSettings.displayName.replaceAll("\\s","")} Camera Commanded to Preset $receivedPreset", displayed: true)
-}
-
-def start() {
-	log.info "${state.cameraSettings.shortName} start()"
-   	def cameraStreamPath = "http://${state.cameraSettings.username}:${state.cameraSettings.password}@${state.cameraSettings.host}:${state.cameraSettings.port}/mjpg/${state.cameraSettings.shortName}"  //todo 
-    //todo - (continued) if the user is using external and enters "http://" in the host entry like they should, then you get http:// twice and it breaks.  
-    //I don't think this is the right path to use for true external anyway...look that up.
-    def dataLiveVideo = [
-		OutHomeURL  : cameraStreamPath,
-		InHomeURL   : cameraStreamPath,
-		ThumbnailURL: "http://cdn.device-icons.smartthings.com/camera/dlink-indoor@2x.png",
-		cookie      : [key: "key", value: "value"]
-	]
-
-	def event = [
-		name           : "stream",
-		value          : groovy.json.JsonOutput.toJson(dataLiveVideo).toString(),
-		data		   : groovy.json.JsonOutput.toJson(dataLiveVideo),
-		descriptionText: "Starting the livestream",
-		eventType      : "VIDEO",
-		displayed      : false,
-		isStateChange  : true
-	]
-	sendEvent(event)
 }
