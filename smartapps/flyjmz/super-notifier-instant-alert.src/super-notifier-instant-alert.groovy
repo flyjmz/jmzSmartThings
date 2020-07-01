@@ -70,6 +70,7 @@ def settings() {
             input "departurePresence", "capability.presenceSensor", title: "Departure Of", required: false, multiple: true
             input "smoke", "capability.smokeDetector", title: "Smoke Detected", required: false, multiple: true
             input "water", "capability.waterSensor", title: "Water Sensor Wet", required: false, multiple: true
+            input "lockJammed", "capability.lock", title: "Lock Jammed", required: false, multiple: true
             input "lockLocked", "capability.lock", title: "Lock Locked", required: false, multiple: true
             input "lockUnlocked", "capability.lock", title: "Lock Unlocked", required: false, multiple: true
             input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, multiple: false, submitOnChange: true
@@ -216,6 +217,7 @@ def initialize() {
     subscribe(smoke, "carbonMonoxide.detected", eventHandler)
     subscribe(water, "water.wet", eventHandler)
     subscribe(temp, "temperature", tempHandler)
+    subscribe(lockJammed,"lock.unknown", eventHandler)
     subscribe(lockLocked,"lock.locked", eventHandler)
     subscribe(lockUnlocked,"lock.unlocked", eventHandler)
     subscribe(knockSensor, "acceleration.active", knockAcceleration)
