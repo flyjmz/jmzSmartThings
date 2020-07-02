@@ -30,6 +30,7 @@ Version History:
     1.6.6 - 10Jun2019, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
     1.6.7 - 4Aug2019, added chime notifications, updated alarm and switch notification execution code (added each, it)
     1.6.8 - 15Sep19, fixed TTS with @xraive's help
+    1.6.9 - 1Jul20, added Lock Jammed from @disforw
 
 To Do:
 -Make notifications for for new app? - should be done
@@ -37,7 +38,7 @@ To Do:
 -Does Pushover work?  Looks like priority will always be normal based on the DTH...
 */
 
-def appVersion() {"1.6.8"}
+def appVersion() {"1.6.9"}
  
 definition(
     name: "Super Notifier - Instant Alert",
@@ -70,9 +71,9 @@ def settings() {
             input "departurePresence", "capability.presenceSensor", title: "Departure Of", required: false, multiple: true
             input "smoke", "capability.smokeDetector", title: "Smoke Detected", required: false, multiple: true
             input "water", "capability.waterSensor", title: "Water Sensor Wet", required: false, multiple: true
-            input "lockJammed", "capability.lock", title: "Lock Jammed", required: false, multiple: true
             input "lockLocked", "capability.lock", title: "Lock Locked", required: false, multiple: true
             input "lockUnlocked", "capability.lock", title: "Lock Unlocked", required: false, multiple: true
+            input "lockJammed", "capability.lock", title: "Lock Jammed", required: false, multiple: true
             input "temp", "capability.temperatureMeasurement", title: "Temp Too Hot or Cold", required: false, multiple: false, submitOnChange: true
             if (temp != null) {
                 input "tempTooHot", "number", title: "Too Hot When Temp is Above:", range: "*..*", required: false
