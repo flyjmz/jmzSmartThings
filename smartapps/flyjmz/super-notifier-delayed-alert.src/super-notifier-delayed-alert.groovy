@@ -67,7 +67,7 @@ preferences {
 def settings() {
     dynamicPage(name: "settings", title: "", install: true, uninstall: true) {
         section("") {
-            input "monitorType", "enum", title: "Monitor what?", required: true, options: ["Contact Sensor", "Lock", "Power", "Switch", "Temperature", "Water or Leak"], submitOnChange: true
+            input "monitorType", "enum", title: "Monitor what?", required: true, options: ["Contact Sensor", "Lock", "Power", "Switch", "Temperature", "Water or Leak", "Valve"], submitOnChange: true
             if (monitorType == "Contact Sensor") {
                 input "myContact", "capability.contactSensor", title: "Which contact?", required: true
                 input "openClosed", "enum", title: "When left open or closed?", required: true, options: ["Open", "Closed"]
@@ -93,6 +93,10 @@ def settings() {
             if (monitorType == "Water or Leak") {
                 input "myWater", "capability.waterSensor", title: "Which Water or Leak Sensor?", required: true
                 input "wetDry", "enum", title: "When left wet or dry?", required: true, options: ["Wet", "Dry"]
+            }
+            if (monitorType == "Valve") {
+                input "myValve", "capability.valve", title: "Which Valve?", required: true
+                input "openClose", "enum", title: "When left open or closed?", required: true, options: ["Open", "Closed"]
             }
         }
         section("Message Details") {
@@ -243,6 +247,14 @@ def initialize () {
             subscribe(myWater, "water.dry", eventHandler)
             subscribe(myWater, "water.wet", okHandler)
         }
+    } else if (monitorType == "Valve") {
+        if (openClose && openClose == "Open") {
+            subscribe(myValve, "valve.open", eventHandler)
+            subscribe(myValve, "valve.closed", okHandler)
+        } else if (openClose && openClose == "Closed") {
+            subscribe(myValve, "valve.closed", eventHandler)
+            subscribe(myValve, "valve.open", okHandler)
+        }
     } else {if (parent.loggingOn) log.debug "Not subscribing to any device events"}
     if (modeChange) subscribe(location, "mode", periodicNotifier) //checks status every time mode changes (in case it missed it)
     if (sunChange) {                //checks status every sun rises/sets (in case it missed it)
@@ -331,7 +343,8 @@ def stillWrong() {
     def myLockState = myLock?.currentState("lock")?.value
     def myPowerState = myPower?.currentState("power")?.doubleValue
     def myWaterState = myWater?.currentState("water")?.value
-    if (parent.loggingOn) log.debug "myContactState is $myContactState, mySwitchState is $mySwitchState, tempState2 is $tempState2, myLockState is $myLockState, myPowerState is $myPowerState, myWaterState is $myWaterState"
+    def myValveState = myValve?.currentState("valve")?.value
+    if (parent.loggingOn) log.debug "myContactState is $myContactState, mySwitchState is $mySwitchState, tempState2 is $tempState2, myLockState is $myLockState, myPowerState is $myPowerState, myWaterState is $myWaterState, myValveState is $myValveState"
     if (monitorType == "Contact Sensor") {
         if (openClosed == "Open") {
             if (myContactState == "open") {
@@ -384,6 +397,19 @@ def stillWrong() {
             } else {if (parent.loggingOn) log.debug "the water sensor is wet and you want it that way"}
         }
     }
+    if (monitorType == "Valve") {
+        if (openClose == "Open") {
+            if (myValveState == "open") {
+                if (parent.loggingOn) log.debug "Valve is still open"
+                stillWrongMsger()
+            } else {if (parent.loggingOn) log.debug "the valve is closed and you want it that way"}
+        } else {
+            if (myValveState == "closed") {
+                if (parent.loggingOn) log.debug "Valve is still closed"
+                stillWrongMsger()
+            } else {if (parent.loggingOn) log.debug "the valve is open and you want it that way"}
+        }
+    }
     if (monitorType == "Temperature") {
         if (tempState2 > tooHot || tempState2 < tooCold) {
             if (parent.loggingOn) log.debug "Temperature is still out of limits (${tempState2} ${location.temperatureScale})"
@@ -406,6 +432,7 @@ def stillWrongMsger() {
     def tempState3 = temp?.currentState("temperature")
     def myPowerState2 = myPower?.currentState("power")
     def myWaterState2 = myWater?.currentState("water")
+    def myValveState2 = myValve?.currentState("valve")
     if (allOk) {
         if (parent.loggingOn) log.debug "Event within time/day/mode/switch constraints"
         if (!atomicState.msgSent) {
@@ -418,6 +445,7 @@ def stillWrongMsger() {
                 if (monitorType == "Temperature") sendMessage("${temp?.displayName} is still ${tempState3?.value} ${location.temperatureScale}!")
                 if (monitorType == "Power") sendMessage("${myPower?.displayName} is still ${myPowerState2?.value} W!")
                 if (monitorType == "Water or Leak") sendMessage("${myWater?.displayName} is still ${myWaterState2?.value}!")
+                if (monitorType == "Valve") sendMessage("${myValve?.displayName} is still ${myValveState2?.value}!")
             }
             atomicState.msgSent = true
             if (parent.loggingOn) log.debug "sent first message, set atomicState.msgSent to ${atomicState.msgSent}"
@@ -457,6 +485,7 @@ def stillWrongMsger() {
                     if (monitorType == "Temperature") sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeMsg} hours! (Currently $tempState3.value ${location.temperatureScale}).")
                     if (monitorType == "Power") sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeMsg} hours! (Currently $myPowerState2.value W).")
                     if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeMsg} hours!")
+                    if (monitorType == "Valve") sendMessage("Periodic Alert: ${myValve?.displayName} has been ${myValveState2?.value} for ${timeMsg} hours!")
                 }
             } 
             if (!snooze && timeSince < 180) {
@@ -469,6 +498,7 @@ def stillWrongMsger() {
                     if (monitorType == "Temperature") sendMessage("Periodic Alert: ${temp?.displayName} has been out of limits for ${timeSince} minutes! (Currently $tempState3.value ${location.temperatureScale})")
                     if (monitorType == "Power") sendMessage("Periodic Alert: ${myPower?.displayName} has been out of limits for ${timeSince} minutes! (Currently $myPowerState2.value W).")
                     if (monitorType == "Water or Leak") sendMessage("Periodic Alert: ${myWater?.displayName} has been ${myWaterState2?.value} for ${timeSince} minutes!")
+                    if (monitorType == "Valve") sendMessage("Periodic Alert: ${myValve?.displayName} has been ${myValveState2?.value} for ${timeSince} minutes!")
                 }
             }
             if (waitMinutes != null) {
