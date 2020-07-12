@@ -32,6 +32,7 @@ Version History:
     1.9.5 - 14Mar2019, updated logging, fixed custom messages (messageText was never used), added v1 of TTS device support- needs to be confirmed, added v1 of Pushover support- needs testing
     1.9.6 - 10Jun2019, added water sensor, updated UI so sections with user-picked options are not hidden by default, v2 of TTS support
     1.9.7 - 15Sep2019, fixed TTS with @xraive's help, enabled push notifications for new ST app
+1.9.8 - 12Jul2020, disforw added valve monitoring
 
 To Do:
 -Is TTS working?  I haven't been able to test it and haven't heard from other users.
@@ -47,7 +48,7 @@ To Do:
 -Prevent bonus fridge executions.  Add unschedule() to okhandler? Only issue may be for multiple devices of the same type (e.g. multiple leak sensors), if one becomes ok, then it'd unschedule any other updates for other ones that aren't ok yet.
 */
 
-def appVersion() {"1.9.7"}
+def appVersion() {"1.9.8"}
 
 definition(
     name: "Super Notifier - Delayed Alert",
